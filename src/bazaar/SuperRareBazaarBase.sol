@@ -187,6 +187,7 @@ abstract contract SuperRareBazaarBase is SuperRareBazaarStorage {
     _performPayouts(_currencyAddress, marketplaceFee, mktFeeRecip, mktFee);
 
     if (!marketplaceSettings.hasERC721TokenSold(_originContract, _tokenId)) {
+      // This was not previously sold, payout as a primary sale
       uint256[] memory platformFee = new uint256[](1);
       address payable[] memory platformRecip = new address payable[](1);
       platformRecip[0] = mktFeeRecip[0];
@@ -209,6 +210,7 @@ abstract contract SuperRareBazaarBase is SuperRareBazaarStorage {
         _performPayouts(_currencyAddress, platformFee[0], platformRecip, platformFee);
       }
     } else {
+      // This is a secondary sale, here we must contact the royalty engine to determine payouts
       (address payable[] memory receivers, uint256[] memory royalties) = royaltyEngine.getRoyalty(
         _originContract,
         _tokenId,

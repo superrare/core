@@ -105,6 +105,93 @@ contract SuperRareAuctionHouse is
     );
   }
 
+  /// @notice Configures an Auction for a given asset with a reward for the first bid to meet the minimum.
+  /// @dev auction type is always coldie if there is a first bid reward, so this is hardcoded.
+  /// @dev _startingAmount can never be 0, because there would be no reward possible.
+  /// @dev _currencyAddress equal to the zero address denotes eth.
+  /// @dev All time related params are unix epoch timestamps.
+  /// @param _guarantorPercentage How much to pay (reward) the wallet address that kicks off the minimum bid and guarantees the auction.
+  /// @param _originContract Contract address of the asset being put up for auction.
+  /// @param _tokenId Token Id of the asset.
+  /// @param _startingAmount The reserve price or min bid of an auction.
+  /// @param _currencyAddress The currency the auction is being conducted in.
+  /// @param _lengthOfAuction The amount of time in seconds that the auction is configured for.
+  /// @param _splitAddresses Addresses to split the sellers commission with.
+  /// @param _splitRatios The ratio for the split corresponding to each of the addresses being split with.
+  function configureFirstBidRewardAuction(
+    uint8 _guarantorPercentage,
+    address _originContract,
+    uint256 _tokenId,
+    uint256 _startingAmount,
+    address _currencyAddress,
+    uint256 _lengthOfAuction,
+    uint256 _startTime,
+    address payable[] calldata _splitAddresses,
+    uint8[] calldata _splitRatios
+  ) external {
+    _checkIfCurrencyIsApproved(_currencyAddress);
+    _senderMustBeTokenOwner(_originContract, _tokenId);
+    _ownerMustHaveMarketplaceApprovedForNFT(_originContract, _tokenId);
+
+    // Check splits, but we must do a re-implementaion inline to include the guarantor in the split
+    require(_splitRatios.length > 0, "configureFirstBidRewardAuction::Must have at least 1 split");
+    require(_splitRatios.length <= 5, "configureFirstBidRewardAuction::Split exceeded max size");
+    require (_splitAddresses.length == _splitRatios.length, "configureFirstBidRewardAuction::Splits must be equal length");
+    uint8 totalRatios = 0;
+    for (uint8 i = 0; i < _splitRatios.length; i++) {
+      totalRatios += _splitRatios[i];
+    }
+    totalRatios += _guarantorPercentage;
+    require (totalRatios == 100);
+
+    {
+      require(_lengthOfAuction <= maxAuctionLength, "configureFirstBidRewardAuction::Auction too long.");
+
+      Auction memory auction = tokenAuctions[_originContract][_tokenId];
+      Bid memory staleBid = auctionBids[_originContract][_tokenId];
+
+      require(staleBid.bidder == address(0), "configureFirstBidRewardAuction::bid shouldnt exist");
+
+      require(
+        auction.auctionType == NO_AUCTION || (auction.auctionCreator != msg.sender),
+        "configureFirstBidRewardAuction::Cannot have a current auction"
+      );
+
+      require(_lengthOfAuction > 0, "configureFirstBidRewardAuction::Length must be > 0");
+      require(_startingAmount > 0, "configureFirstBidRewardAuction::Starting price must be > 0");
+
+      require(
+        _startingAmount <= marketplaceSettings.getMarketplaceMaxValue(),
+        "configureFirstBidRewardAuction::Cannot set starting price higher than max value."
+      );
+    }
+
+    // Remember the guarantor reward percentage
+    auctionGuarantorRewardPercentage[msg.sender][_originContract][_tokenId] = _guarantorPercentage;
+
+    tokenAuctions[_originContract][_tokenId] = Auction(
+      payable(msg.sender),
+      block.number,
+      0,
+      _lengthOfAuction,
+      _currencyAddress,
+      _startingAmount,
+      COLDIE_AUCTION,
+      _splitAddresses,
+      _splitRatios
+    );
+
+    emit NewAuction(
+      _originContract,
+      _tokenId,
+      msg.sender,
+      _currencyAddress,
+      _startTime,
+      _startingAmount,
+      _lengthOfAuction
+    );
+  }
+
   /// @notice Converts an offer into a coldie auction.
   /// @param _originContract Contract address of the asset.
   /// @dev Covers use of any currency (0 address is eth).
@@ -294,6 +381,15 @@ contract SuperRareAuctionHouse is
       erc721.transferFrom(auction.auctionCreator, address(this), _tokenId);
 
       startedAuction = true;
+
+      // If this is the first bid, we need to see if there is a guarantor reward assigned
+      uint8 guarantorReward = auctionGuarantorRewardPercentage[auction.auctionCreator][_originContract][_tokenId];
+      if (guarantorReward > 0) {
+        address payable guarantor = payable(msg.sender);
+        tokenAuctions[_originContract][_tokenId].splitRecipients.push(guarantor);
+        tokenAuctions[_originContract][_tokenId].splitRatios.push(guarantorReward);
+      }
+      
     } else if (auction.startingTime + auction.lengthOfAuction - block.timestamp < auctionLengthExtension) {
       newAuctionLength = block.timestamp + auctionLengthExtension - auction.startingTime;
 

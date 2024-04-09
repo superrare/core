@@ -220,6 +220,9 @@ contract SuperRareBazaarStorage {
   // Mapping from contract to mapping of tokenId to Bid.
   mapping(address => mapping(uint256 => Bid)) public auctionBids;
 
+  // Mapping guarantor reward percentage to an auction
+  mapping(address => mapping(address => mapping(uint256 => uint8))) public auctionGuarantorRewardPercentage; 
+
   uint256[50] private __gap;
   /// ALL NEW STORAGE MUST COME AFTER THIS
 }
