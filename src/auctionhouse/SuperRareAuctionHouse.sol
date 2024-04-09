@@ -58,10 +58,9 @@ contract SuperRareAuctionHouse is
 
       require(staleBid.bidder == address(0), "configureAuction::bid shouldnt exist");
 
-      require(
-        auction.auctionType == NO_AUCTION || (auction.auctionCreator != msg.sender),
-        "configureAuction::Cannot have a current auction"
-      );
+      if (auction.auctionType != NO_AUCTION) {
+        require(auction.auctionCreator == msg.sender, "configureAuction::Must be auction creator to perform an update");
+      }
 
       require(_lengthOfAuction > 0, "configureAuction::Length must be > 0");
 
@@ -77,32 +76,42 @@ contract SuperRareAuctionHouse is
       );
     }
 
-    tokenAuctions[_originContract][_tokenId] = Auction(
-      payable(msg.sender),
-      block.number,
-      _auctionType == COLDIE_AUCTION ? 0 : _startTime,
-      _lengthOfAuction,
-      _currencyAddress,
-      _startingAmount,
-      _auctionType,
-      _splitAddresses,
-      _splitRatios
-    );
+    if (auction.auctionType == NO_AUCTION) {
+      tokenAuctions[_originContract][_tokenId] = Auction(
+        payable(msg.sender),
+        block.number,
+        _auctionType == COLDIE_AUCTION ? 0 : _startTime,
+        _lengthOfAuction,
+        _currencyAddress,
+        _startingAmount,
+        _auctionType,
+        _splitAddresses,
+        _splitRatios
+      );
 
-    if (_auctionType == SCHEDULED_AUCTION) {
-      IERC721 erc721 = IERC721(_originContract);
-      erc721.transferFrom(msg.sender, address(this), _tokenId);
+      if (_auctionType == SCHEDULED_AUCTION) {
+        IERC721 erc721 = IERC721(_originContract);
+        erc721.transferFrom(msg.sender, address(this), _tokenId);
+      }
+
+      emit NewAuction(
+        _originContract,
+        _tokenId,
+        msg.sender,
+        _currencyAddress,
+        _startTime,
+        _startingAmount,
+        _lengthOfAuction
+      );
+    } else {
+      tokenAuctions[_originContract][_tokenId].auctionType = _auctionType;
+      tokenAuctions[_originContract][_tokenId].minimumBid = _startingAmount;
+      tokenAuctions[_originContract][_tokenId].currencyAddress = _currencyAddress;
+      tokenAuctions[_originContract][_tokenId].lengthOfAuction = _lengthOfAuction;
+      tokenAuctions[_originContract][_tokenId].startingTime = _startTime;
+
+      emit AuctionUpdate(_originContract, _tokenId, _startingAmount, _lengthOfAuction);
     }
-
-    emit NewAuction(
-      _originContract,
-      _tokenId,
-      msg.sender,
-      _currencyAddress,
-      _startTime,
-      _startingAmount,
-      _lengthOfAuction
-    );
   }
 
   /// @notice Converts an offer into a coldie auction.
