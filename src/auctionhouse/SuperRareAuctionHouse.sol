@@ -105,7 +105,6 @@ contract SuperRareAuctionHouse is
         _lengthOfAuction
       );
     } else {
-      tokenAuctions[_originContract][_tokenId].auctionType = _auctionType;
       tokenAuctions[_originContract][_tokenId].minimumBid = _startingAmount;
       tokenAuctions[_originContract][_tokenId].currencyAddress = _currencyAddress;
       tokenAuctions[_originContract][_tokenId].lengthOfAuction = _lengthOfAuction;
