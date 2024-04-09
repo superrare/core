@@ -60,6 +60,7 @@ contract SuperRareAuctionHouse is
 
       if (auction.auctionType != NO_AUCTION) {
         require(auction.auctionType == RESERVE_AUCTION, "configureAuction::Only Reserve auctions are updateable");
+        require(auction.startingTime == 0 || block.timestamp < auction.startingTime, "configureAuction::Auction must not have started.")
         require(auction.auctionCreator == msg.sender, "configureAuction::Must be auction creator to perform an update");
       }
 
