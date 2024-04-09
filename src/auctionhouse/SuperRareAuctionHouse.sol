@@ -54,11 +54,12 @@ contract SuperRareAuctionHouse is
 
       Auction memory auction = tokenAuctions[_originContract][_tokenId];
 
-      Bid memory staleBid = auctionBids[_originContract][_tokenId];
+        Bid memory staleBid = auctionBids[_originContract][_tokenId];
 
-      require(staleBid.bidder == address(0), "configureAuction::bid shouldnt exist");
+        require(staleBid.bidder == address(0), "configureAuction::bid shouldnt exist");
 
       if (auction.auctionType != NO_AUCTION) {
+        require(auction.auctionType == RESERVE_AUCTION, "configureAuction::Only Reserve auctions are updateable");
         require(auction.auctionCreator == msg.sender, "configureAuction::Must be auction creator to perform an update");
       }
 
