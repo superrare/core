@@ -334,6 +334,44 @@ contract SuperRareBazaar is ISuperRareBazaar, OwnableUpgradeable, ReentrancyGuar
     require(success, string(data));
   }
 
+  /// @notice Configures an Auction of Guarantor Type (First bid reward for the given asset.)
+    /// @param _guarantorPercentage How much to pay (reward) the wallet address that kicks off the minimum bid and guarantees the auction.
+  /// @param _originContract Contract address of the asset being put up for auction.
+  /// @param _tokenId Token Id of the asset.
+  /// @param _startingAmount The reserve price or min bid of an auction.
+  /// @param _currencyAddress The currency the auction is being conducted in.
+  /// @param _lengthOfAuction The amount of time in seconds that the auction is configured for.
+  /// @param _splitAddresses Addresses to split the sellers commission with.
+  /// @param _splitRatios The ratio for the split corresponding to each of the addresses being split with.
+  function configureFirstBidRewardAuction(
+    uint8 _guarantorPercentage,
+    address _originContract,
+    uint256 _tokenId,
+    uint256 _startingAmount,
+    address _currencyAddress,
+    uint256 _lengthOfAuction,
+    uint256 _startTime,
+    address payable[] calldata _splitAddresses,
+    uint8[] calldata _splitRatios
+  ) external override {
+    (bool success, bytes memory data) = superRareAuctionHouse.delegatecall(
+      abi.encodeWithSelector(
+        this.configureFirstBidRewardAuction.selector,
+        _guarantorPercentage,
+        _originContract,
+        _tokenId,
+        _startingAmount,
+        _currencyAddress,
+        _lengthOfAuction,
+        _startTime,
+        _splitAddresses,
+        _splitRatios
+      )
+    );
+
+    require(success, string(data));
+  }
+
   /// @notice Converts an offer into a coldie auction.
   /// @dev Covers use of any currency (0 address is eth).
   /// @dev Only covers converting an offer to a coldie auction.

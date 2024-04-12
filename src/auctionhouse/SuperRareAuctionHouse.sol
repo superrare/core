@@ -142,7 +142,7 @@ contract SuperRareAuctionHouse is
       totalRatios += _splitRatios[i];
     }
     totalRatios += _guarantorPercentage;
-    require (totalRatios == 100);
+    require (totalRatios == 100, "configureFirstBidRewardAuction::given ratios in combination with guarantor reward must equal 100");
 
     {
       require(_lengthOfAuction <= maxAuctionLength, "configureFirstBidRewardAuction::Auction too long.");
