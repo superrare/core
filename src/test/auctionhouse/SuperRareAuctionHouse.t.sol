@@ -205,6 +205,20 @@ contract SuperRareAuctionHouseTest is Test {
             _splitRatios
         );
 
+        // Make an invalid update
+        vm.expectRevert();
+        superRareBazaar.configureAuction(
+            SCHEDULED_AUCTION,
+            address(sfn),
+            1,
+            TARGET_AMOUNT + 100000,
+            address(0),
+            _lengthOfAuction + 1,
+            block.timestamp + 2,
+            _splitAddresses,
+            _splitRatios
+        );
+
         vm.stopPrank();
     }
 }
