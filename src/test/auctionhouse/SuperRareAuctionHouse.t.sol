@@ -179,7 +179,7 @@ contract SuperRareAuctionHouseTest is Test {
         uint8[] memory _splitRatios = new uint8[](1);
         _splitRatios[0] = 100;
 
-        // Create an auction with bad split numbers (in combo with guarnator)
+        // Create an auction
         superRareBazaar.configureAuction(
             COLDIE_AUCTION,
             address(sfn),
