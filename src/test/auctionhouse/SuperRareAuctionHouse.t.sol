@@ -43,6 +43,7 @@ contract SuperRareAuctionHouseTest is Test {
     uint256 private constant _lengthOfAuction = 1;
 
     bytes32 private constant SCHEDULED_AUCTION = "SCHEDULED_AUCTION";
+    bytes32 private constant COLDIE_AUCTION = "COLDIE_AUCTION";
 
     SuperFakeNFT private sfn;
 
@@ -162,6 +163,44 @@ contract SuperRareAuctionHouseTest is Test {
             address(0),
             _lengthOfAuction,
             block.timestamp + 1,
+            _splitAddresses,
+            _splitRatios
+        );
+
+        vm.stopPrank();
+    }
+
+    function testUpdateAuction() public {
+        vm.startPrank(artist);
+
+        address payable[] memory _splitAddresses = new address payable[](1);
+        _splitAddresses[0] = payable(address(this));
+
+        uint8[] memory _splitRatios = new uint8[](1);
+        _splitRatios[0] = 100;
+
+        // Create an auction with bad split numbers (in combo with guarnator)
+        superRareBazaar.configureAuction(
+            COLDIE_AUCTION,
+            address(sfn),
+            1,
+            TARGET_AMOUNT,
+            address(0),
+            _lengthOfAuction,
+            block.timestamp + 1,
+            _splitAddresses,
+            _splitRatios
+        );
+
+        // Update the auction
+        superRareBazaar.configureAuction(
+            COLDIE_AUCTION,
+            address(sfn),
+            1,
+            TARGET_AMOUNT - 10,
+            address(0),
+            _lengthOfAuction + 1,
+            block.timestamp + 2,
             _splitAddresses,
             _splitRatios
         );

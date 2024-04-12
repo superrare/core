@@ -59,8 +59,8 @@ contract SuperRareAuctionHouse is
         require(staleBid.bidder == address(0), "configureAuction::bid shouldnt exist");
 
       if (auction.auctionType != NO_AUCTION) {
-        require(auction.auctionType == RESERVE_AUCTION, "configureAuction::Only Reserve auctions are updateable");
-        require(auction.startingTime == 0 || block.timestamp < auction.startingTime, "configureAuction::Auction must not have started.")
+        require(auction.auctionType == COLDIE_AUCTION, "configureAuction::Only Reserve auctions are updateable");
+        require(auction.startingTime == 0 || block.timestamp < auction.startingTime, "configureAuction::Auction must not have started.");
         require(auction.auctionCreator == msg.sender, "configureAuction::Must be auction creator to perform an update");
       }
 
@@ -78,7 +78,7 @@ contract SuperRareAuctionHouse is
       );
     }
 
-    if (auction.auctionType == NO_AUCTION) {
+    if (tokenAuctions[_originContract][_tokenId].auctionType == NO_AUCTION) {
       tokenAuctions[_originContract][_tokenId] = Auction(
         payable(msg.sender),
         block.number,
@@ -111,7 +111,15 @@ contract SuperRareAuctionHouse is
       tokenAuctions[_originContract][_tokenId].lengthOfAuction = _lengthOfAuction;
       tokenAuctions[_originContract][_tokenId].startingTime = _startTime;
 
-      emit AuctionUpdate(_originContract, _tokenId, _startingAmount, _lengthOfAuction);
+      emit AuctionUpdate(
+        _originContract, 
+        _tokenId, 
+        msg.sender,
+        _currencyAddress,
+        _startTime,
+        _startingAmount, 
+        _lengthOfAuction
+      );
     }
   }
 
@@ -147,6 +155,7 @@ contract SuperRareAuctionHouse is
     require(_splitRatios.length > 0, "configureFirstBidRewardAuction::Must have at least 1 split");
     require(_splitRatios.length <= 5, "configureFirstBidRewardAuction::Split exceeded max size");
     require (_splitAddresses.length == _splitRatios.length, "configureFirstBidRewardAuction::Splits must be equal length");
+
     uint8 totalRatios = 0;
     for (uint8 i = 0; i < _splitRatios.length; i++) {
       totalRatios += _splitRatios[i];
