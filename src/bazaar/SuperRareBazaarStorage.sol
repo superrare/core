@@ -151,16 +151,6 @@ contract SuperRareBazaarStorage {
     uint8 _guarantorRewardPercentage
   );
 
-  event AuctionUpdate(
-    address indexed _contractAddress,
-    uint256 indexed _tokenId,
-    address indexed _auctionCreator,
-    address _currencyAddress,
-    uint256 _startingTime,
-    uint256 _minimumBid,
-    uint256 _lengthOfAuction
-  );
-
   event CancelAuction(address indexed _contractAddress, uint256 indexed _tokenId, address indexed _auctionCreator);
 
   event AuctionBid(

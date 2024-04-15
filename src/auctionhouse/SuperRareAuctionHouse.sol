@@ -111,13 +111,13 @@ contract SuperRareAuctionHouse is
       tokenAuctions[_originContract][_tokenId].lengthOfAuction = _lengthOfAuction;
       tokenAuctions[_originContract][_tokenId].startingTime = _startTime;
 
-      emit AuctionUpdate(
-        _originContract, 
-        _tokenId, 
+      emit NewAuction(
+        _originContract,
+        _tokenId,
         msg.sender,
         _currencyAddress,
         _startTime,
-        _startingAmount, 
+        _startingAmount,
         _lengthOfAuction
       );
     }
@@ -218,15 +218,16 @@ contract SuperRareAuctionHouse is
       tokenAuctions[_originContract][_tokenId].lengthOfAuction = _lengthOfAuction;
       tokenAuctions[_originContract][_tokenId].startingTime = _startTime;
 
-      emit AuctionUpdate(
-        _originContract, 
-        _tokenId, 
-        msg.sender,
-        _currencyAddress,
-        _startTime,
-        _startingAmount, 
-        _lengthOfAuction
-      );
+      emit NewGuarantorAuction(
+          _originContract,
+          _tokenId,
+          msg.sender,
+          _currencyAddress,
+          _startTime,
+          _startingAmount,
+          _lengthOfAuction,
+          _guarantorPercentage
+        );
     }
 
   }
