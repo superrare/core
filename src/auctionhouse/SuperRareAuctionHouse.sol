@@ -171,10 +171,11 @@ contract SuperRareAuctionHouse is
 
       require(staleBid.bidder == address(0), "configureFirstBidRewardAuction::bid shouldnt exist");
 
-      require(
-        auction.auctionType == NO_AUCTION || (auction.auctionCreator != msg.sender),
-        "configureFirstBidRewardAuction::Cannot have a current auction"
-      );
+      if (auction.auctionType != NO_AUCTION) {
+        require(auction.auctionType == COLDIE_AUCTION && _auctionType == COLDIE_AUCTION, "configureAuction::Only Reserve auctions are updateable");
+        require(auction.startingTime == 0 || block.timestamp < auction.startingTime, "configureAuction::Auction must not have started.");
+        require(auction.auctionCreator == msg.sender, "configureAuction::Must be auction creator to perform an update");
+      }
 
       require(_lengthOfAuction > 0, "configureFirstBidRewardAuction::Length must be > 0");
       require(_startingAmount > 0, "configureFirstBidRewardAuction::Starting price must be > 0");
@@ -188,28 +189,46 @@ contract SuperRareAuctionHouse is
     // Remember the guarantor reward percentage
     auctionGuarantorRewardPercentage[msg.sender][_originContract][_tokenId] = _guarantorPercentage;
 
-    tokenAuctions[_originContract][_tokenId] = Auction(
-      payable(msg.sender),
-      block.number,
-      0,
-      _lengthOfAuction,
-      _currencyAddress,
-      _startingAmount,
-      COLDIE_AUCTION,
-      _splitAddresses,
-      _splitRatios
-    );
+    if (tokenAuctions[_originContract][_tokenId].auctionType == NO_AUCTION) {
+        tokenAuctions[_originContract][_tokenId] = Auction(
+          payable(msg.sender),
+          block.number,
+          0,
+          _lengthOfAuction,
+          _currencyAddress,
+          _startingAmount,
+          COLDIE_AUCTION,
+          _splitAddresses,
+          _splitRatios
+        );
 
-    emit NewGuarantorAuction(
-      _originContract,
-      _tokenId,
-      msg.sender,
-      _currencyAddress,
-      _startTime,
-      _startingAmount,
-      _lengthOfAuction,
-      _guarantorPercentage
-    );
+        emit NewGuarantorAuction(
+          _originContract,
+          _tokenId,
+          msg.sender,
+          _currencyAddress,
+          _startTime,
+          _startingAmount,
+          _lengthOfAuction,
+          _guarantorPercentage
+        );
+    } else {
+      tokenAuctions[_originContract][_tokenId].minimumBid = _startingAmount;
+      tokenAuctions[_originContract][_tokenId].currencyAddress = _currencyAddress;
+      tokenAuctions[_originContract][_tokenId].lengthOfAuction = _lengthOfAuction;
+      tokenAuctions[_originContract][_tokenId].startingTime = _startTime;
+
+      emit AuctionUpdate(
+        _originContract, 
+        _tokenId, 
+        msg.sender,
+        _currencyAddress,
+        _startTime,
+        _startingAmount, 
+        _lengthOfAuction
+      );
+    }
+
   }
 
   /// @notice Converts an offer into a coldie auction.
