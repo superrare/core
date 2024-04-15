@@ -26,7 +26,6 @@ interface ISuperRareAuctionHouse {
     uint8[] calldata _splitRatios
   ) external;
 
-interface ISuperRareAuctionHouse {
   /// @notice Configures an Auction for a given asset with a reward for the first bid to meet the minimum.
   /// @param _guarantorPercentage How much to pay (reward) the wallet address that kicks off the minimum bid and guarantees the auction.
   /// @param _originContract Contract address of the asset being put up for auction.

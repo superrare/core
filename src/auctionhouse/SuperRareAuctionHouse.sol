@@ -172,7 +172,7 @@ contract SuperRareAuctionHouse is
       require(staleBid.bidder == address(0), "configureFirstBidRewardAuction::bid shouldnt exist");
 
       if (auction.auctionType != NO_AUCTION) {
-        require(auction.auctionType == COLDIE_AUCTION && _auctionType == COLDIE_AUCTION, "configureAuction::Only Reserve auctions are updateable");
+        require(auction.auctionType == COLDIE_AUCTION, "configureAuction::Only Reserve auctions are updateable");
         require(auction.startingTime == 0 || block.timestamp < auction.startingTime, "configureAuction::Auction must not have started.");
         require(auction.auctionCreator == msg.sender, "configureAuction::Must be auction creator to perform an update");
       }
