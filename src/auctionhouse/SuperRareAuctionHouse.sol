@@ -200,14 +200,15 @@ contract SuperRareAuctionHouse is
       _splitRatios
     );
 
-    emit NewAuction(
+    emit NewGuarantorAuction(
       _originContract,
       _tokenId,
       msg.sender,
       _currencyAddress,
       _startTime,
       _startingAmount,
-      _lengthOfAuction
+      _lengthOfAuction,
+      _guarantorPercentage
     );
   }
 
