@@ -26,6 +26,28 @@ interface ISuperRareAuctionHouse {
     uint8[] calldata _splitRatios
   ) external;
 
+interface ISuperRareAuctionHouse {
+  /// @notice Configures an Auction for a given asset with a reward for the first bid to meet the minimum.
+  /// @param _guarantorPercentage How much to pay (reward) the wallet address that kicks off the minimum bid and guarantees the auction.
+  /// @param _originContract Contract address of the asset being put up for auction.
+  /// @param _tokenId Token Id of the asset.
+  /// @param _startingAmount The reserve price or min bid of an auction.
+  /// @param _currencyAddress The currency the auction is being conducted in.
+  /// @param _lengthOfAuction The amount of time in seconds that the auction is configured for.
+  /// @param _splitAddresses Addresses to split the sellers commission with.
+  /// @param _splitRatios The ratio for the split corresponding to each of the addresses being split with.
+  function configureFirstBidRewardAuction(
+    uint8 _guarantorPercentage,
+    address _originContract,
+    uint256 _tokenId,
+    uint256 _startingAmount,
+    address _currencyAddress,
+    uint256 _lengthOfAuction,
+    uint256 _startTime,
+    address payable[] calldata _splitAddresses,
+    uint8[] calldata _splitRatios
+  ) external;
+
   /// @notice Converts an offer into a coldie auction.
   /// @param _originContract Contract address of the asset.
   /// @param _tokenId Token Id of the asset.
