@@ -136,7 +136,6 @@ contract SuperRareAuctionHouseTest is Test {
             TARGET_AMOUNT,
             address(0),
             _lengthOfAuction,
-            block.timestamp + 1,
             _splitAddresses,
             _splitRatios
         );
@@ -162,7 +161,6 @@ contract SuperRareAuctionHouseTest is Test {
             TARGET_AMOUNT,
             address(0),
             _lengthOfAuction,
-            block.timestamp + 1,
             _splitAddresses,
             _splitRatios
         );

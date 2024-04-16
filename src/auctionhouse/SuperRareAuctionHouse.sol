@@ -54,13 +54,13 @@ contract SuperRareAuctionHouse is
 
       Auction memory auction = tokenAuctions[_originContract][_tokenId];
 
-        Bid memory staleBid = auctionBids[_originContract][_tokenId];
+      Bid memory staleBid = auctionBids[_originContract][_tokenId];
 
-        require(staleBid.bidder == address(0), "configureAuction::bid shouldnt exist");
+      require(staleBid.bidder == address(0), "configureAuction::bid shouldnt exist");
 
       if (auction.auctionType != NO_AUCTION) {
         require(auction.auctionType == COLDIE_AUCTION && _auctionType == COLDIE_AUCTION, "configureAuction::Only Reserve auctions are updateable");
-        require(auction.startingTime == 0 || block.timestamp < auction.startingTime, "configureAuction::Auction must not have started.");
+        require(auction.startingTime == 0 && _startTime == 0, "configureAuction::Auction must not have started.");
         require(auction.auctionCreator == msg.sender, "configureAuction::Must be auction creator to perform an update");
       }
 
@@ -109,7 +109,8 @@ contract SuperRareAuctionHouse is
       tokenAuctions[_originContract][_tokenId].minimumBid = _startingAmount;
       tokenAuctions[_originContract][_tokenId].currencyAddress = _currencyAddress;
       tokenAuctions[_originContract][_tokenId].lengthOfAuction = _lengthOfAuction;
-      tokenAuctions[_originContract][_tokenId].startingTime = _startTime;
+      tokenAuctions[_originContract][_tokenId].splitRecipients = _splitAddresses;
+      tokenAuctions[_originContract][_tokenId].splitRatios = _splitRatios;
 
       emit NewAuction(
         _originContract,
@@ -143,7 +144,6 @@ contract SuperRareAuctionHouse is
     uint256 _startingAmount,
     address _currencyAddress,
     uint256 _lengthOfAuction,
-    uint256 _startTime,
     address payable[] calldata _splitAddresses,
     uint8[] calldata _splitRatios
   ) external {
@@ -151,19 +151,19 @@ contract SuperRareAuctionHouse is
     _senderMustBeTokenOwner(_originContract, _tokenId);
     _ownerMustHaveMarketplaceApprovedForNFT(_originContract, _tokenId);
 
-    // Check splits, but we must do a re-implementaion inline to include the guarantor in the split
-    require(_splitRatios.length > 0, "configureFirstBidRewardAuction::Must have at least 1 split");
-    require(_splitRatios.length <= 5, "configureFirstBidRewardAuction::Split exceeded max size");
-    require (_splitAddresses.length == _splitRatios.length, "configureFirstBidRewardAuction::Splits must be equal length");
-
-    uint8 totalRatios = 0;
-    for (uint8 i = 0; i < _splitRatios.length; i++) {
-      totalRatios += _splitRatios[i];
-    }
-    totalRatios += _guarantorPercentage;
-    require (totalRatios == 100, "configureFirstBidRewardAuction::given ratios in combination with guarantor reward must equal 100");
-
     {
+      // Check splits, but we must do a re-implementaion inline to include the guarantor in the split
+      require(_splitRatios.length > 0, "configureFirstBidRewardAuction::Must have at least 1 split");
+      require(_splitRatios.length <= 5, "configureFirstBidRewardAuction::Split exceeded max size");
+      require (_splitAddresses.length == _splitRatios.length, "configureFirstBidRewardAuction::Splits must be equal length");
+
+      uint8 totalRatios = 0;
+      for (uint8 i = 0; i < _splitRatios.length; i++) {
+        totalRatios += _splitRatios[i];
+      }
+      totalRatios += _guarantorPercentage;
+      require (totalRatios == 100, "configureFirstBidRewardAuction::given ratios in combination with guarantor reward must equal 100");
+
       require(_lengthOfAuction <= maxAuctionLength, "configureFirstBidRewardAuction::Auction too long.");
 
       Auction memory auction = tokenAuctions[_originContract][_tokenId];
@@ -173,7 +173,7 @@ contract SuperRareAuctionHouse is
 
       if (auction.auctionType != NO_AUCTION) {
         require(auction.auctionType == COLDIE_AUCTION, "configureAuction::Only Reserve auctions are updateable");
-        require(auction.startingTime == 0 || block.timestamp < auction.startingTime, "configureAuction::Auction must not have started.");
+        require(auction.startingTime == 0, "configureAuction::Auction must not have started.");
         require(auction.auctionCreator == msg.sender, "configureAuction::Must be auction creator to perform an update");
       }
 
@@ -207,7 +207,7 @@ contract SuperRareAuctionHouse is
           _tokenId,
           msg.sender,
           _currencyAddress,
-          _startTime,
+          0,
           _startingAmount,
           _lengthOfAuction,
           _guarantorPercentage
@@ -216,14 +216,15 @@ contract SuperRareAuctionHouse is
       tokenAuctions[_originContract][_tokenId].minimumBid = _startingAmount;
       tokenAuctions[_originContract][_tokenId].currencyAddress = _currencyAddress;
       tokenAuctions[_originContract][_tokenId].lengthOfAuction = _lengthOfAuction;
-      tokenAuctions[_originContract][_tokenId].startingTime = _startTime;
+      tokenAuctions[_originContract][_tokenId].splitRecipients = _splitAddresses;
+      tokenAuctions[_originContract][_tokenId].splitRatios = _splitRatios;
 
       emit NewGuarantorAuction(
           _originContract,
           _tokenId,
           msg.sender,
           _currencyAddress,
-          _startTime,
+          0,
           _startingAmount,
           _lengthOfAuction,
           _guarantorPercentage

@@ -42,7 +42,6 @@ interface ISuperRareAuctionHouse {
     uint256 _startingAmount,
     address _currencyAddress,
     uint256 _lengthOfAuction,
-    uint256 _startTime,
     address payable[] calldata _splitAddresses,
     uint8[] calldata _splitRatios
   ) external;

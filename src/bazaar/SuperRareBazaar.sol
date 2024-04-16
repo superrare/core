@@ -350,7 +350,6 @@ contract SuperRareBazaar is ISuperRareBazaar, OwnableUpgradeable, ReentrancyGuar
     uint256 _startingAmount,
     address _currencyAddress,
     uint256 _lengthOfAuction,
-    uint256 _startTime,
     address payable[] calldata _splitAddresses,
     uint8[] calldata _splitRatios
   ) external override {
@@ -363,7 +362,6 @@ contract SuperRareBazaar is ISuperRareBazaar, OwnableUpgradeable, ReentrancyGuar
         _startingAmount,
         _currencyAddress,
         _lengthOfAuction,
-        _startTime,
         _splitAddresses,
         _splitRatios
       )
