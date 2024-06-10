@@ -185,6 +185,9 @@ contract SuperRareAuctionHouse is
         "configureFirstBidRewardAuction::Cannot set starting price higher than max value."
       );
     }
+    
+    // If a reward already exists for this token, reset it
+    delete auctionGuarantorRewardPercentage[msg.sender][_originContract][_tokenId];
 
     // Remember the guarantor reward percentage
     auctionGuarantorRewardPercentage[msg.sender][_originContract][_tokenId] = _guarantorPercentage;
@@ -429,6 +432,9 @@ contract SuperRareAuctionHouse is
         address payable guarantor = payable(msg.sender);
         tokenAuctions[_originContract][_tokenId].splitRecipients.push(guarantor);
         tokenAuctions[_originContract][_tokenId].splitRatios.push(guarantorReward);
+
+        // Reset the award after it's been posted to the split ratios so that it cannot be re-used
+        delete auctionGuarantorRewardPercentage[msg.sender][_originContract][_tokenId];
       }
       
     } else if (auction.startingTime + auction.lengthOfAuction - block.timestamp < auctionLengthExtension) {
@@ -470,6 +476,7 @@ contract SuperRareAuctionHouse is
 
     delete tokenAuctions[_originContract][_tokenId];
     delete auctionBids[_originContract][_tokenId];
+    delete auctionGuarantorRewardPercentage[msg.sender][_originContract][_tokenId];
 
     IERC721 erc721 = IERC721(_originContract);
 
