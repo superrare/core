@@ -434,7 +434,7 @@ contract SuperRareAuctionHouse is
         tokenAuctions[_originContract][_tokenId].splitRatios.push(guarantorReward);
 
         // Reset the award after it's been posted to the split ratios so that it cannot be re-used
-        delete auctionGuarantorRewardPercentage[msg.sender][_originContract][_tokenId];
+        delete auctionGuarantorRewardPercentage[auction.auctionCreator][_originContract][_tokenId];
       }
       
     } else if (auction.startingTime + auction.lengthOfAuction - block.timestamp < auctionLengthExtension) {
@@ -476,7 +476,7 @@ contract SuperRareAuctionHouse is
 
     delete tokenAuctions[_originContract][_tokenId];
     delete auctionBids[_originContract][_tokenId];
-    delete auctionGuarantorRewardPercentage[msg.sender][_originContract][_tokenId];
+    delete auctionGuarantorRewardPercentage[auction.auctionCreator][_originContract][_tokenId];
 
     IERC721 erc721 = IERC721(_originContract);
 
