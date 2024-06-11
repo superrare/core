@@ -407,14 +407,14 @@ contract SuperRareAuctionHouse is
 
     _checkAmountAndTransfer(_currencyAddress, requiredAmount);
 
-    _refund(_currencyAddress, currBid.amount, currBid.marketplaceFee, currBid.bidder);
-
     auctionBids[_originContract][_tokenId] = Bid(
       payable(msg.sender),
       _currencyAddress,
       _amount,
       marketplaceSettings.getMarketplaceFeePercentage()
     );
+
+    _refund(_currencyAddress, currBid.amount, currBid.marketplaceFee, currBid.bidder);
 
     bool startedAuction = false;
     uint256 newAuctionLength = 0;
