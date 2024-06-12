@@ -416,8 +416,8 @@ contract SuperRareAuctionHouse is
 
     _refund(_currencyAddress, currBid.amount, currBid.marketplaceFee, currBid.bidder);
 
-    bool startedAuction = false;
-    uint256 newAuctionLength = 0;
+    bool startedAuction;
+    uint256 newAuctionLength;
 
     if (auction.startingTime == 0) {
       tokenAuctions[_originContract][_tokenId].startingTime = block.timestamp;
