@@ -342,6 +342,7 @@ contract SuperRareAuctionHouse is
     );
 
     delete tokenAuctions[_originContract][_tokenId];
+    delete auctionGuarantorRewardPercentage[auction.auctionCreator][_originContract][_tokenId];
 
     if (erc721.ownerOf(_tokenId) == address(this)) {
       erc721.transferFrom(address(this), msg.sender, _tokenId);
