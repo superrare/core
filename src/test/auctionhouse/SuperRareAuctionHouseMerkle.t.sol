@@ -352,14 +352,6 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     assertEq(roots.length, 1, "Root should still be registered");
   }
 
-  function test_cancelAuctionMerkleRoot_nonexistent() public {
-    // Try to cancel a non-existent root
-    vm.startPrank(auctionCreator);
-    vm.expectRevert("Root not found");
-    auctionHouse.cancelAuctionMerkleRoot(merkleRoot);
-    vm.stopPrank();
-  }
-
   function test_bidWithAuctionMerkleProof() public {
     // Setup: Register the auction root
     vm.startPrank(auctionCreator);

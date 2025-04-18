@@ -435,13 +435,18 @@ contract SuperRareAuctionHouse is
   /// @notice Cancels a previously registered Merkle root
   /// @param root The Merkle root to cancel
   function cancelAuctionMerkleRoot(bytes32 root) external override {
-    require(_userAuctionMerkleRoots[msg.sender].remove(root), "Root not found");
+    // Check if caller owns the root
+    require(_userAuctionMerkleRoots[msg.sender].contains(root), "Not root owner");
+
+    // Remove root from user's set
+    _userAuctionMerkleRoots[msg.sender].remove(root);
 
     // Clean up nonce and config data
     uint256 nonce = auctionMerkleRootNonce[msg.sender][root];
     delete auctionMerkleRootNonce[msg.sender][root];
     delete auctionMerkleConfigs[msg.sender][root][nonce];
 
+    // Emit event
     emit AuctionMerkleRootCancelled(msg.sender, root);
   }
 
