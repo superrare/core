@@ -103,7 +103,7 @@ contract SuperRareAuctionHouseMerkleTest is Test {
       contracts[i] = address(nftContract);
       ids[i] = tokenIds[i];
     }
-    (merkleRoot, merkleProof) = _createMerkleTree(contracts, ids);
+    (merkleRoot, merkleProof) = _createMerkleTree(contracts, ids, 0); // Get proof for first token (index 0)
 
     // Fund test users
     vm.deal(admin, 10 ether);
@@ -114,12 +114,14 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     currencyContract.mint(bidder, 1000 * 10 ** currencyContract.decimals());
   }
 
-  // Helper function to create a Merkle tree with multiple tokens
+  // Helper function to create a Merkle tree with multiple tokens and get proof for specific token
   function _createMerkleTree(
     address[] memory contracts,
-    uint256[] memory tokenIds
+    uint256[] memory tokenIds,
+    uint256 proofIndex
   ) internal returns (bytes32 root, bytes32[] memory proof) {
     require(contracts.length == tokenIds.length, "Length mismatch");
+    require(proofIndex < contracts.length, "Invalid proof index");
 
     bytes32[] memory leaves = new bytes32[](contracts.length);
 
@@ -128,9 +130,25 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     }
 
     root = merkle.getRoot(leaves);
-    proof = merkle.getProof(leaves, 0); // Get proof for first token
+    proof = merkle.getProof(leaves, proofIndex);
 
     return (root, proof);
+  }
+
+  // Helper function to get proof for a specific token
+  function _getProofForToken(
+    address contractAddress,
+    uint256 tokenId,
+    uint256 proofIndex
+  ) internal view returns (bytes32[] memory) {
+    address[] memory contracts = new address[](3);
+    uint256[] memory ids = new uint256[](3);
+    for (uint256 i = 0; i < 3; i++) {
+      contracts[i] = contractAddress;
+      ids[i] = tokenId + i;
+    }
+    (, bytes32[] memory proof) = _createMerkleTree(contracts, ids, proofIndex);
+    return proof;
   }
 
   function test_registerAuctionMerkleRoot() public {
@@ -153,5 +171,318 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     assertEq(nonce, 1, "Nonce should be 1");
 
     vm.stopPrank();
+  }
+
+  function test_cancelAuctionMerkleRoot() public {
+    // First register a root
+    vm.startPrank(auctionCreator);
+    nftContract.approve(address(auctionHouse), tokenId);
+    auctionHouse.registerAuctionMerkleRoot(merkleRoot, auctionConfig);
+    vm.stopPrank();
+
+    // Verify root is registered
+    bytes32[] memory roots = auctionHouse.getUserAuctionMerkleRoots(auctionCreator);
+    assertEq(roots.length, 1, "Root should be registered");
+
+    // Cancel the root
+    vm.startPrank(auctionCreator);
+    auctionHouse.cancelAuctionMerkleRoot(merkleRoot);
+    vm.stopPrank();
+
+    // Verify root is removed
+    roots = auctionHouse.getUserAuctionMerkleRoots(auctionCreator);
+    assertEq(roots.length, 0, "Root should be removed");
+  }
+
+  function test_cancelAuctionMerkleRoot_notOwner() public {
+    // First register a root
+    vm.startPrank(auctionCreator);
+    nftContract.approve(address(auctionHouse), tokenId);
+    auctionHouse.registerAuctionMerkleRoot(merkleRoot, auctionConfig);
+    vm.stopPrank();
+
+    // Try to cancel as non-owner
+    vm.startPrank(bidder);
+    vm.expectRevert("Not root owner");
+    auctionHouse.cancelAuctionMerkleRoot(merkleRoot);
+    vm.stopPrank();
+
+    // Verify root is still registered
+    bytes32[] memory roots = auctionHouse.getUserAuctionMerkleRoots(auctionCreator);
+    assertEq(roots.length, 1, "Root should still be registered");
+  }
+
+  function test_cancelAuctionMerkleRoot_nonexistent() public {
+    // Try to cancel a non-existent root
+    vm.startPrank(auctionCreator);
+    vm.expectRevert("Root not found");
+    auctionHouse.cancelAuctionMerkleRoot(merkleRoot);
+    vm.stopPrank();
+  }
+
+  function test_bidWithAuctionMerkleProof() public {
+    // Setup: Register the auction root
+    vm.startPrank(auctionCreator);
+    nftContract.approve(address(auctionHouse), tokenId);
+
+    // Create Merkle tree and get proof for our specific token
+    address[] memory contracts = new address[](3);
+    uint256[] memory ids = new uint256[](3);
+    for (uint256 i = 0; i < 3; i++) {
+      contracts[i] = address(nftContract);
+      ids[i] = tokenId + i;
+    }
+    (bytes32 root, bytes32[] memory proof) = _createMerkleTree(contracts, ids, 0);
+
+    auctionHouse.registerAuctionMerkleRoot(root, auctionConfig);
+    vm.stopPrank();
+
+    // Setup: Approve the auction house to spend bidder's tokens
+    vm.startPrank(bidder);
+    currencyContract.approve(address(auctionHouse), STARTING_AMOUNT);
+    vm.stopPrank();
+
+    // Place bid
+    vm.startPrank(bidder);
+    auctionHouse.bidWithAuctionMerkleProof(
+      address(nftContract),
+      tokenId,
+      auctionCreator,
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      proof
+    );
+    vm.stopPrank();
+
+    // Verify auction was created
+    (address highestBidder, uint256 highestBid, uint256 endTime) = auctionHouse.getAuctionDetails(
+      address(nftContract),
+      tokenId
+    );
+    assertEq(highestBidder, bidder, "Bidder should be highest bidder");
+    assertEq(highestBid, STARTING_AMOUNT, "Bid amount should match");
+    assertEq(endTime, block.timestamp + AUCTION_DURATION, "Auction duration should be correct");
+  }
+
+  function test_bidWithAuctionMerkleProof_invalidProof() public {
+    // Setup: Register the auction root
+    vm.startPrank(auctionCreator);
+    nftContract.approve(address(auctionHouse), tokenId);
+
+    // Create Merkle tree and get proof for our specific token
+    address[] memory contracts = new address[](3);
+    uint256[] memory ids = new uint256[](3);
+    for (uint256 i = 0; i < 3; i++) {
+      contracts[i] = address(nftContract);
+      ids[i] = tokenId + i;
+    }
+    (bytes32 root, bytes32[] memory validProof) = _createMerkleTree(contracts, ids, 0);
+
+    auctionHouse.registerAuctionMerkleRoot(root, auctionConfig);
+    vm.stopPrank();
+
+    // Setup: Approve the auction house to spend bidder's tokens
+    vm.startPrank(bidder);
+    currencyContract.approve(address(auctionHouse), STARTING_AMOUNT);
+    vm.stopPrank();
+
+    // Create invalid proof
+    bytes32[] memory invalidProof = new bytes32[](validProof.length);
+    for (uint256 i = 0; i < validProof.length; i++) {
+      invalidProof[i] = bytes32(uint256(validProof[i]) + 1);
+    }
+
+    // Try to place bid with invalid proof
+    vm.startPrank(bidder);
+    vm.expectRevert("Invalid merkle proof");
+    auctionHouse.bidWithAuctionMerkleProof(
+      address(nftContract),
+      tokenId,
+      auctionCreator,
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      invalidProof
+    );
+    vm.stopPrank();
+  }
+
+  function test_bidWithAuctionMerkleProof_replayProtection() public {
+    // Setup: Register the auction root
+    vm.startPrank(auctionCreator);
+    nftContract.approve(address(auctionHouse), tokenId);
+
+    // Create Merkle tree and get proof for our specific token
+    address[] memory contracts = new address[](3);
+    uint256[] memory ids = new uint256[](3);
+    for (uint256 i = 0; i < 3; i++) {
+      contracts[i] = address(nftContract);
+      ids[i] = tokenId + i;
+    }
+    (bytes32 root, bytes32[] memory proof) = _createMerkleTree(contracts, ids, 0);
+
+    auctionHouse.registerAuctionMerkleRoot(root, auctionConfig);
+    vm.stopPrank();
+
+    // Setup: Approve the auction house to spend bidder's tokens
+    vm.startPrank(bidder);
+    currencyContract.approve(address(auctionHouse), STARTING_AMOUNT * 2);
+    vm.stopPrank();
+
+    // Place first bid
+    vm.startPrank(bidder);
+    auctionHouse.bidWithAuctionMerkleProof(
+      address(nftContract),
+      tokenId,
+      auctionCreator,
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      proof
+    );
+    vm.stopPrank();
+
+    // Try to place same bid again
+    vm.startPrank(bidder);
+    vm.expectRevert("Proof already used");
+    auctionHouse.bidWithAuctionMerkleProof(
+      address(nftContract),
+      tokenId,
+      auctionCreator,
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      proof
+    );
+    vm.stopPrank();
+  }
+
+  function test_bidWithAuctionMerkleProof_ownershipVerification() public {
+    // Setup: Register the auction root
+    vm.startPrank(auctionCreator);
+    nftContract.approve(address(auctionHouse), tokenId);
+
+    // Create Merkle tree and get proof for our specific token
+    address[] memory contracts = new address[](3);
+    uint256[] memory ids = new uint256[](3);
+    for (uint256 i = 0; i < 3; i++) {
+      contracts[i] = address(nftContract);
+      ids[i] = tokenId + i;
+    }
+    (bytes32 root, bytes32[] memory proof) = _createMerkleTree(contracts, ids, 0);
+
+    auctionHouse.registerAuctionMerkleRoot(root, auctionConfig);
+    vm.stopPrank();
+
+    // Transfer NFT to someone else
+    vm.startPrank(auctionCreator);
+    nftContract.transferFrom(auctionCreator, bidder, tokenId);
+    vm.stopPrank();
+
+    // Setup: Approve the auction house to spend bidder's tokens
+    vm.startPrank(bidder);
+    currencyContract.approve(address(auctionHouse), STARTING_AMOUNT);
+    vm.stopPrank();
+
+    // Try to place bid with wrong owner
+    vm.startPrank(bidder);
+    vm.expectRevert("Not token owner");
+    auctionHouse.bidWithAuctionMerkleProof(
+      address(nftContract),
+      tokenId,
+      auctionCreator, // Wrong owner
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      proof
+    );
+    vm.stopPrank();
+  }
+
+  function test_getUserAuctionMerkleRoots() public {
+    // Test with no roots
+    bytes32[] memory roots = auctionHouse.getUserAuctionMerkleRoots(auctionCreator);
+    assertEq(roots.length, 0, "Should have no roots initially");
+
+    // Register multiple roots
+    vm.startPrank(auctionCreator);
+    nftContract.approve(address(auctionHouse), tokenId);
+
+    // Create and register first root
+    address[] memory contracts = new address[](3);
+    uint256[] memory ids = new uint256[](3);
+    for (uint256 i = 0; i < 3; i++) {
+      contracts[i] = address(nftContract);
+      ids[i] = tokenId + i;
+    }
+    (bytes32 root1, ) = _createMerkleTree(contracts, ids, 0);
+    auctionHouse.registerAuctionMerkleRoot(root1, auctionConfig);
+
+    // Create and register second root
+    for (uint256 i = 0; i < 3; i++) {
+      ids[i] = tokenId + i + 3; // Different token IDs
+    }
+    (bytes32 root2, ) = _createMerkleTree(contracts, ids, 0);
+    auctionHouse.registerAuctionMerkleRoot(root2, auctionConfig);
+    vm.stopPrank();
+
+    // Verify both roots are returned
+    roots = auctionHouse.getUserAuctionMerkleRoots(auctionCreator);
+    assertEq(roots.length, 2, "Should have two roots");
+    assertEq(roots[0], root1, "First root should match");
+    assertEq(roots[1], root2, "Second root should match");
+  }
+
+  function test_getCurrentAuctionMerkleRootNonce() public {
+    // Test initial nonce
+    uint256 nonce = auctionHouse.getCurrentAuctionMerkleRootNonce(auctionCreator, merkleRoot);
+    assertEq(nonce, 0, "Initial nonce should be 0");
+
+    // Register root and check nonce
+    vm.startPrank(auctionCreator);
+    nftContract.approve(address(auctionHouse), tokenId);
+
+    address[] memory contracts = new address[](3);
+    uint256[] memory ids = new uint256[](3);
+    for (uint256 i = 0; i < 3; i++) {
+      contracts[i] = address(nftContract);
+      ids[i] = tokenId + i;
+    }
+    (bytes32 root, ) = _createMerkleTree(contracts, ids, 0);
+
+    auctionHouse.registerAuctionMerkleRoot(root, auctionConfig);
+    vm.stopPrank();
+
+    // Verify nonce was incremented
+    nonce = auctionHouse.getCurrentAuctionMerkleRootNonce(auctionCreator, root);
+    assertEq(nonce, 1, "Nonce should be 1 after registration");
+  }
+
+  function test_isTokenInRoot() public {
+    // Create Merkle tree with multiple tokens
+    address[] memory contracts = new address[](3);
+    uint256[] memory ids = new uint256[](3);
+    for (uint256 i = 0; i < 3; i++) {
+      contracts[i] = address(nftContract);
+      ids[i] = tokenId + i;
+    }
+    (bytes32 root, bytes32[] memory proof) = _createMerkleTree(contracts, ids, 0);
+
+    // Test valid proof
+    bool isInRoot = auctionHouse.isTokenInRoot(root, address(nftContract), tokenId, proof);
+    assertTrue(isInRoot, "Token should be in root");
+
+    // Test invalid proof
+    bytes32[] memory invalidProof = new bytes32[](proof.length);
+    for (uint256 i = 0; i < proof.length; i++) {
+      invalidProof[i] = bytes32(uint256(proof[i]) + 1);
+    }
+    isInRoot = auctionHouse.isTokenInRoot(root, address(nftContract), tokenId, invalidProof);
+    assertFalse(isInRoot, "Token should not be in root with invalid proof");
+
+    // Test token not in tree
+    isInRoot = auctionHouse.isTokenInRoot(root, address(nftContract), tokenId + 10, proof);
+    assertFalse(isInRoot, "Token should not be in root");
   }
 }

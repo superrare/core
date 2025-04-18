@@ -103,34 +103,34 @@
   - [x] Test nonce increment
   - [x] Test root added to EnumerableSet
   - [ ] Test event emission
-- [ ] Test `cancelAuctionMerkleRoot`
-  - [ ] Test valid cancellation
-  - [ ] Test invalid cancellation attempts
-  - [ ] Test root removed from EnumerableSet
-  - [ ] Test data cleanup
+- [x] Test `cancelAuctionMerkleRoot`
+  - [x] Test valid cancellation
+  - [x] Test invalid cancellation attempts
+  - [x] Test root removed from EnumerableSet
+  - [x] Test data cleanup
   - [ ] Test event emission
 
 ### 3. Bidding System Tests
-- [ ] Test `bidWithAuctionMerkleProof`
-  - [ ] Test valid proofs
-  - [ ] Test invalid proofs
-  - [ ] Test replay protection
-  - [ ] Test ownership verification
-  - [ ] Test approval checks
-  - [ ] Test token transfer
-  - [ ] Test auction creation
+- [x] Test `bidWithAuctionMerkleProof`
+  - [x] Test valid proofs
+  - [x] Test invalid proofs
+  - [x] Test replay protection
+  - [x] Test ownership verification
+  - [x] Test approval checks
+  - [x] Test token transfer
+  - [x] Test auction creation
   - [ ] Test event emission
 
 ### 4. View Function Tests
-- [ ] Test `getUserAuctionMerkleRoots`
-  - [ ] Test with no roots
-  - [ ] Test with multiple roots
-- [ ] Test `getCurrentAuctionMerkleRootNonce`
-  - [ ] Test initial nonce
-  - [ ] Test after registration
-- [ ] Test `isTokenInRoot`
-  - [ ] Test valid proofs
-  - [ ] Test invalid proofs
+- [x] Test `getUserAuctionMerkleRoots`
+  - [x] Test with no roots
+  - [x] Test with multiple roots
+- [x] Test `getCurrentAuctionMerkleRootNonce`
+  - [x] Test initial nonce
+  - [x] Test after registration
+- [x] Test `isTokenInRoot`
+  - [x] Test valid proofs
+  - [x] Test invalid proofs
 
 ## Phase 5: Function Implementation
 
