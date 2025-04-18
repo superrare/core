@@ -3,49 +3,55 @@
 ## Phase 1: Storage Updates
 
 ### 1. Base Storage Updates (SuperRareBazaarBase.sol)
-- [ ] Add Merkle-specific storage mappings
-  - [ ] `mapping(address => EnumerableSet.Bytes32Set) private _userAuctionMerkleRoots` // For tracking and querying all roots per user
-  - [ ] `mapping(address => mapping(bytes32 => uint256)) public auctionMerkleRootNonce` // For versioning
-  - [ ] `mapping(address => mapping(bytes32 => mapping(uint256 => MerkleAuctionConfig))) public auctionMerkleConfigs` // For config storage
-  - [ ] `mapping(bytes32 => bool) public auctionMerkleProofUsed` // For replay protection
+- [x] Add Merkle-specific storage mappings
+  - [x] `mapping(address => EnumerableSet.Bytes32Set) private _userAuctionMerkleRoots` // For tracking and querying all roots per user
+  - [x] `mapping(address => mapping(bytes32 => uint256)) public auctionMerkleRootNonce` // For versioning
+  - [x] `mapping(address => mapping(bytes32 => mapping(uint256 => MerkleAuctionConfig))) public auctionMerkleConfigs` // For config storage
+  - [x] `mapping(bytes32 => bool) public auctionMerkleProofUsed` // For replay protection
 
 ### 2. Struct Updates
-- [ ] Add `MerkleAuctionConfig` struct to SuperRareBazaarBase.sol
-- [ ] Update existing storage layout documentation
+- [x] Add `MerkleAuctionConfig` struct to SuperRareBazaarBase.sol
+  - [x] Added fields: currency, startingAmount, duration, splitAddresses, splitRatios
+- [x] Update existing storage layout documentation
+  - [x] Added storage section for Merkle Auction Storage
+  - [x] Added EnumerableSet import and usage
 
 ## Phase 2: Interface Updates
 
 ### 1. ISuperRareAuctionHouse.sol Updates
-- [ ] Add new function signatures
-  - [ ] `registerAuctionMerkleRoot`
-  - [ ] `cancelAuctionMerkleRoot`
-  - [ ] `bidWithAuctionMerkleProof`
-  - [ ] `getUserAuctionMerkleRoots`
-  - [ ] `getCurrentAuctionMerkleRootNonce`
-  - [ ] `isTokenInRoot`
-- [ ] Add NatSpec documentation for new functions
+- [x] Add new function signatures
+  - [x] `registerAuctionMerkleRoot`
+  - [x] `cancelAuctionMerkleRoot`
+  - [x] `bidWithAuctionMerkleProof`
+  - [x] `getUserAuctionMerkleRoots`
+  - [x] `getCurrentAuctionMerkleRootNonce`
+  - [x] `isTokenInRoot`
+- [x] Add NatSpec documentation for new functions
+  - [x] Added detailed parameter descriptions
+  - [x] Added return value descriptions
+  - [x] Added function purpose descriptions
 
 ## Phase 3: Function Shells
 
 ### 1. Root Management Shells
-- [ ] Implement empty `registerAuctionMerkleRoot` function
+- [x] Implement empty `registerAuctionMerkleRoot` function
   ```solidity
   function registerAuctionMerkleRoot(
     bytes32 merkleRoot,
     MerkleAuctionConfig calldata config
   ) external {
-    // TODO: Implement
+    revert("registerAuctionMerkleRoot::Not implemented");
   }
   ```
-- [ ] Implement empty `cancelAuctionMerkleRoot` function
+- [x] Implement empty `cancelAuctionMerkleRoot` function
   ```solidity
   function cancelAuctionMerkleRoot(bytes32 root) external {
-    // TODO: Implement
+    revert("cancelAuctionMerkleRoot::Not implemented");
   }
   ```
 
 ### 2. Bidding System Shells
-- [ ] Implement empty `bidWithAuctionMerkleProof` function
+- [x] Implement empty `bidWithAuctionMerkleProof` function
   ```solidity
   function bidWithAuctionMerkleProof(
     address originContract,
@@ -56,27 +62,27 @@
     uint256 bidAmount,
     bytes32[] calldata proof
   ) external payable nonReentrant {
-    // TODO: Implement
+    revert("bidWithAuctionMerkleProof::Not implemented");
   }
   ```
 
 ### 3. View Function Shells
-- [ ] Implement empty `getUserAuctionMerkleRoots` function
+- [x] Implement empty `getUserAuctionMerkleRoots` function
   ```solidity
   function getUserAuctionMerkleRoots(address user) external view returns (bytes32[] memory) {
-    // TODO: Implement
+    revert("getUserAuctionMerkleRoots::Not implemented");
   }
   ```
-- [ ] Implement empty `getCurrentAuctionMerkleRootNonce` function
+- [x] Implement empty `getCurrentAuctionMerkleRootNonce` function
   ```solidity
   function getCurrentAuctionMerkleRootNonce(address user, bytes32 root) external view returns (uint256) {
-    // TODO: Implement
+    revert("getCurrentAuctionMerkleRootNonce::Not implemented");
   }
   ```
-- [ ] Implement empty `isTokenInRoot` function
+- [x] Implement empty `isTokenInRoot` function
   ```solidity
   function isTokenInRoot(bytes32 root, address origin, uint256 tokenId, bytes32[] calldata proof) public pure returns (bool) {
-    // TODO: Implement
+    revert("isTokenInRoot::Not implemented");
   }
   ```
 

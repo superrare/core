@@ -7,11 +7,14 @@ import {IPayments} from "rareprotocol/aux/payments/IPayments.sol";
 import {ISpaceOperatorRegistry} from "rareprotocol/aux/registry/interfaces/ISpaceOperatorRegistry.sol";
 import {IApprovedTokenRegistry} from "rareprotocol/aux/registry/interfaces/IApprovedTokenRegistry.sol";
 import {IRoyaltyEngineV1} from "royalty-registry/IRoyaltyEngineV1.sol";
+import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
 /// @author koloz
 /// @title SuperRareBazaar Storage Contract
 /// @dev STORAGE CAN ONLY BE APPENDED NOT INSERTED OR MODIFIED
 contract SuperRareBazaarStorage {
+  using EnumerableSet for EnumerableSet.Bytes32Set;
+
   /////////////////////////////////////////////////////////////////////////
   // Constants
   /////////////////////////////////////////////////////////////////////////
@@ -78,6 +81,20 @@ contract SuperRareBazaarStorage {
     address currencyAddress;
     uint256 amount;
     uint8 marketplaceFee;
+  }
+
+  // Structure for Merkle Auction Configuration:
+  // currency - address of the erc20 token used for the auction
+  // startingAmount - minimum bid amount
+  // duration - length of auction in seconds
+  // splitAddresses - addresses to split the proceeds with
+  // splitRatios - ratios for each split address
+  struct MerkleAuctionConfig {
+    address currency;
+    uint256 startingAmount;
+    uint256 duration;
+    address payable[] splitAddresses;
+    uint8[] splitRatios;
   }
 
   /////////////////////////////////////////////////////////////////////////
@@ -220,6 +237,22 @@ contract SuperRareBazaarStorage {
   // Mapping from contract to mapping of tokenId to Bid.
   mapping(address => mapping(uint256 => Bid)) public auctionBids;
 
-  uint256[50] private __gap;
+  uint256[46] private __gap;
   /// ALL NEW STORAGE MUST COME AFTER THIS
+
+  /////////////////////////////////////////////////////////////////////////
+  // Merkle Auction Storage
+  /////////////////////////////////////////////////////////////////////////
+
+  // Mapping of user to their Merkle roots
+  mapping(address => EnumerableSet.Bytes32Set) private _userAuctionMerkleRoots;
+
+  // Mapping of user to root to nonce for versioning
+  mapping(address => mapping(bytes32 => uint256)) public auctionMerkleRootNonce;
+
+  // Mapping of user to root to nonce to config
+  mapping(address => mapping(bytes32 => mapping(uint256 => MerkleAuctionConfig))) public auctionMerkleConfigs;
+
+  // Mapping of proof key to usage status for replay protection
+  mapping(bytes32 => bool) public auctionMerkleProofUsed;
 }

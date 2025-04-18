@@ -125,7 +125,7 @@ contract SuperRareAuctionHouse is
     address payable[] calldata _splitAddresses,
     uint8[] calldata _splitRatios
   ) external override {
-    require(false, 'convertOfferToAuction::Deprecated');
+    require(false, "convertOfferToAuction::Deprecated");
     _senderMustBeTokenOwner(_originContract, _tokenId);
     _ownerMustHaveMarketplaceApprovedForNFT(_originContract, _tokenId);
     _checkSplits(_splitAddresses, _splitRatios);
@@ -338,7 +338,10 @@ contract SuperRareAuctionHouse is
 
     if (currBid.bidder == address(0)) {
       erc721.transferFrom(address(this), auction.auctionCreator, _tokenId);
-      require(erc721.ownerOf(_tokenId) == auction.auctionCreator , "settleAuction::Failed to return token to auction creator");
+      require(
+        erc721.ownerOf(_tokenId) == auction.auctionCreator,
+        "settleAuction::Failed to return token to auction creator"
+      );
     } else {
       erc721.transferFrom(address(this), currBid.bidder, _tokenId);
 
@@ -353,9 +356,8 @@ contract SuperRareAuctionHouse is
       );
 
       marketplaceSettings.markERC721Token(_originContract, _tokenId, true);
-      require(erc721.ownerOf(_tokenId) == currBid.bidder , "settleAuction::Failed to transfer to auction winner");
+      require(erc721.ownerOf(_tokenId) == currBid.bidder, "settleAuction::Failed to transfer to auction winner");
     }
-
 
     emit AuctionSettled(
       _originContract,
@@ -401,5 +403,71 @@ contract SuperRareAuctionHouse is
     if (_auctionType != COLDIE_AUCTION && _auctionType != SCHEDULED_AUCTION) {
       revert("Invalid Auction Type");
     }
+  }
+
+  /// @notice Registers a new Merkle root for auction configuration
+  /// @param merkleRoot The root hash of the Merkle tree containing token IDs
+  /// @param config The auction configuration for this root
+  function registerAuctionMerkleRoot(
+    bytes32 merkleRoot,
+    SuperRareBazaarStorage.MerkleAuctionConfig calldata config
+  ) external override {
+    revert("registerAuctionMerkleRoot::Not implemented");
+  }
+
+  /// @notice Cancels a previously registered Merkle root
+  /// @param root The Merkle root to cancel
+  function cancelAuctionMerkleRoot(bytes32 root) external override {
+    revert("cancelAuctionMerkleRoot::Not implemented");
+  }
+
+  /// @notice Places a bid using a Merkle proof to verify token inclusion
+  /// @param originContract The contract address of the token
+  /// @param tokenId The ID of the token being bid on
+  /// @param creator The creator of the auction
+  /// @param merkleRoot The root hash of the Merkle tree
+  /// @param currency The currency address for the bid
+  /// @param bidAmount The amount of the bid
+  /// @param proof The Merkle proof verifying token inclusion
+  function bidWithAuctionMerkleProof(
+    address originContract,
+    uint256 tokenId,
+    address creator,
+    bytes32 merkleRoot,
+    address currency,
+    uint256 bidAmount,
+    bytes32[] calldata proof
+  ) external payable override nonReentrant {
+    revert("bidWithAuctionMerkleProof::Not implemented");
+  }
+
+  /// @notice Gets all Merkle roots registered by a user
+  /// @param user The address of the user
+  /// @return An array of Merkle roots
+  function getUserAuctionMerkleRoots(address user) external view override returns (bytes32[] memory) {
+    revert("getUserAuctionMerkleRoots::Not implemented");
+  }
+
+  /// @notice Gets the current nonce for a user's Merkle root
+  /// @param user The address of the user
+  /// @param root The Merkle root
+  /// @return The current nonce value
+  function getCurrentAuctionMerkleRootNonce(address user, bytes32 root) external view override returns (uint256) {
+    revert("getCurrentAuctionMerkleRootNonce::Not implemented");
+  }
+
+  /// @notice Verifies if a token is included in a Merkle root
+  /// @param root The Merkle root to check against
+  /// @param origin The contract address of the token
+  /// @param tokenId The ID of the token
+  /// @param proof The Merkle proof for verification
+  /// @return True if the token is included in the root, false otherwise
+  function isTokenInRoot(
+    bytes32 root,
+    address origin,
+    uint256 tokenId,
+    bytes32[] calldata proof
+  ) external pure override returns (bool) {
+    revert("isTokenInRoot::Not implemented");
   }
 }
