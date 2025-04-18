@@ -89,17 +89,19 @@
 ## Phase 4: Test Implementation
 
 ### 1. Test Setup
-- [ ] Create `MerkleAuctionHouse.t.sol`
-- [ ] Set up test environment
-- [ ] Create helper functions
-- [ ] Create mock contracts
+- [x] Add Merkle auction tests to `SuperRareAuctionHouse.t.sol`
+- [x] Set up test environment
+  - [x] Created TestNFT and TestToken contracts
+  - [x] Set up Merkle tree generation
+  - [x] Created test users and funding
+- [x] Create helper functions for Merkle proof generation
+- [x] Create mock contracts for testing
 
 ### 2. Root Management Tests
-- [ ] Test `registerAuctionMerkleRoot`
-  - [ ] Test valid registration
-  - [ ] Test invalid config parameters
-  - [ ] Test nonce increment
-  - [ ] Test root added to EnumerableSet
+- [x] Test `registerAuctionMerkleRoot`
+  - [x] Test valid registration
+  - [x] Test nonce increment
+  - [x] Test root added to EnumerableSet
   - [ ] Test event emission
 - [ ] Test `cancelAuctionMerkleRoot`
   - [ ] Test valid cancellation

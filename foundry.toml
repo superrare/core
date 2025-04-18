@@ -1,3 +1,4 @@
 [profile.default]
 auto_detect_remappings = false
 viaIR = true
+fs_permissions = [{ access = "read", path = "./"}]
