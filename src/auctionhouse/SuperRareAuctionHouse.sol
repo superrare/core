@@ -9,6 +9,8 @@ import {IERC721} from "openzeppelin-contracts/token/ERC721/IERC721.sol";
 import {SuperRareBazaarBase} from "../bazaar/SuperRareBazaarBase.sol";
 import {SuperRareBazaarStorage} from "../bazaar/SuperRareBazaarStorage.sol";
 import {ISuperRareAuctionHouse} from "./ISuperRareAuctionHouse.sol";
+import {MerkleProof} from "openzeppelin-contracts/utils/cryptography/MerkleProof.sol";
+import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
 /// @author koloz
 /// @title SuperRareAuctionHouse
@@ -20,6 +22,7 @@ contract SuperRareAuctionHouse is
   SuperRareBazaarBase
 {
   using SafeERC20 for IERC20;
+  using EnumerableSet for EnumerableSet.Bytes32Set;
 
   /// @notice Configures an Auction for a given asset.
   /// @dev If auction type is coldie (reserve) then _startingAmount cant be 0.
@@ -413,13 +416,33 @@ contract SuperRareAuctionHouse is
     bytes32 merkleRoot,
     SuperRareBazaarStorage.MerkleAuctionConfig calldata config
   ) external override {
-    revert("registerAuctionMerkleRoot::Not implemented");
+    // Check if currency is approved
+    _checkIfCurrencyIsApproved(config.currency);
+
+    // Add root to user's set of roots
+    _userAuctionMerkleRoots[msg.sender].add(merkleRoot);
+
+    // Increment nonce for this root
+    uint256 nonce = auctionMerkleRootNonce[msg.sender][merkleRoot] + 1;
+    auctionMerkleRootNonce[msg.sender][merkleRoot] = nonce;
+
+    // Store config for this root and nonce
+    auctionMerkleConfigs[msg.sender][merkleRoot][nonce] = config;
+
+    emit NewAuctionMerkleRoot(msg.sender, merkleRoot);
   }
 
   /// @notice Cancels a previously registered Merkle root
   /// @param root The Merkle root to cancel
   function cancelAuctionMerkleRoot(bytes32 root) external override {
-    revert("cancelAuctionMerkleRoot::Not implemented");
+    require(_userAuctionMerkleRoots[msg.sender].remove(root), "Root not found");
+
+    // Clean up nonce and config data
+    uint256 nonce = auctionMerkleRootNonce[msg.sender][root];
+    delete auctionMerkleRootNonce[msg.sender][root];
+    delete auctionMerkleConfigs[msg.sender][root][nonce];
+
+    emit AuctionMerkleRootCancelled(msg.sender, root);
   }
 
   /// @notice Places a bid using a Merkle proof to verify token inclusion
@@ -446,7 +469,7 @@ contract SuperRareAuctionHouse is
   /// @param user The address of the user
   /// @return An array of Merkle roots
   function getUserAuctionMerkleRoots(address user) external view override returns (bytes32[] memory) {
-    revert("getUserAuctionMerkleRoots::Not implemented");
+    return _userAuctionMerkleRoots[user].values();
   }
 
   /// @notice Gets the current nonce for a user's Merkle root
@@ -454,7 +477,7 @@ contract SuperRareAuctionHouse is
   /// @param root The Merkle root
   /// @return The current nonce value
   function getCurrentAuctionMerkleRootNonce(address user, bytes32 root) external view override returns (uint256) {
-    revert("getCurrentAuctionMerkleRootNonce::Not implemented");
+    return auctionMerkleRootNonce[user][root];
   }
 
   /// @notice Verifies if a token is included in a Merkle root
@@ -469,6 +492,7 @@ contract SuperRareAuctionHouse is
     uint256 tokenId,
     bytes32[] calldata proof
   ) external pure override returns (bool) {
-    revert("isTokenInRoot::Not implemented");
+    bytes32 leaf = keccak256(abi.encodePacked(origin, tokenId));
+    return MerkleProof.verify(proof, root, leaf);
   }
 }

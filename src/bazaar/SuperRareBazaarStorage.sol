@@ -179,6 +179,17 @@ contract SuperRareBazaarStorage {
     uint256 _amount
   );
 
+  event NewAuctionMerkleRoot(address indexed user, bytes32 indexed root);
+  event AuctionMerkleRootCancelled(address indexed user, bytes32 indexed root);
+  event BidWithAuctionMerkleProof(
+    address indexed originContract,
+    uint256 indexed tokenId,
+    address indexed bidder,
+    bytes32 merkleRoot,
+    address currency,
+    uint256 amount
+  );
+
   /////////////////////////////////////////////////////////////////////////
   // State Variables
   /////////////////////////////////////////////////////////////////////////
@@ -245,7 +256,7 @@ contract SuperRareBazaarStorage {
   /////////////////////////////////////////////////////////////////////////
 
   // Mapping of user to their Merkle roots
-  mapping(address => EnumerableSet.Bytes32Set) private _userAuctionMerkleRoots;
+  mapping(address => EnumerableSet.Bytes32Set) internal _userAuctionMerkleRoots;
 
   // Mapping of user to root to nonce for versioning
   mapping(address => mapping(bytes32 => uint256)) public auctionMerkleRootNonce;

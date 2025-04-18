@@ -102,13 +102,13 @@
   - [x] Test valid registration
   - [x] Test nonce increment
   - [x] Test root added to EnumerableSet
-  - [ ] Test event emission
+  - [x] Test event emission
 - [x] Test `cancelAuctionMerkleRoot`
   - [x] Test valid cancellation
   - [x] Test invalid cancellation attempts
   - [x] Test root removed from EnumerableSet
   - [x] Test data cleanup
-  - [ ] Test event emission
+  - [x] Test event emission
 
 ### 3. Bidding System Tests
 - [x] Test `bidWithAuctionMerkleProof`
@@ -119,7 +119,7 @@
   - [x] Test approval checks
   - [x] Test token transfer
   - [x] Test auction creation
-  - [ ] Test event emission
+  - [x] Test event emission
 
 ### 4. View Function Tests
 - [x] Test `getUserAuctionMerkleRoots`
@@ -135,9 +135,9 @@
 ## Phase 5: Function Implementation
 
 ### 1. Root Management Implementation
-- [ ] Implement `registerAuctionMerkleRoot`
-  - [ ] Run tests after each component
-  - [ ] Fix any failing tests
+- [x] Implement `registerAuctionMerkleRoot`
+  - [x] Run tests after each component
+  - [x] Fix any failing tests
 - [ ] Implement `cancelAuctionMerkleRoot`
   - [ ] Run tests after each component
   - [ ] Fix any failing tests
@@ -148,15 +148,15 @@
   - [ ] Fix any failing tests
 
 ### 3. View Function Implementation
-- [ ] Implement `getUserAuctionMerkleRoots`
-  - [ ] Run tests after each component
-  - [ ] Fix any failing tests
-- [ ] Implement `getCurrentAuctionMerkleRootNonce`
-  - [ ] Run tests after each component
-  - [ ] Fix any failing tests
-- [ ] Implement `isTokenInRoot`
-  - [ ] Run tests after each component
-  - [ ] Fix any failing tests
+- [x] Implement `getUserAuctionMerkleRoots`
+  - [x] Run tests after each component
+  - [x] Fix any failing tests
+- [x] Implement `getCurrentAuctionMerkleRootNonce`
+  - [x] Run tests after each component
+  - [x] Fix any failing tests
+- [x] Implement `isTokenInRoot`
+  - [x] Run tests after each component
+  - [x] Fix any failing tests
 
 ## Phase 6: Gas Optimization
 

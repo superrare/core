@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 pragma abicoder v2;
 
-import {Test} from "forge-std/Test.sol";
+import "forge-std/Test.sol";
 import {SuperRareAuctionHouse} from "../../auctionhouse/SuperRareAuctionHouse.sol";
 import {SuperRareBazaarStorage} from "../../bazaar/SuperRareBazaarStorage.sol";
 import {IERC721} from "openzeppelin-contracts/token/ERC721/IERC721.sol";
@@ -10,6 +10,12 @@ import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {Merkle} from "murky/Merkle.sol";
 import {ERC721} from "openzeppelin-contracts/token/ERC721/ERC721.sol";
 import {ERC20} from "openzeppelin-contracts/token/ERC20/ERC20.sol";
+import "openzeppelin-contracts/utils/cryptography/MerkleProof.sol";
+import {IMarketplaceSettings} from "rareprotocol/aux/marketplace/IMarketplaceSettings.sol";
+import {IRoyaltyEngineV1} from "royalty-registry/IRoyaltyEngineV1.sol";
+import {ISpaceOperatorRegistry} from "rareprotocol/aux/registry/interfaces/ISpaceOperatorRegistry.sol";
+import {IApprovedTokenRegistry} from "rareprotocol/aux/registry/interfaces/IApprovedTokenRegistry.sol";
+import {IPayments} from "rareprotocol/aux/payments/IPayments.sol";
 
 contract TestNFT is ERC721 {
   uint256 private _nextTokenId;
@@ -41,9 +47,49 @@ contract TestToken is ERC20 {
   }
 }
 
+contract TestAuctionHouse is SuperRareAuctionHouse {
+  function initialize(
+    address _marketplaceSettings,
+    address _royaltyEngine,
+    address _spaceOperatorRegistry,
+    address _approvedTokenRegistry,
+    address _payments,
+    address _stakingRegistry,
+    address _networkBeneficiary
+  ) public initializer {
+    // Initialize the auction house
+    marketplaceSettings = IMarketplaceSettings(_marketplaceSettings);
+    royaltyEngine = IRoyaltyEngineV1(_royaltyEngine);
+    spaceOperatorRegistry = ISpaceOperatorRegistry(_spaceOperatorRegistry);
+    approvedTokenRegistry = IApprovedTokenRegistry(_approvedTokenRegistry);
+    payments = IPayments(_payments);
+    stakingRegistry = _stakingRegistry;
+    networkBeneficiary = _networkBeneficiary;
+
+    // Set auction parameters
+    minimumBidIncreasePercentage = 10;
+    maxAuctionLength = 7 days;
+    auctionLengthExtension = 15 minutes;
+    offerCancelationDelay = 5 minutes;
+
+    // Initialize Ownable and ReentrancyGuard
+    __Ownable_init();
+    __ReentrancyGuard_init();
+  }
+}
+
 contract SuperRareAuctionHouseMerkleTest is Test {
+  // Mock addresses for dependencies
+  address marketplaceSettings = makeAddr("marketplaceSettings");
+  address royaltyEngine = makeAddr("royaltyEngine");
+  address spaceOperatorRegistry = makeAddr("spaceOperatorRegistry");
+  address approvedTokenRegistry = makeAddr("approvedTokenRegistry");
+  address payments = makeAddr("payments");
+  address stakingRegistry = makeAddr("stakingRegistry");
+  address networkBeneficiary = makeAddr("networkBeneficiary");
+
   // Test contracts
-  SuperRareAuctionHouse public auctionHouse;
+  TestAuctionHouse public auctionHouse;
   TestNFT public nftContract;
   TestToken public currencyContract;
 
@@ -73,7 +119,16 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     bidder = makeAddr("bidder");
 
     // Deploy contracts
-    auctionHouse = new SuperRareAuctionHouse();
+    auctionHouse = new TestAuctionHouse();
+    auctionHouse.initialize(
+      marketplaceSettings,
+      royaltyEngine,
+      spaceOperatorRegistry,
+      approvedTokenRegistry,
+      payments,
+      stakingRegistry,
+      networkBeneficiary
+    );
     merkle = new Merkle();
     nftContract = new TestNFT();
     currencyContract = new TestToken();
@@ -112,6 +167,59 @@ contract SuperRareAuctionHouseMerkleTest is Test {
 
     // Fund users with test tokens
     currencyContract.mint(bidder, 1000 * 10 ** currencyContract.decimals());
+
+    // Default Mocks
+    // Mock marketplace settings
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceFeePercentage.selector),
+      abi.encode(uint8(3))
+    );
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceMaxValue.selector),
+      abi.encode(type(uint256).max)
+    );
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceMinValue.selector),
+      abi.encode(uint256(0))
+    );
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.calculateMarketplaceFee.selector, uint256(100)),
+      abi.encode(uint256(3))
+    );
+
+    // Mock royalty engine
+    vm.mockCall(
+      royaltyEngine,
+      abi.encodeWithSelector(IRoyaltyEngineV1.getRoyaltyView.selector),
+      abi.encode(new address payable[](0), new uint256[](0))
+    );
+    vm.mockCall(
+      royaltyEngine,
+      abi.encodeWithSelector(IRoyaltyEngineV1.getRoyalty.selector),
+      abi.encode(new address payable[](0), new uint256[](0))
+    );
+
+    // Mock space operator registry
+    vm.mockCall(
+      spaceOperatorRegistry,
+      abi.encodeWithSelector(ISpaceOperatorRegistry.isApprovedSpaceOperator.selector),
+      abi.encode(true)
+    );
+
+    // Mock approved token registry
+    vm.mockCall(
+      approvedTokenRegistry,
+      abi.encodeWithSelector(IApprovedTokenRegistry.isApprovedToken.selector),
+      abi.encode(true)
+    );
+
+    // Mock payments
+    vm.mockCall(payments, abi.encodeWithSelector(IPayments.refund.selector), abi.encode());
+    vm.mockCall(payments, abi.encodeWithSelector(IPayments.payout.selector), abi.encode());
   }
 
   // Helper function to create a Merkle tree with multiple tokens and get proof for specific token
@@ -119,7 +227,7 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     address[] memory contracts,
     uint256[] memory tokenIds,
     uint256 proofIndex
-  ) internal returns (bytes32 root, bytes32[] memory proof) {
+  ) internal view returns (bytes32 root, bytes32[] memory proof) {
     require(contracts.length == tokenIds.length, "Length mismatch");
     require(proofIndex < contracts.length, "Invalid proof index");
 
@@ -138,14 +246,14 @@ contract SuperRareAuctionHouseMerkleTest is Test {
   // Helper function to get proof for a specific token
   function _getProofForToken(
     address contractAddress,
-    uint256 tokenId,
+    uint256 targetTokenId,
     uint256 proofIndex
   ) internal view returns (bytes32[] memory) {
     address[] memory contracts = new address[](3);
     uint256[] memory ids = new uint256[](3);
     for (uint256 i = 0; i < 3; i++) {
       contracts[i] = contractAddress;
-      ids[i] = tokenId + i;
+      ids[i] = targetTokenId + i;
     }
     (, bytes32[] memory proof) = _createMerkleTree(contracts, ids, proofIndex);
     return proof;
@@ -170,6 +278,38 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     uint256 nonce = auctionHouse.getCurrentAuctionMerkleRootNonce(auctionCreator, merkleRoot);
     assertEq(nonce, 1, "Nonce should be 1");
 
+    vm.stopPrank();
+  }
+
+  function test_registerAuctionMerkleRoot_invalidCurrency() public {
+    // Create an invalid currency contract
+    TestToken invalidCurrency = new TestToken();
+
+    // Setup auction config with invalid currency
+    address payable[] memory splitAddresses = new address payable[](1);
+    splitAddresses[0] = payable(makeAddr("splitRecipient"));
+    uint8[] memory splitRatios = new uint8[](1);
+    splitRatios[0] = SPLIT_RATIO;
+
+    SuperRareBazaarStorage.MerkleAuctionConfig memory invalidConfig = SuperRareBazaarStorage.MerkleAuctionConfig({
+      currency: address(invalidCurrency),
+      startingAmount: STARTING_AMOUNT,
+      duration: AUCTION_DURATION,
+      splitAddresses: splitAddresses,
+      splitRatios: splitRatios
+    });
+
+    // Mock isApprovedToken to return false for the invalid currency
+    vm.mockCall(
+      approvedTokenRegistry,
+      abi.encodeWithSelector(IApprovedTokenRegistry.isApprovedToken.selector, address(invalidCurrency)),
+      abi.encode(false)
+    );
+
+    // Try to register with invalid currency
+    vm.startPrank(auctionCreator);
+    vm.expectRevert("Not approved currency");
+    auctionHouse.registerAuctionMerkleRoot(merkleRoot, invalidConfig);
     vm.stopPrank();
   }
 
@@ -256,13 +396,20 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     vm.stopPrank();
 
     // Verify auction was created
-    (address highestBidder, uint256 highestBid, uint256 endTime) = auctionHouse.getAuctionDetails(
-      address(nftContract),
-      tokenId
-    );
-    assertEq(highestBidder, bidder, "Bidder should be highest bidder");
-    assertEq(highestBid, STARTING_AMOUNT, "Bid amount should match");
-    assertEq(endTime, block.timestamp + AUCTION_DURATION, "Auction duration should be correct");
+    (
+      address creator,
+      uint256 creationBlock,
+      uint256 startTime,
+      uint256 lengthOfAuction,
+      address currencyAddress,
+      uint256 minimumBid,
+      bytes32 auctionType,
+      address payable[] memory splitRecipients,
+      uint8[] memory splitRatios
+    ) = auctionHouse.getAuctionDetails(address(nftContract), tokenId);
+    assertEq(creator, bidder, "Bidder should be highest bidder");
+    assertEq(minimumBid, STARTING_AMOUNT, "Bid amount should match");
+    assertEq(startTime + lengthOfAuction, block.timestamp + AUCTION_DURATION, "Auction duration should be correct");
   }
 
   function test_bidWithAuctionMerkleProof_invalidProof() public {
