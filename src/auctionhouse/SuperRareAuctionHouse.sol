@@ -470,7 +470,6 @@ contract SuperRareAuctionHouse is
   /// @param tokenId The ID of the token being bid on
   /// @param creator The creator of the auction
   /// @param merkleRoot The root hash of the Merkle tree
-  /// @param currency The currency address for the bid
   /// @param bidAmount The amount of the bid
   /// @param proof The Merkle proof verifying token inclusion
   function bidWithAuctionMerkleProof(
@@ -478,7 +477,6 @@ contract SuperRareAuctionHouse is
     uint256 tokenId,
     address creator,
     bytes32 merkleRoot,
-    address currency,
     uint256 bidAmount,
     bytes32[] calldata proof
   ) external payable override nonReentrant {
@@ -502,9 +500,6 @@ contract SuperRareAuctionHouse is
       "bidWithAuctionMerkleProof::Token already used for this Merkle root"
     );
 
-    // Verify currency is approved
-    _checkIfCurrencyIsApproved(currency);
-
     // Verify no auction exists for this token
     require(
       tokenAuctions[originContract][tokenId].auctionType == NO_AUCTION,
@@ -524,7 +519,7 @@ contract SuperRareAuctionHouse is
 
     // Transfer bid amount
     uint256 requiredAmount = bidAmount + marketplaceSettings.calculateMarketplaceFee(bidAmount);
-    _checkAmountAndTransfer(currency, requiredAmount);
+    _checkAmountAndTransfer(config.currency, requiredAmount);
 
     // Update token nonce to current config nonce + 1
     tokenAuctionNonce[tokenNonceKey] = tokenAuctionNonce[tokenNonceKey] + 1;
@@ -535,7 +530,7 @@ contract SuperRareAuctionHouse is
       block.number,
       block.timestamp,
       config.duration,
-      currency,
+      config.currency,
       config.startingAmount,
       COLDIE_AUCTION,
       config.splitAddresses,
@@ -545,7 +540,7 @@ contract SuperRareAuctionHouse is
     // Record the bid
     auctionBids[originContract][tokenId] = Bid(
       payable(msg.sender),
-      currency,
+      config.currency,
       bidAmount,
       marketplaceSettings.getMarketplaceFeePercentage()
     );
@@ -557,7 +552,7 @@ contract SuperRareAuctionHouse is
       originContract,
       msg.sender,
       tokenId,
-      currency,
+      config.currency,
       bidAmount,
       merkleRoot,
       true, // startedAuction

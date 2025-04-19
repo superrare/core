@@ -464,7 +464,6 @@ contract SuperRareAuctionHouseMerkleTest is Test {
       firstTokenId,
       auctionCreator,
       root,
-      address(currencyContract),
       STARTING_AMOUNT,
       proof
     );
@@ -522,7 +521,6 @@ contract SuperRareAuctionHouseMerkleTest is Test {
       firstTokenId,
       auctionCreator,
       root,
-      address(currencyContract),
       STARTING_AMOUNT,
       invalidProof
     );
@@ -563,29 +561,13 @@ contract SuperRareAuctionHouseMerkleTest is Test {
 
     // Place first bid
     vm.startPrank(bidder);
-    auctionHouse.bidWithAuctionMerkleProof(
-      address(nftContract),
-      tokenId,
-      auctionCreator,
-      root,
-      address(currencyContract),
-      STARTING_AMOUNT,
-      proof
-    );
+    auctionHouse.bidWithAuctionMerkleProof(address(nftContract), tokenId, auctionCreator, root, STARTING_AMOUNT, proof);
     vm.stopPrank();
 
     // Try to place same bid again
     vm.startPrank(bidder);
     vm.expectRevert("bidWithAuctionMerkleProof::Token already used for this Merkle root");
-    auctionHouse.bidWithAuctionMerkleProof(
-      address(nftContract),
-      tokenId,
-      auctionCreator,
-      root,
-      address(currencyContract),
-      STARTING_AMOUNT,
-      proof
-    );
+    auctionHouse.bidWithAuctionMerkleProof(address(nftContract), tokenId, auctionCreator, root, STARTING_AMOUNT, proof);
     vm.stopPrank();
   }
 
@@ -623,7 +605,6 @@ contract SuperRareAuctionHouseMerkleTest is Test {
       firstTokenId,
       auctionCreator, // Wrong owner
       root,
-      address(currencyContract),
       STARTING_AMOUNT,
       proof
     );
@@ -777,7 +758,6 @@ contract SuperRareAuctionHouseMerkleTest is Test {
       firstTokenId,
       auctionCreator,
       root,
-      address(currencyContract),
       STARTING_AMOUNT,
       proof
     );
@@ -804,7 +784,6 @@ contract SuperRareAuctionHouseMerkleTest is Test {
       firstTokenId,
       auctionCreator,
       root,
-      address(currencyContract),
       STARTING_AMOUNT,
       proof
     );
@@ -841,7 +820,6 @@ contract SuperRareAuctionHouseMerkleTest is Test {
       newFirstTokenId,
       auctionCreator,
       newRoot,
-      address(currencyContract),
       STARTING_AMOUNT,
       newProof
     );
@@ -880,7 +858,6 @@ contract SuperRareAuctionHouseMerkleTest is Test {
       firstTokenId,
       auctionCreator,
       root,
-      address(currencyContract),
       STARTING_AMOUNT,
       proof
     );
@@ -913,7 +890,6 @@ contract SuperRareAuctionHouseMerkleTest is Test {
       newFirstTokenId,
       auctionCreator,
       newRoot,
-      address(currencyContract),
       STARTING_AMOUNT,
       newProof
     );
@@ -970,7 +946,6 @@ contract SuperRareAuctionHouseMerkleTest is Test {
       firstTokenId,
       auctionCreator,
       root,
-      address(currencyContract),
       STARTING_AMOUNT,
       proof
     );
@@ -1017,7 +992,6 @@ contract SuperRareAuctionHouseMerkleTest is Test {
       newFirstTokenId,
       auctionCreator,
       newRoot,
-      address(currencyContract),
       STARTING_AMOUNT,
       newProof
     );
@@ -1058,7 +1032,6 @@ contract SuperRareAuctionHouseMerkleTest is Test {
       firstTokenId,
       auctionCreator,
       root,
-      address(0), // ETH
       STARTING_AMOUNT,
       proof
     );
@@ -1115,7 +1088,6 @@ contract SuperRareAuctionHouseMerkleTest is Test {
       firstTokenId,
       auctionCreator,
       root,
-      address(0), // ETH
       STARTING_AMOUNT,
       proof
     );
@@ -1156,7 +1128,6 @@ contract SuperRareAuctionHouseMerkleTest is Test {
       nonExistentTokenId,
       auctionCreator,
       root,
-      address(currencyContract),
       STARTING_AMOUNT,
       proof // Using proof for firstTokenId, which won't match nonExistentTokenId
     );
@@ -1203,7 +1174,6 @@ contract SuperRareAuctionHouseMerkleTest is Test {
       firstTokenId,
       auctionCreator,
       root,
-      address(currencyContract),
       STARTING_AMOUNT,
       malformedProof
     );
@@ -1244,7 +1214,6 @@ contract SuperRareAuctionHouseMerkleTest is Test {
       firstTokenId,
       auctionCreator,
       root,
-      address(currencyContract),
       STARTING_AMOUNT,
       emptyProof
     );
@@ -1301,7 +1270,6 @@ contract SuperRareAuctionHouseMerkleTest is Test {
       targetTokenId,
       auctionCreator,
       root,
-      address(0), // ETH
       STARTING_AMOUNT,
       proof
     );

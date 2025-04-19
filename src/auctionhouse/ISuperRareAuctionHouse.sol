@@ -104,7 +104,6 @@ interface ISuperRareAuctionHouse {
   /// @param tokenId The ID of the token being bid on
   /// @param creator The creator of the auction
   /// @param merkleRoot The root hash of the Merkle tree
-  /// @param currency The currency address for the bid
   /// @param bidAmount The amount of the bid
   /// @param proof The Merkle proof verifying token inclusion
   function bidWithAuctionMerkleProof(
@@ -112,7 +111,6 @@ interface ISuperRareAuctionHouse {
     uint256 tokenId,
     address creator,
     bytes32 merkleRoot,
-    address currency,
     uint256 bidAmount,
     bytes32[] calldata proof
   ) external payable;
