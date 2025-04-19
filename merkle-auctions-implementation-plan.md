@@ -9,7 +9,18 @@
   - [x] `mapping(address => mapping(bytes32 => mapping(uint256 => MerkleAuctionConfig))) public auctionMerkleConfigs` // For config storage
   - [x] `mapping(bytes32 => bool) public auctionMerkleProofUsed` // For replay protection
 
-### 2. Struct Updates
+### 2. Dual Nonce System Design
+- [x] Implement dual nonce tracking system
+  - [x] Root-level nonce tracking
+    - [x] `mapping(address => mapping(bytes32 => uint256)) public auctionMerkleRootNonce` // Tracks how many times a user has reconfigured an auction for a given root
+  - [x] Token-level nonce tracking
+    - [x] `mapping(bytes32 => mapping(address => mapping(uint256 => uint256))) public tokenAuctionNonce` // Tracks which configuration version a token was sold under
+  - [x] Update validation logic
+    - [x] Check token nonce matches current root nonce
+    - [x] Increment token nonce on successful sale
+    - [x] Increment root nonce on reconfiguration
+
+### 3. Struct Updates
 - [x] Add `MerkleAuctionConfig` struct to SuperRareBazaarBase.sol
   - [x] Added fields: currency, startingAmount, duration, splitAddresses, splitRatios
 - [x] Update existing storage layout documentation
@@ -112,14 +123,56 @@
 
 ### 3. Bidding System Tests
 - [x] Test `bidWithAuctionMerkleProof`
-  - [x] Test valid proofs
-  - [x] Test invalid proofs
-  - [x] Test replay protection
-  - [x] Test ownership verification
-  - [x] Test approval checks
-  - [x] Test token transfer
-  - [x] Test auction creation
-  - [x] Test event emission
+  - [x] Basic Functionality Tests
+    - [x] Test valid proofs
+    - [x] Test invalid proofs
+    - [x] Test replay protection
+    - [x] Test ownership verification
+    - [x] Test approval checks
+    - [x] Test token transfer
+    - [x] Test auction creation
+    - [x] Test event emission
+  - [x] Token and Currency Validation
+    - [x] Test with ERC20 payments
+    - [x] Test with unapproved currency
+    - [x] Test with insufficient allowance
+    - [ ] Test with ETH payments
+    - [ ] Test with insufficient balance
+    - [ ] Test with non-existent token ID
+    - [ ] Test with non-contract token address
+  - [x] Merkle Proof Validation
+    - [x] Test with invalid root
+    - [x] Test with proof for different token
+    - [x] Test with proof for different amount
+    - [x] Test with proof for different currency
+    - [ ] Test with malformed proof array
+    - [ ] Test with empty proof array
+  - [x] Nonce and Configuration Tests
+    - [x] Test bidding with outdated root nonce
+    - [x] Test bidding with outdated token nonce
+    - [x] Test bidding after root reconfiguration
+    - [x] Test multiple bids for different tokens under same root
+    - [x] Test bidding with cancelled root
+  - [x] Amount Validation
+    - [x] Test bid below minimum amount
+    - [x] Test bid above maximum marketplace value
+    - [x] Test bid with exact minimum amount
+    - [x] Test bid with marketplace fee calculation
+  - [x] Edge Cases and Security
+    - [x] Test reentrancy protection
+    - [x] Test with zero address currency
+    - [x] Test with zero bid amount
+    - [x] Test when auction already exists
+    - [x] Test when token is already in another auction
+    - [x] Test when sender is token owner
+    - [ ] Test when contract is paused (if applicable)
+  - [x] Event Emission Tests
+    - [x] Verify all AuctionMerkleBid event parameters
+    - [x] Test event emission order
+    - [x] Test multiple events in single transaction
+    - [x] Verify correct previous bidder address
+    - [x] Verify correct auction start flag
+    - [x] Verify correct auction length
 
 ### 4. View Function Tests
 - [x] Test `getUserAuctionMerkleRoots`
@@ -138,14 +191,14 @@
 - [x] Implement `registerAuctionMerkleRoot`
   - [x] Run tests after each component
   - [x] Fix any failing tests
-- [ ] Implement `cancelAuctionMerkleRoot`
-  - [ ] Run tests after each component
-  - [ ] Fix any failing tests
+- [x] Implement `cancelAuctionMerkleRoot`
+  - [x] Run tests after each component
+  - [x] Fix any failing tests
 
 ### 2. Bidding System Implementation
-- [ ] Implement `bidWithAuctionMerkleProof`
-  - [ ] Run tests after each component
-  - [ ] Fix any failing tests
+- [x] Implement `bidWithAuctionMerkleProof`
+  - [x] Run tests after each component
+  - [x] Fix any failing tests
 
 ### 3. View Function Implementation
 - [x] Implement `getUserAuctionMerkleRoots`
@@ -194,6 +247,18 @@
 - [ ] Schedule security audit
 - [ ] Address audit findings
 - [ ] Implement recommended fixes
+
+### 2. Additional Test Cases
+- [ ] Test gas consumption for various operations
+- [ ] Test edge cases with large arrays of split recipients
+- [ ] Test concurrent auction operations
+- [ ] Test integration with external contracts
+- [ ] Test recovery scenarios
+- [ ] Test upgrade scenarios (if applicable)
+- [ ] Test event emission in error cases
+- [ ] Test token approvals and transfers in error cases
+- [ ] Test marketplace fee calculations with different percentages
+- [ ] Test royalty calculations with different recipients
 
 ## Phase 9: Deployment
 

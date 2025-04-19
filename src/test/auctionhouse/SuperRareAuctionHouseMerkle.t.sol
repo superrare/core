@@ -16,6 +16,7 @@ import {IRoyaltyEngineV1} from "royalty-registry/IRoyaltyEngineV1.sol";
 import {ISpaceOperatorRegistry} from "rareprotocol/aux/registry/interfaces/ISpaceOperatorRegistry.sol";
 import {IApprovedTokenRegistry} from "rareprotocol/aux/registry/interfaces/IApprovedTokenRegistry.sol";
 import {IPayments} from "rareprotocol/aux/payments/IPayments.sol";
+import {IStakingSettings} from "../../marketplace/IStakingSettings.sol";
 
 contract TestNFT is ERC721 {
   uint256 private _nextTokenId;
@@ -148,7 +149,8 @@ contract SuperRareAuctionHouseMerkleTest is Test {
       startingAmount: STARTING_AMOUNT,
       duration: AUCTION_DURATION,
       splitAddresses: splitAddresses,
-      splitRatios: splitRatios
+      splitRatios: splitRatios,
+      nonce: 0
     });
 
     // Setup Merkle tree with multiple tokens
@@ -187,8 +189,38 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     );
     vm.mockCall(
       marketplaceSettings,
-      abi.encodeWithSelector(IMarketplaceSettings.calculateMarketplaceFee.selector, uint256(100)),
-      abi.encode(uint256(3))
+      abi.encodeWithSelector(IMarketplaceSettings.calculateMarketplaceFee.selector, STARTING_AMOUNT),
+      abi.encode((STARTING_AMOUNT * 3) / 100)
+    );
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.hasERC721TokenSold.selector, address(nftContract), 3),
+      abi.encode(false)
+    );
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(
+        IMarketplaceSettings.getERC721ContractPrimarySaleFeePercentage.selector,
+        address(nftContract)
+      ),
+      abi.encode(15)
+    );
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.markERC721Token.selector, address(nftContract)),
+      abi.encode()
+    );
+
+    // Mock staking settings
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IStakingSettings.calculateMarketplacePayoutFee.selector, STARTING_AMOUNT),
+      abi.encode((STARTING_AMOUNT * 3) / 100)
+    );
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSignature("calculateStakingFee(uint256)", STARTING_AMOUNT),
+      abi.encode(0)
     );
 
     // Mock royalty engine
@@ -209,6 +241,11 @@ contract SuperRareAuctionHouseMerkleTest is Test {
       abi.encodeWithSelector(ISpaceOperatorRegistry.isApprovedSpaceOperator.selector),
       abi.encode(true)
     );
+    vm.mockCall(
+      spaceOperatorRegistry,
+      abi.encodeWithSelector(ISpaceOperatorRegistry.getPlatformCommission.selector),
+      abi.encode(uint8(0))
+    );
 
     // Mock approved token registry
     vm.mockCall(
@@ -220,6 +257,13 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     // Mock payments
     vm.mockCall(payments, abi.encodeWithSelector(IPayments.refund.selector), abi.encode());
     vm.mockCall(payments, abi.encodeWithSelector(IPayments.payout.selector), abi.encode());
+
+    // Mock staking registry
+    vm.mockCall(
+      stakingRegistry,
+      abi.encodeWithSelector(bytes4(keccak256("getRewardAccumulatorAddressForUser(address)"))),
+      abi.encode(address(0))
+    );
   }
 
   // Helper function to create a Merkle tree with multiple tokens and get proof for specific token
@@ -243,39 +287,60 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     return (root, proof);
   }
 
-  // Helper function to get proof for a specific token
-  function _getProofForToken(
-    address contractAddress,
-    uint256 targetTokenId,
-    uint256 proofIndex
-  ) internal view returns (bytes32[] memory) {
-    address[] memory contracts = new address[](3);
-    uint256[] memory ids = new uint256[](3);
-    for (uint256 i = 0; i < 3; i++) {
-      contracts[i] = contractAddress;
-      ids[i] = targetTokenId + i;
+  // Helper function to create a fresh Merkle tree with newly minted tokens
+  function _createFreshMerkleTree(
+    uint256 numTokens
+  ) internal returns (bytes32 root, bytes32[] memory proof, uint256[] memory tokenIds, uint256 firstTokenId) {
+    // Mint fresh tokens
+    tokenIds = new uint256[](numTokens);
+    address[] memory contracts = new address[](numTokens);
+
+    for (uint256 i = 0; i < numTokens; i++) {
+      tokenIds[i] = nftContract.mint(auctionCreator);
+      contracts[i] = address(nftContract);
+
+      // Approve each token
+      vm.startPrank(auctionCreator);
+      nftContract.approve(address(auctionHouse), tokenIds[i]);
+      vm.stopPrank();
     }
-    (, bytes32[] memory proof) = _createMerkleTree(contracts, ids, proofIndex);
-    return proof;
+
+    firstTokenId = tokenIds[0];
+
+    // Create Merkle tree
+    bytes32[] memory leaves = new bytes32[](numTokens);
+    for (uint256 i = 0; i < numTokens; i++) {
+      leaves[i] = keccak256(abi.encodePacked(contracts[i], tokenIds[i]));
+    }
+
+    root = merkle.getRoot(leaves);
+    proof = merkle.getProof(leaves, 0); // Get proof for first token
+
+    return (root, proof, tokenIds, firstTokenId);
   }
 
   function test_registerAuctionMerkleRoot() public {
-    // Start acting as the auction creator
-    vm.startPrank(auctionCreator);
-
-    // Approve the NFT for the auction house
-    nftContract.approve(address(auctionHouse), tokenId);
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, , , ) = _createFreshMerkleTree(3);
 
     // Register the auction merkle root
-    auctionHouse.registerAuctionMerkleRoot(merkleRoot, auctionConfig);
+    vm.startPrank(auctionCreator);
+    auctionHouse.registerAuctionMerkleRoot(
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
 
     // Verify the root was registered
     bytes32[] memory roots = auctionHouse.getUserAuctionMerkleRoots(auctionCreator);
     assertEq(roots.length, 1, "Should have one root registered");
-    assertEq(roots[0], merkleRoot, "Registered root should match");
+    assertEq(roots[0], root, "Registered root should match");
 
     // Verify the nonce was incremented
-    uint256 nonce = auctionHouse.getCurrentAuctionMerkleRootNonce(auctionCreator, merkleRoot);
+    uint256 nonce = auctionHouse.getCurrentAuctionMerkleRootNonce(auctionCreator, root);
     assertEq(nonce, 1, "Nonce should be 1");
 
     vm.stopPrank();
@@ -285,19 +350,11 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     // Create an invalid currency contract
     TestToken invalidCurrency = new TestToken();
 
-    // Setup auction config with invalid currency
+    // Setup split addresses and ratios
     address payable[] memory splitAddresses = new address payable[](1);
     splitAddresses[0] = payable(makeAddr("splitRecipient"));
     uint8[] memory splitRatios = new uint8[](1);
     splitRatios[0] = SPLIT_RATIO;
-
-    SuperRareBazaarStorage.MerkleAuctionConfig memory invalidConfig = SuperRareBazaarStorage.MerkleAuctionConfig({
-      currency: address(invalidCurrency),
-      startingAmount: STARTING_AMOUNT,
-      duration: AUCTION_DURATION,
-      splitAddresses: splitAddresses,
-      splitRatios: splitRatios
-    });
 
     // Mock isApprovedToken to return false for the invalid currency
     vm.mockCall(
@@ -309,15 +366,31 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     // Try to register with invalid currency
     vm.startPrank(auctionCreator);
     vm.expectRevert("Not approved currency");
-    auctionHouse.registerAuctionMerkleRoot(merkleRoot, invalidConfig);
+    auctionHouse.registerAuctionMerkleRoot(
+      merkleRoot,
+      address(invalidCurrency),
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      splitAddresses,
+      splitRatios
+    );
     vm.stopPrank();
   }
 
   function test_cancelAuctionMerkleRoot() public {
-    // First register a root
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, , , ) = _createFreshMerkleTree(3);
+
+    // Register the root
     vm.startPrank(auctionCreator);
-    nftContract.approve(address(auctionHouse), tokenId);
-    auctionHouse.registerAuctionMerkleRoot(merkleRoot, auctionConfig);
+    auctionHouse.registerAuctionMerkleRoot(
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
     vm.stopPrank();
 
     // Verify root is registered
@@ -326,7 +399,7 @@ contract SuperRareAuctionHouseMerkleTest is Test {
 
     // Cancel the root
     vm.startPrank(auctionCreator);
-    auctionHouse.cancelAuctionMerkleRoot(merkleRoot);
+    auctionHouse.cancelAuctionMerkleRoot(root);
     vm.stopPrank();
 
     // Verify root is removed
@@ -335,16 +408,25 @@ contract SuperRareAuctionHouseMerkleTest is Test {
   }
 
   function test_cancelAuctionMerkleRoot_notOwner() public {
-    // First register a root
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, , , ) = _createFreshMerkleTree(3);
+
+    // Register the root
     vm.startPrank(auctionCreator);
-    nftContract.approve(address(auctionHouse), tokenId);
-    auctionHouse.registerAuctionMerkleRoot(merkleRoot, auctionConfig);
+    auctionHouse.registerAuctionMerkleRoot(
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
     vm.stopPrank();
 
     // Try to cancel as non-owner
     vm.startPrank(bidder);
     vm.expectRevert("Not root owner");
-    auctionHouse.cancelAuctionMerkleRoot(merkleRoot);
+    auctionHouse.cancelAuctionMerkleRoot(root);
     vm.stopPrank();
 
     // Verify root is still registered
@@ -353,32 +435,33 @@ contract SuperRareAuctionHouseMerkleTest is Test {
   }
 
   function test_bidWithAuctionMerkleProof() public {
-    // Setup: Register the auction root
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, bytes32[] memory proof, uint256[] memory tokenIds, uint256 firstTokenId) = _createFreshMerkleTree(3);
+
+    // Register the auction merkle root
     vm.startPrank(auctionCreator);
-    nftContract.approve(address(auctionHouse), tokenId);
-
-    // Create Merkle tree and get proof for our specific token
-    address[] memory contracts = new address[](3);
-    uint256[] memory ids = new uint256[](3);
-    for (uint256 i = 0; i < 3; i++) {
-      contracts[i] = address(nftContract);
-      ids[i] = tokenId + i;
-    }
-    (bytes32 root, bytes32[] memory proof) = _createMerkleTree(contracts, ids, 0);
-
-    auctionHouse.registerAuctionMerkleRoot(root, auctionConfig);
+    auctionHouse.registerAuctionMerkleRoot(
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
     vm.stopPrank();
 
     // Setup: Approve the auction house to spend bidder's tokens
     vm.startPrank(bidder);
-    currencyContract.approve(address(auctionHouse), STARTING_AMOUNT);
+    uint256 requiredAmount = STARTING_AMOUNT +
+      IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT);
+    currencyContract.approve(address(auctionHouse), requiredAmount);
     vm.stopPrank();
 
     // Place bid
     vm.startPrank(bidder);
     auctionHouse.bidWithAuctionMerkleProof(
       address(nftContract),
-      tokenId,
+      firstTokenId,
       auctionCreator,
       root,
       address(currencyContract),
@@ -388,37 +471,36 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     vm.stopPrank();
 
     // Verify auction was created
-    (
-      address creator,
-      uint256 creationBlock,
-      uint256 startTime,
-      uint256 lengthOfAuction,
-      address currencyAddress,
-      uint256 minimumBid,
-      bytes32 auctionType,
-      address payable[] memory splitRecipients,
-      uint8[] memory splitRatios
-    ) = auctionHouse.getAuctionDetails(address(nftContract), tokenId);
-    assertEq(creator, bidder, "Bidder should be highest bidder");
+    (address creator, , uint256 startTime, uint256 lengthOfAuction, , uint256 minimumBid, , , ) = auctionHouse
+      .getAuctionDetails(address(nftContract), firstTokenId);
+    assertEq(creator, auctionCreator, "Creator should be the one who created the Merkle root");
     assertEq(minimumBid, STARTING_AMOUNT, "Bid amount should match");
     assertEq(startTime + lengthOfAuction, block.timestamp + AUCTION_DURATION, "Auction duration should be correct");
+
+    // Verify current bidder
+    (address currentBidder, address bidCurrency, uint256 bidAmount, ) = auctionHouse.auctionBids(
+      address(nftContract),
+      firstTokenId
+    );
+    assertEq(currentBidder, bidder, "Bidder should be the current highest bidder");
+    assertEq(bidAmount, STARTING_AMOUNT, "Bid amount should match");
+    assertEq(bidCurrency, address(currencyContract), "Currency should match");
   }
 
   function test_bidWithAuctionMerkleProof_invalidProof() public {
-    // Setup: Register the auction root
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, bytes32[] memory validProof, , uint256 firstTokenId) = _createFreshMerkleTree(3);
+
+    // Register the root
     vm.startPrank(auctionCreator);
-    nftContract.approve(address(auctionHouse), tokenId);
-
-    // Create Merkle tree and get proof for our specific token
-    address[] memory contracts = new address[](3);
-    uint256[] memory ids = new uint256[](3);
-    for (uint256 i = 0; i < 3; i++) {
-      contracts[i] = address(nftContract);
-      ids[i] = tokenId + i;
-    }
-    (bytes32 root, bytes32[] memory validProof) = _createMerkleTree(contracts, ids, 0);
-
-    auctionHouse.registerAuctionMerkleRoot(root, auctionConfig);
+    auctionHouse.registerAuctionMerkleRoot(
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
     vm.stopPrank();
 
     // Setup: Approve the auction house to spend bidder's tokens
@@ -434,10 +516,10 @@ contract SuperRareAuctionHouseMerkleTest is Test {
 
     // Try to place bid with invalid proof
     vm.startPrank(bidder);
-    vm.expectRevert("Invalid merkle proof");
+    vm.expectRevert("bidWithAuctionMerkleProof::Invalid Merkle proof");
     auctionHouse.bidWithAuctionMerkleProof(
       address(nftContract),
-      tokenId,
+      firstTokenId,
       auctionCreator,
       root,
       address(currencyContract),
@@ -450,8 +532,6 @@ contract SuperRareAuctionHouseMerkleTest is Test {
   function test_bidWithAuctionMerkleProof_replayProtection() public {
     // Setup: Register the auction root
     vm.startPrank(auctionCreator);
-    nftContract.approve(address(auctionHouse), tokenId);
-
     // Create Merkle tree and get proof for our specific token
     address[] memory contracts = new address[](3);
     uint256[] memory ids = new uint256[](3);
@@ -461,12 +541,24 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     }
     (bytes32 root, bytes32[] memory proof) = _createMerkleTree(contracts, ids, 0);
 
-    auctionHouse.registerAuctionMerkleRoot(root, auctionConfig);
+    auctionHouse.registerAuctionMerkleRoot(
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
+
+    // Approve NFT after registering root
+    nftContract.approve(address(auctionHouse), tokenId);
     vm.stopPrank();
 
     // Setup: Approve the auction house to spend bidder's tokens
     vm.startPrank(bidder);
-    currencyContract.approve(address(auctionHouse), STARTING_AMOUNT * 2);
+    uint256 requiredAmount = STARTING_AMOUNT +
+      IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT);
+    currencyContract.approve(address(auctionHouse), requiredAmount * 2); // Double for two attempts
     vm.stopPrank();
 
     // Place first bid
@@ -484,7 +576,7 @@ contract SuperRareAuctionHouseMerkleTest is Test {
 
     // Try to place same bid again
     vm.startPrank(bidder);
-    vm.expectRevert("Proof already used");
+    vm.expectRevert("bidWithAuctionMerkleProof::Token already used for this Merkle root");
     auctionHouse.bidWithAuctionMerkleProof(
       address(nftContract),
       tokenId,
@@ -498,25 +590,24 @@ contract SuperRareAuctionHouseMerkleTest is Test {
   }
 
   function test_bidWithAuctionMerkleProof_ownershipVerification() public {
-    // Setup: Register the auction root
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, bytes32[] memory proof, , uint256 firstTokenId) = _createFreshMerkleTree(3);
+
+    // Register the root
     vm.startPrank(auctionCreator);
-    nftContract.approve(address(auctionHouse), tokenId);
-
-    // Create Merkle tree and get proof for our specific token
-    address[] memory contracts = new address[](3);
-    uint256[] memory ids = new uint256[](3);
-    for (uint256 i = 0; i < 3; i++) {
-      contracts[i] = address(nftContract);
-      ids[i] = tokenId + i;
-    }
-    (bytes32 root, bytes32[] memory proof) = _createMerkleTree(contracts, ids, 0);
-
-    auctionHouse.registerAuctionMerkleRoot(root, auctionConfig);
+    auctionHouse.registerAuctionMerkleRoot(
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
     vm.stopPrank();
 
-    // Transfer NFT to someone else
+    // Transfer NFT to bidder
     vm.startPrank(auctionCreator);
-    nftContract.transferFrom(auctionCreator, bidder, tokenId);
+    nftContract.transferFrom(auctionCreator, bidder, firstTokenId);
     vm.stopPrank();
 
     // Setup: Approve the auction house to spend bidder's tokens
@@ -526,10 +617,10 @@ contract SuperRareAuctionHouseMerkleTest is Test {
 
     // Try to place bid with wrong owner
     vm.startPrank(bidder);
-    vm.expectRevert("Not token owner");
+    vm.expectRevert("bidWithAuctionMerkleProof::Not token owner");
     auctionHouse.bidWithAuctionMerkleProof(
       address(nftContract),
-      tokenId,
+      firstTokenId,
       auctionCreator, // Wrong owner
       root,
       address(currencyContract),
@@ -556,14 +647,28 @@ contract SuperRareAuctionHouseMerkleTest is Test {
       ids[i] = tokenId + i;
     }
     (bytes32 root1, ) = _createMerkleTree(contracts, ids, 0);
-    auctionHouse.registerAuctionMerkleRoot(root1, auctionConfig);
+    auctionHouse.registerAuctionMerkleRoot(
+      root1,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
 
     // Create and register second root
     for (uint256 i = 0; i < 3; i++) {
       ids[i] = tokenId + i + 3; // Different token IDs
     }
     (bytes32 root2, ) = _createMerkleTree(contracts, ids, 0);
-    auctionHouse.registerAuctionMerkleRoot(root2, auctionConfig);
+    auctionHouse.registerAuctionMerkleRoot(
+      root2,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
     vm.stopPrank();
 
     // Verify both roots are returned
@@ -590,7 +695,14 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     }
     (bytes32 root, ) = _createMerkleTree(contracts, ids, 0);
 
-    auctionHouse.registerAuctionMerkleRoot(root, auctionConfig);
+    auctionHouse.registerAuctionMerkleRoot(
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
     vm.stopPrank();
 
     // Verify nonce was incremented
@@ -623,5 +735,296 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     // Test token not in tree
     isInRoot = auctionHouse.isTokenInRoot(root, address(nftContract), tokenId + 10, proof);
     assertFalse(isInRoot, "Token should not be in root");
+  }
+
+  function test_dualNonceSystem_basicFlow() public {
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, bytes32[] memory proof, uint256[] memory tokenIds, uint256 firstTokenId) = _createFreshMerkleTree(3);
+
+    // Setup: Register initial auction root
+    vm.startPrank(auctionCreator);
+    auctionHouse.registerAuctionMerkleRoot(
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
+    vm.stopPrank();
+
+    // Verify initial nonces
+    uint256 rootNonce = auctionHouse.getCurrentAuctionMerkleRootNonce(auctionCreator, root);
+    assertEq(rootNonce, 1, "Initial root nonce should be 1");
+
+    // Mock platform commission
+    vm.mockCall(
+      address(spaceOperatorRegistry),
+      abi.encodeWithSelector(ISpaceOperatorRegistry.getPlatformCommission.selector, auctionCreator),
+      abi.encode(uint8(0))
+    );
+
+    // Setup bidder with enough allowance for both bids including fees
+    vm.startPrank(bidder);
+    uint256 marketplaceFee = IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT);
+    uint256 totalRequiredAmount = (STARTING_AMOUNT + marketplaceFee) * 2; // Enough for two bids including fees
+    currencyContract.approve(address(auctionHouse), totalRequiredAmount);
+    vm.stopPrank();
+
+    vm.startPrank(bidder);
+    auctionHouse.bidWithAuctionMerkleProof(
+      address(nftContract),
+      firstTokenId,
+      auctionCreator,
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      proof
+    );
+    vm.stopPrank();
+
+    // Verify token nonce was incremented
+    uint256 tokenNonce = auctionHouse.getTokenAuctionNonce(auctionCreator, root, address(nftContract), firstTokenId);
+    assertEq(tokenNonce, 1, "Token nonce should be 1 after sale");
+
+    // Settle the auction before trying to sell again
+    vm.warp(block.timestamp + AUCTION_DURATION + 1);
+    auctionHouse.settleAuction(address(nftContract), firstTokenId);
+
+    // Approve token for new owner (bidder)
+    vm.startPrank(bidder);
+    nftContract.approve(address(auctionHouse), firstTokenId);
+    vm.stopPrank();
+
+    // Try to sell same token again - should fail
+    vm.startPrank(bidder);
+    vm.expectRevert("bidWithAuctionMerkleProof::Token already used for this Merkle root");
+    auctionHouse.bidWithAuctionMerkleProof(
+      address(nftContract),
+      firstTokenId,
+      auctionCreator,
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      proof
+    );
+    vm.stopPrank();
+
+    // Create fresh tokens and Merkle tree for reconfiguration
+    (
+      bytes32 newRoot,
+      bytes32[] memory newProof,
+      uint256[] memory newTokenIds,
+      uint256 newFirstTokenId
+    ) = _createFreshMerkleTree(3);
+
+    // Reconfigure auction with new root
+    vm.startPrank(auctionCreator);
+    auctionHouse.registerAuctionMerkleRoot(
+      newRoot,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
+    vm.stopPrank();
+
+    // Verify root nonce incremented
+    rootNonce = auctionHouse.getCurrentAuctionMerkleRootNonce(auctionCreator, newRoot);
+    assertEq(rootNonce, 1, "New root nonce should be 1");
+
+    // Now new token can be sold under new configuration
+    vm.startPrank(bidder);
+    auctionHouse.bidWithAuctionMerkleProof(
+      address(nftContract),
+      newFirstTokenId,
+      auctionCreator,
+      newRoot,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      newProof
+    );
+    vm.stopPrank();
+
+    // Verify token nonce updated
+    tokenNonce = auctionHouse.getTokenAuctionNonce(auctionCreator, newRoot, address(nftContract), newFirstTokenId);
+    assertEq(tokenNonce, 1, "New token nonce should be 1 after sale under new root");
+  }
+
+  function test_dualNonceSystem_multipleTokens() public {
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, bytes32[] memory proof, uint256[] memory tokenIds, uint256 firstTokenId) = _createFreshMerkleTree(3);
+
+    // Register the root
+    vm.startPrank(auctionCreator);
+    auctionHouse.registerAuctionMerkleRoot(
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
+    vm.stopPrank();
+
+    // Setup bidder
+    vm.startPrank(bidder);
+    currencyContract.approve(address(auctionHouse), STARTING_AMOUNT * 3); // Enough for three bids
+    vm.stopPrank();
+
+    // Bid on first token
+    vm.startPrank(bidder);
+    auctionHouse.bidWithAuctionMerkleProof(
+      address(nftContract),
+      firstTokenId,
+      auctionCreator,
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      proof
+    );
+    vm.stopPrank();
+
+    // Create new Merkle tree for second token
+    (
+      bytes32 newRoot,
+      bytes32[] memory newProof,
+      uint256[] memory newTokenIds,
+      uint256 newFirstTokenId
+    ) = _createFreshMerkleTree(3);
+
+    // Register new root
+    vm.startPrank(auctionCreator);
+    auctionHouse.registerAuctionMerkleRoot(
+      newRoot,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
+    vm.stopPrank();
+
+    // Bid on first token of new tree
+    vm.startPrank(bidder);
+    auctionHouse.bidWithAuctionMerkleProof(
+      address(nftContract),
+      newFirstTokenId,
+      auctionCreator,
+      newRoot,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      newProof
+    );
+    vm.stopPrank();
+
+    // Verify nonces
+    uint256 token1Nonce = auctionHouse.getTokenAuctionNonce(auctionCreator, root, address(nftContract), firstTokenId);
+    uint256 token2Nonce = auctionHouse.getTokenAuctionNonce(
+      auctionCreator,
+      newRoot,
+      address(nftContract),
+      newFirstTokenId
+    );
+    assertEq(token1Nonce, 1, "First token nonce should be 1");
+    assertEq(token2Nonce, 1, "Second token nonce should be 1");
+  }
+
+  function test_dualNonceSystem_reconfiguration() public {
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, bytes32[] memory proof, uint256[] memory tokenIds, uint256 firstTokenId) = _createFreshMerkleTree(3);
+
+    // Register initial root
+    vm.startPrank(auctionCreator);
+    auctionHouse.registerAuctionMerkleRoot(
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
+    vm.stopPrank();
+
+    // Verify initial nonce
+    uint256 rootNonce = auctionHouse.getCurrentAuctionMerkleRootNonce(auctionCreator, root);
+    assertEq(rootNonce, 1, "Initial root nonce should be 1");
+
+    // Mock platform commission
+    vm.mockCall(
+      address(spaceOperatorRegistry),
+      abi.encodeWithSelector(ISpaceOperatorRegistry.getPlatformCommission.selector, auctionCreator),
+      abi.encode(uint8(0))
+    );
+
+    vm.startPrank(bidder);
+    uint256 marketplaceFee = IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT);
+    uint256 totalRequiredAmount = (STARTING_AMOUNT + marketplaceFee) * 2; // Enough for two bids including fees
+    currencyContract.approve(address(auctionHouse), totalRequiredAmount);
+    vm.stopPrank();
+
+    vm.startPrank(bidder);
+    auctionHouse.bidWithAuctionMerkleProof(
+      address(nftContract),
+      firstTokenId,
+      auctionCreator,
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      proof
+    );
+    vm.stopPrank();
+
+    // Create new tokens and tree for reconfiguration
+    (
+      bytes32 newRoot,
+      bytes32[] memory newProof,
+      uint256[] memory newTokenIds,
+      uint256 newFirstTokenId
+    ) = _createFreshMerkleTree(3);
+
+    // Register new root
+    vm.startPrank(auctionCreator);
+    auctionHouse.registerAuctionMerkleRoot(
+      newRoot,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
+    vm.stopPrank();
+
+    // Verify nonces
+    rootNonce = auctionHouse.getCurrentAuctionMerkleRootNonce(auctionCreator, newRoot);
+    uint256 token1Nonce = auctionHouse.getTokenAuctionNonce(auctionCreator, root, address(nftContract), firstTokenId);
+    uint256 token2Nonce = auctionHouse.getTokenAuctionNonce(
+      auctionCreator,
+      newRoot,
+      address(nftContract),
+      newFirstTokenId
+    );
+
+    assertEq(rootNonce, 1, "New root nonce should be 1");
+    assertEq(token1Nonce, 1, "First token nonce should be 1");
+    assertEq(token2Nonce, 0, "Second token nonce should be 0 (not used yet)");
+
+    // Bid on new token
+    vm.startPrank(bidder);
+    auctionHouse.bidWithAuctionMerkleProof(
+      address(nftContract),
+      newFirstTokenId,
+      auctionCreator,
+      newRoot,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      newProof
+    );
+    vm.stopPrank();
+
+    // Verify final nonces
+    token2Nonce = auctionHouse.getTokenAuctionNonce(auctionCreator, newRoot, address(nftContract), newFirstTokenId);
+    assertEq(token2Nonce, 1, "Second token nonce should be 1 after bid");
   }
 }

@@ -81,10 +81,18 @@ interface ISuperRareAuctionHouse {
 
   /// @notice Registers a new Merkle root for auction configuration
   /// @param merkleRoot The root hash of the Merkle tree containing token IDs
-  /// @param config The auction configuration for this root
+  /// @param currency The currency address for the auction
+  /// @param startingAmount The minimum bid amount
+  /// @param duration The length of the auction in seconds
+  /// @param splitAddresses The addresses to split the proceeds with
+  /// @param splitRatios The ratios for each split address
   function registerAuctionMerkleRoot(
     bytes32 merkleRoot,
-    SuperRareBazaarStorage.MerkleAuctionConfig calldata config
+    address currency,
+    uint256 startingAmount,
+    uint256 duration,
+    address payable[] calldata splitAddresses,
+    uint8[] calldata splitRatios
   ) external;
 
   /// @notice Cancels a previously registered Merkle root
@@ -132,4 +140,17 @@ interface ISuperRareAuctionHouse {
     uint256 tokenId,
     bytes32[] calldata proof
   ) external pure returns (bool);
+
+  /// @notice Gets the nonce for a specific token under a Merkle root
+  /// @param creator The creator of the auction
+  /// @param root The Merkle root
+  /// @param tokenContract The token contract address
+  /// @param tokenId The token ID
+  /// @return The current nonce for this token
+  function getTokenAuctionNonce(
+    address creator,
+    bytes32 root,
+    address tokenContract,
+    uint256 tokenId
+  ) external view returns (uint256);
 }

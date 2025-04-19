@@ -89,12 +89,14 @@ contract SuperRareBazaarStorage {
   // duration - length of auction in seconds
   // splitAddresses - addresses to split the proceeds with
   // splitRatios - ratios for each split address
+  // nonce - version number of this configuration
   struct MerkleAuctionConfig {
     address currency;
     uint256 startingAmount;
     uint256 duration;
     address payable[] splitAddresses;
     uint8[] splitRatios;
+    uint256 nonce;
   }
 
   /////////////////////////////////////////////////////////////////////////
@@ -179,7 +181,7 @@ contract SuperRareBazaarStorage {
     uint256 _amount
   );
 
-  event NewAuctionMerkleRoot(address indexed user, bytes32 indexed root);
+  event NewAuctionMerkleRoot(address indexed user, bytes32 indexed root, uint256 nonce);
   event AuctionMerkleRootCancelled(address indexed user, bytes32 indexed root);
   event BidWithAuctionMerkleProof(
     address indexed originContract,
@@ -188,6 +190,18 @@ contract SuperRareBazaarStorage {
     bytes32 merkleRoot,
     address currency,
     uint256 amount
+  );
+
+  event AuctionMerkleBid(
+    address indexed originContract,
+    address indexed bidder,
+    uint256 indexed tokenId,
+    address currencyAddress,
+    uint256 amount,
+    bytes32 merkleRoot,
+    bool startedAuction,
+    uint256 newAuctionLength,
+    address previousBidder
   );
 
   /////////////////////////////////////////////////////////////////////////
@@ -258,12 +272,13 @@ contract SuperRareBazaarStorage {
   // Mapping of user to their Merkle roots
   mapping(address => EnumerableSet.Bytes32Set) internal _userAuctionMerkleRoots;
 
-  // Mapping of user to root to nonce for versioning
-  mapping(address => mapping(bytes32 => uint256)) public auctionMerkleRootNonce;
-
-  // Mapping of user to root to nonce to config
-  mapping(address => mapping(bytes32 => mapping(uint256 => MerkleAuctionConfig))) public auctionMerkleConfigs;
+  // Mapping of (creator, root) to config
+  mapping(address => mapping(bytes32 => MerkleAuctionConfig)) public auctionMerkleConfigs;
 
   // Mapping of proof key to usage status for replay protection
   mapping(bytes32 => bool) public auctionMerkleProofUsed;
+
+  // Mapping of keccak256(creator, root, tokenContract, tokenId) to nonce
+  // Key is computed as: keccak256(abi.encodePacked(creator, root, tokenContract, tokenId))
+  mapping(bytes32 => uint256) public tokenAuctionNonce;
 }
