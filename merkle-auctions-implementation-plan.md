@@ -173,6 +173,7 @@
     - [x] Verify correct previous bidder address
     - [x] Verify correct auction start flag
     - [x] Verify correct auction length
+  - [x] Test scenario: Configure root -> One token fails to sell (auction ends, returned to creator) -> Creator cancels root -> Creator reconfigures the same root
 
 ### 4. View Function Tests
 - [x] Test `getUserAuctionMerkleRoots`

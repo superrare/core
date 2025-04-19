@@ -96,7 +96,6 @@ contract SuperRareBazaarStorage {
     uint256 duration;
     address payable[] splitAddresses;
     uint8[] splitRatios;
-    uint256 nonce;
   }
 
   /////////////////////////////////////////////////////////////////////////
@@ -277,6 +276,10 @@ contract SuperRareBazaarStorage {
 
   // Mapping of proof key to usage status for replay protection
   mapping(bytes32 => bool) public auctionMerkleProofUsed;
+
+  // Mapping of keccak256(creator, root) to nonce
+  // Key is computed as: keccak256(abi.encodePacked(creator, root))
+  mapping(bytes32 => uint256) public creatorRootNonce;
 
   // Mapping of keccak256(creator, root, tokenContract, tokenId) to nonce
   // Key is computed as: keccak256(abi.encodePacked(creator, root, tokenContract, tokenId))

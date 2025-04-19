@@ -213,7 +213,7 @@ interface ISuperRareBazaar {
   // /// @param user The address of the user
   // /// @param root The Merkle root
   // /// @return The current nonce value
-  // function getCurrentAuctionMerkleRootNonce(address user, bytes32 root) external view returns (uint256);
+  // function getCreatorAuctionMerkleRootNonce(address user, bytes32 root) external view returns (uint256);
 
   // /// @notice Verifies if a token is included in a Merkle root
   // /// @param root The Merkle root to check against

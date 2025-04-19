@@ -124,7 +124,7 @@ interface ISuperRareAuctionHouse {
   /// @param user The address of the user
   /// @param root The Merkle root
   /// @return The current nonce value
-  function getCurrentAuctionMerkleRootNonce(address user, bytes32 root) external view returns (uint256);
+  function getCreatorAuctionMerkleRootNonce(address user, bytes32 root) external view returns (uint256);
 
   /// @notice Verifies if a token is included in a Merkle root
   /// @param root The Merkle root to check against
@@ -138,6 +138,15 @@ interface ISuperRareAuctionHouse {
     uint256 tokenId,
     bytes32[] calldata proof
   ) external pure returns (bool);
+
+  /// @notice Gets the Merkle auction configuration for a given creator and root
+  /// @param creator The address of the creator
+  /// @param root The Merkle root
+  /// @return The MerkleAuctionConfig struct containing the auction configuration
+  function getMerkleAuctionConfig(
+    address creator,
+    bytes32 root
+  ) external view returns (SuperRareBazaarStorage.MerkleAuctionConfig memory);
 
   /// @notice Gets the nonce for a specific token under a Merkle root
   /// @param creator The creator of the auction

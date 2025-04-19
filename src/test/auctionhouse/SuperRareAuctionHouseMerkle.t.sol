@@ -149,8 +149,7 @@ contract SuperRareAuctionHouseMerkleTest is Test {
       startingAmount: STARTING_AMOUNT,
       duration: AUCTION_DURATION,
       splitAddresses: splitAddresses,
-      splitRatios: splitRatios,
-      nonce: 0
+      splitRatios: splitRatios
     });
 
     // Setup Merkle tree with multiple tokens
@@ -217,11 +216,7 @@ contract SuperRareAuctionHouseMerkleTest is Test {
       abi.encodeWithSelector(IStakingSettings.calculateMarketplacePayoutFee.selector, STARTING_AMOUNT),
       abi.encode((STARTING_AMOUNT * 3) / 100)
     );
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSignature("calculateStakingFee(uint256)", STARTING_AMOUNT),
-      abi.encode(0)
-    );
+    vm.mockCall(marketplaceSettings, abi.encodeWithSignature("calculateStakingFee(uint256)"), abi.encode(0));
 
     // Mock royalty engine
     vm.mockCall(
@@ -340,7 +335,7 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     assertEq(roots[0], root, "Registered root should match");
 
     // Verify the nonce was incremented
-    uint256 nonce = auctionHouse.getCurrentAuctionMerkleRootNonce(auctionCreator, root);
+    uint256 nonce = auctionHouse.getCreatorAuctionMerkleRootNonce(auctionCreator, root);
     assertEq(nonce, 1, "Nonce should be 1");
 
     vm.stopPrank();
@@ -661,7 +656,7 @@ contract SuperRareAuctionHouseMerkleTest is Test {
 
   function test_getCurrentAuctionMerkleRootNonce() public {
     // Test initial nonce
-    uint256 nonce = auctionHouse.getCurrentAuctionMerkleRootNonce(auctionCreator, merkleRoot);
+    uint256 nonce = auctionHouse.getCreatorAuctionMerkleRootNonce(auctionCreator, merkleRoot);
     assertEq(nonce, 0, "Initial nonce should be 0");
 
     // Register root and check nonce
@@ -687,7 +682,7 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     vm.stopPrank();
 
     // Verify nonce was incremented
-    nonce = auctionHouse.getCurrentAuctionMerkleRootNonce(auctionCreator, root);
+    nonce = auctionHouse.getCreatorAuctionMerkleRootNonce(auctionCreator, root);
     assertEq(nonce, 1, "Nonce should be 1 after registration");
   }
 
@@ -735,7 +730,7 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     vm.stopPrank();
 
     // Verify initial nonces
-    uint256 rootNonce = auctionHouse.getCurrentAuctionMerkleRootNonce(auctionCreator, root);
+    uint256 rootNonce = auctionHouse.getCreatorAuctionMerkleRootNonce(auctionCreator, root);
     assertEq(rootNonce, 1, "Initial root nonce should be 1");
 
     // Mock platform commission
@@ -810,7 +805,7 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     vm.stopPrank();
 
     // Verify root nonce incremented
-    rootNonce = auctionHouse.getCurrentAuctionMerkleRootNonce(auctionCreator, newRoot);
+    rootNonce = auctionHouse.getCreatorAuctionMerkleRootNonce(auctionCreator, newRoot);
     assertEq(rootNonce, 1, "New root nonce should be 1");
 
     // Now new token can be sold under new configuration
@@ -924,7 +919,7 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     vm.stopPrank();
 
     // Verify initial nonce
-    uint256 rootNonce = auctionHouse.getCurrentAuctionMerkleRootNonce(auctionCreator, root);
+    uint256 rootNonce = auctionHouse.getCreatorAuctionMerkleRootNonce(auctionCreator, root);
     assertEq(rootNonce, 1, "Initial root nonce should be 1");
 
     // Mock platform commission
@@ -972,7 +967,7 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     vm.stopPrank();
 
     // Verify nonces
-    rootNonce = auctionHouse.getCurrentAuctionMerkleRootNonce(auctionCreator, newRoot);
+    rootNonce = auctionHouse.getCreatorAuctionMerkleRootNonce(auctionCreator, newRoot);
     uint256 token1Nonce = auctionHouse.getTokenAuctionNonce(auctionCreator, root, address(nftContract), firstTokenId);
     uint256 token2Nonce = auctionHouse.getTokenAuctionNonce(
       auctionCreator,
@@ -1000,6 +995,25 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     // Verify final nonces
     token2Nonce = auctionHouse.getTokenAuctionNonce(auctionCreator, newRoot, address(nftContract), newFirstTokenId);
     assertEq(token2Nonce, 1, "Second token nonce should be 1 after bid");
+
+    // Verify token nonce was updated correctly
+    // The token's nonce for this root was effectively reset/deleted upon cancellation.
+    // The bid succeeds because the new root config nonce (2) is greater than the token's (now implicit 0).
+    // The bid sets the token's nonce to 1.
+    uint256 finalTokenNonce = auctionHouse.getTokenAuctionNonce(
+      auctionCreator,
+      root,
+      address(nftContract),
+      firstTokenId
+    );
+    assertEq(finalTokenNonce, 1, "Token nonce should be 1 after successful bid under reconfigured root");
+
+    // 9. Complete the sale by settling the auction
+    vm.warp(block.timestamp + AUCTION_DURATION + 1);
+    auctionHouse.settleAuction(address(nftContract), firstTokenId);
+
+    // Verify the token is transferred to the bidder
+    assertEq(nftContract.ownerOf(firstTokenId), bidder, "Token should be with bidder after settlement");
   }
 
   function test_bidWithAuctionMerkleProof_ETHPayment() public {
@@ -1294,5 +1308,166 @@ contract SuperRareAuctionHouseMerkleTest is Test {
 
     // Verify contract ETH balance increased
     assertEq(address(auctionHouse).balance, requiredAmount, "AuctionHouse ETH balance incorrect");
+  }
+
+  function test_rootManagement_reconfigureAfterFailedAuction() public {
+    // 1. Setup: Create fresh tokens and Merkle tree
+    (bytes32 root, bytes32[] memory proof, , uint256 firstTokenId) = _createFreshMerkleTree(3);
+
+    // Approve the first token for the initial registration
+    vm.startPrank(auctionCreator);
+    nftContract.approve(address(auctionHouse), firstTokenId);
+    vm.stopPrank();
+
+    // 2. Register the initial Merkle root
+    vm.startPrank(auctionCreator);
+    auctionHouse.registerAuctionMerkleRoot(
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
+    vm.stopPrank();
+
+    // Verify initial registration
+    uint256 initialNonce = auctionHouse.getCreatorAuctionMerkleRootNonce(auctionCreator, root);
+    assertEq(initialNonce, 1, "Initial root nonce should be 1");
+    assertTrue(auctionHouse.getUserAuctionMerkleRoots(auctionCreator)[0] == root, "Root should be registered");
+
+    // 3. Simulate Auction: Place initial bid to create auction state
+    vm.startPrank(bidder);
+    uint256 requiredAmount = STARTING_AMOUNT +
+      IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT);
+    currencyContract.approve(address(auctionHouse), requiredAmount);
+    auctionHouse.bidWithAuctionMerkleProof(
+      address(nftContract),
+      firstTokenId,
+      auctionCreator,
+      root,
+      STARTING_AMOUNT,
+      proof
+    );
+    vm.stopPrank();
+
+    // 4. Simulate Auction End and Settlement (Token goes to bidder)
+    vm.warp(block.timestamp + AUCTION_DURATION + 1);
+    auctionHouse.settleAuction(address(nftContract), firstTokenId);
+    assertEq(nftContract.ownerOf(firstTokenId), bidder, "Token should be with bidder after settlement");
+
+    // 5. Simulate Token Return to Creator
+    vm.startPrank(bidder);
+    nftContract.transferFrom(bidder, auctionCreator, firstTokenId);
+    vm.stopPrank();
+    assertEq(nftContract.ownerOf(firstTokenId), auctionCreator, "Token should be back with creator");
+
+    // 6. Creator Cancels the Root
+    vm.startPrank(auctionCreator);
+    auctionHouse.cancelAuctionMerkleRoot(root);
+    vm.stopPrank();
+
+    // Verify cancellation
+    bytes32[] memory rootsAfterCancel = auctionHouse.getUserAuctionMerkleRoots(auctionCreator);
+    assertEq(rootsAfterCancel.length, 0, "Root should be cancelled");
+    // Check config is zeroed out
+    SuperRareBazaarStorage.MerkleAuctionConfig memory config = auctionHouse.getMerkleAuctionConfig(
+      auctionCreator,
+      root
+    );
+    assertEq(config.currency, address(0), "Config currency should be zeroed out after cancel");
+    assertEq(config.startingAmount, 0, "Config startingAmount should be zeroed out after cancel");
+
+    // 7. Creator Reconfigures the *Same* Root
+    vm.startPrank(auctionCreator);
+    // Approve the token again for the new registration/auction
+    nftContract.approve(address(auctionHouse), firstTokenId);
+    auctionHouse.registerAuctionMerkleRoot(
+      root, // Using the same root
+      address(currencyContract),
+      STARTING_AMOUNT + 1 ether, // Change config slightly
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
+    vm.stopPrank();
+
+    // Verify re-registration and nonce increment
+    uint256 newNonce = auctionHouse.getCreatorAuctionMerkleRootNonce(auctionCreator, root);
+    assertEq(newNonce, 2, "Nonce should be 2 after re-registration");
+    bytes32[] memory rootsAfterReconfigure = auctionHouse.getUserAuctionMerkleRoots(auctionCreator);
+    assertEq(rootsAfterReconfigure.length, 1, "Root should be registered again");
+    assertEq(rootsAfterReconfigure[0], root, "Re-registered root should match");
+
+    // 8. Attempt Bid under New Nonce Configuration
+    vm.startPrank(bidder);
+    uint256 newStartingAmount = STARTING_AMOUNT + 1 ether;
+    uint256 newMarketplaceFee = (newStartingAmount * 3) / 100;
+
+    // Mock marketplace fee calculation for new amount
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.calculateMarketplaceFee.selector, newStartingAmount),
+      abi.encode(newMarketplaceFee)
+    );
+
+    // Mock staking settings
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IStakingSettings.calculateMarketplacePayoutFee.selector, newStartingAmount),
+      abi.encode(newMarketplaceFee)
+    );
+
+    uint256 newRequiredAmount = newStartingAmount + newMarketplaceFee;
+    // Ensure enough allowance for the new amount
+    currencyContract.approve(address(auctionHouse), newRequiredAmount);
+    vm.stopPrank();
+
+    // Place bid using the original proof but against the reconfigured root (nonce 2)
+    vm.startPrank(bidder);
+    auctionHouse.bidWithAuctionMerkleProof(
+      address(nftContract),
+      firstTokenId, // Same token that was returned
+      auctionCreator,
+      root,
+      newStartingAmount,
+      proof // Original proof is still valid for the token inclusion in the root
+    );
+    vm.stopPrank();
+
+    // Verify auction was created successfully under the new nonce
+    (
+      address creator,
+      ,
+      uint256 startTime,
+      uint256 lengthOfAuction,
+      address auctionCurrency,
+      uint256 minimumBid,
+      ,
+      ,
+
+    ) = auctionHouse.getAuctionDetails(address(nftContract), firstTokenId);
+    assertEq(creator, auctionCreator, "Creator should match");
+    assertEq(minimumBid, newStartingAmount, "Minimum bid should match new config");
+    assertEq(auctionCurrency, address(currencyContract), "Currency should match new config");
+
+    // Verify token nonce was updated correctly
+    // The token's nonce for this root was effectively reset/deleted upon cancellation.
+    // The bid succeeds because the new root config nonce (2) is greater than the token's (now implicit 0).
+    // The bid sets the token's nonce to 1.
+    uint256 finalTokenNonce = auctionHouse.getTokenAuctionNonce(
+      auctionCreator,
+      root,
+      address(nftContract),
+      firstTokenId
+    );
+    assertEq(finalTokenNonce, 2, "Token nonce should be 1 after successful bid under reconfigured root");
+
+    // 9. Complete the sale by settling the auction
+    vm.warp(block.timestamp + AUCTION_DURATION + 1);
+    auctionHouse.settleAuction(address(nftContract), firstTokenId);
+
+    // Verify the token is transferred to the bidder
+    assertEq(nftContract.ownerOf(firstTokenId), bidder, "Token should be with bidder after settlement");
   }
 }

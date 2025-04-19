@@ -434,7 +434,8 @@ contract SuperRareAuctionHouse is
     MerkleAuctionConfig memory currentConfig = auctionMerkleConfigs[msg.sender][merkleRoot];
 
     // Calculate new nonce
-    uint256 newNonce = currentConfig.nonce > 0 ? currentConfig.nonce + 1 : 1;
+    uint256 newNonce = creatorRootNonce[keccak256(abi.encodePacked(msg.sender, merkleRoot))] + 1;
+    creatorRootNonce[keccak256(abi.encodePacked(msg.sender, merkleRoot))] = newNonce;
 
     // Create and store new config
     auctionMerkleConfigs[msg.sender][merkleRoot] = MerkleAuctionConfig({
@@ -442,8 +443,7 @@ contract SuperRareAuctionHouse is
       startingAmount: startingAmount,
       duration: duration,
       splitAddresses: splitAddresses,
-      splitRatios: splitRatios,
-      nonce: newNonce
+      splitRatios: splitRatios
     });
 
     emit NewAuctionMerkleRoot(msg.sender, merkleRoot, newNonce);
@@ -495,8 +495,9 @@ contract SuperRareAuctionHouse is
 
     // Get token nonce key and verify it hasn't been used
     bytes32 tokenNonceKey = keccak256(abi.encodePacked(creator, merkleRoot, originContract, tokenId));
+    uint256 currentNonce = creatorRootNonce[keccak256(abi.encodePacked(creator, merkleRoot))];
     require(
-      tokenAuctionNonce[tokenNonceKey] < config.nonce,
+      tokenAuctionNonce[tokenNonceKey] < currentNonce,
       "bidWithAuctionMerkleProof::Token already used for this Merkle root"
     );
 
@@ -521,8 +522,8 @@ contract SuperRareAuctionHouse is
     uint256 requiredAmount = bidAmount + marketplaceSettings.calculateMarketplaceFee(bidAmount);
     _checkAmountAndTransfer(config.currency, requiredAmount);
 
-    // Update token nonce to current config nonce + 1
-    tokenAuctionNonce[tokenNonceKey] = tokenAuctionNonce[tokenNonceKey] + 1;
+    // Update token nonce to current creatorRootNonce
+    tokenAuctionNonce[tokenNonceKey] = currentNonce;
 
     // Create auction
     tokenAuctions[originContract][tokenId] = Auction(
@@ -572,8 +573,8 @@ contract SuperRareAuctionHouse is
   /// @param user The address of the user
   /// @param root The Merkle root
   /// @return The current nonce value
-  function getCurrentAuctionMerkleRootNonce(address user, bytes32 root) external view override returns (uint256) {
-    return auctionMerkleConfigs[user][root].nonce;
+  function getCreatorAuctionMerkleRootNonce(address user, bytes32 root) external view override returns (uint256) {
+    return creatorRootNonce[keccak256(abi.encodePacked(user, root))];
   }
 
   /// @notice Verifies if a token is included in a Merkle root
@@ -590,6 +591,17 @@ contract SuperRareAuctionHouse is
   ) external pure override returns (bool) {
     bytes32 leaf = keccak256(abi.encodePacked(origin, tokenId));
     return MerkleProof.verify(proof, root, leaf);
+  }
+
+  /// @notice Gets the Merkle auction configuration for a given creator and root
+  /// @param creator The address of the creator
+  /// @param root The Merkle root
+  /// @return The MerkleAuctionConfig struct containing the auction configuration
+  function getMerkleAuctionConfig(
+    address creator,
+    bytes32 root
+  ) external view override returns (SuperRareBazaarStorage.MerkleAuctionConfig memory) {
+    return auctionMerkleConfigs[creator][root];
   }
 
   /// @notice Gets the nonce for a specific token under a Merkle root
