@@ -1027,4 +1027,304 @@ contract SuperRareAuctionHouseMerkleTest is Test {
     token2Nonce = auctionHouse.getTokenAuctionNonce(auctionCreator, newRoot, address(nftContract), newFirstTokenId);
     assertEq(token2Nonce, 1, "Second token nonce should be 1 after bid");
   }
+
+  function test_bidWithAuctionMerkleProof_ETHPayment() public {
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, bytes32[] memory proof, , uint256 firstTokenId) = _createFreshMerkleTree(3);
+
+    // Register the auction merkle root with ETH as currency
+    vm.startPrank(auctionCreator);
+    auctionHouse.registerAuctionMerkleRoot(
+      root,
+      address(0), // ETH
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
+    vm.stopPrank();
+
+    // Mint ETH for the bidder
+    vm.deal(bidder, STARTING_AMOUNT * 2); // Give bidder some ETH
+
+    // Calculate required amount including fee
+    uint256 marketplaceFee = IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT);
+    uint256 requiredAmount = STARTING_AMOUNT + marketplaceFee;
+
+    // Place bid with ETH
+    vm.startPrank(bidder);
+    auctionHouse.bidWithAuctionMerkleProof{value: requiredAmount}(
+      address(nftContract),
+      firstTokenId,
+      auctionCreator,
+      root,
+      address(0), // ETH
+      STARTING_AMOUNT,
+      proof
+    );
+    vm.stopPrank();
+
+    // Verify auction was created
+    (address creator, , uint256 startTime, uint256 lengthOfAuction, , uint256 minimumBid, , , ) = auctionHouse
+      .getAuctionDetails(address(nftContract), firstTokenId);
+    assertEq(creator, auctionCreator, "Creator should be the one who created the Merkle root");
+    assertEq(minimumBid, STARTING_AMOUNT, "Bid amount should match");
+    assertEq(startTime + lengthOfAuction, block.timestamp + AUCTION_DURATION, "Auction duration should be correct");
+
+    // Verify current bidder and ETH bid
+    (address currentBidder, address bidCurrency, uint256 bidAmount, ) = auctionHouse.auctionBids(
+      address(nftContract),
+      firstTokenId
+    );
+    assertEq(currentBidder, bidder, "Bidder should be the current highest bidder");
+    assertEq(bidAmount, STARTING_AMOUNT, "Bid amount should match");
+    assertEq(bidCurrency, address(0), "Currency should be ETH");
+
+    // Verify contract ETH balance increased
+    assertEq(address(auctionHouse).balance, requiredAmount, "AuctionHouse ETH balance incorrect");
+  }
+
+  function test_bidWithAuctionMerkleProof_ETH_InsufficientBalance() public {
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, bytes32[] memory proof, , uint256 firstTokenId) = _createFreshMerkleTree(3);
+
+    // Register the auction merkle root with ETH as currency
+    vm.startPrank(auctionCreator);
+    auctionHouse.registerAuctionMerkleRoot(
+      root,
+      address(0), // ETH
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
+    vm.stopPrank();
+
+    // Mint ETH for the bidder, but less than required
+    vm.deal(bidder, STARTING_AMOUNT / 2);
+
+    // Calculate required amount including fee
+    uint256 marketplaceFee = IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT);
+    uint256 requiredAmount = STARTING_AMOUNT + marketplaceFee;
+
+    // Try to place bid with insufficient ETH
+    vm.startPrank(bidder);
+    vm.expectRevert("not enough eth sent");
+    auctionHouse.bidWithAuctionMerkleProof{value: STARTING_AMOUNT / 2}(
+      address(nftContract),
+      firstTokenId,
+      auctionCreator,
+      root,
+      address(0), // ETH
+      STARTING_AMOUNT,
+      proof
+    );
+    vm.stopPrank();
+  }
+
+  function test_bidWithAuctionMerkleProof_NonExistentTokenId() public {
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, bytes32[] memory proof, , uint256 firstTokenId) = _createFreshMerkleTree(3);
+
+    // Register the auction merkle root
+    vm.startPrank(auctionCreator);
+    auctionHouse.registerAuctionMerkleRoot(
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
+    vm.stopPrank();
+
+    // Setup: Approve the auction house to spend bidder's tokens
+    vm.startPrank(bidder);
+    uint256 requiredAmount = STARTING_AMOUNT +
+      IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT);
+    currencyContract.approve(address(auctionHouse), requiredAmount);
+    vm.stopPrank();
+
+    uint256 nonExistentTokenId = 9999;
+
+    // Try to place bid with non-existent token ID
+    vm.startPrank(bidder);
+    // Note: The Merkle proof validation happens first, so that's the expected revert.
+    vm.expectRevert("bidWithAuctionMerkleProof::Invalid Merkle proof");
+    auctionHouse.bidWithAuctionMerkleProof(
+      address(nftContract),
+      nonExistentTokenId,
+      auctionCreator,
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      proof // Using proof for firstTokenId, which won't match nonExistentTokenId
+    );
+    vm.stopPrank();
+  }
+
+  function test_bidWithAuctionMerkleProof_MalformedProof() public {
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, bytes32[] memory validProof, , uint256 firstTokenId) = _createFreshMerkleTree(3);
+
+    // Register the root
+    vm.startPrank(auctionCreator);
+    auctionHouse.registerAuctionMerkleRoot(
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
+    vm.stopPrank();
+
+    // Setup: Approve the auction house to spend bidder's tokens
+    vm.startPrank(bidder);
+    uint256 requiredAmount = STARTING_AMOUNT +
+      IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT);
+    currencyContract.approve(address(auctionHouse), requiredAmount);
+    vm.stopPrank();
+
+    // Create malformed proof (modify one element)
+    bytes32[] memory malformedProof = new bytes32[](validProof.length);
+    for (uint256 i = 0; i < validProof.length; i++) {
+      malformedProof[i] = validProof[i];
+    }
+    if (malformedProof.length > 0) {
+      malformedProof[0] = bytes32(uint256(malformedProof[0]) + 1);
+    }
+
+    // Try to place bid with malformed proof
+    vm.startPrank(bidder);
+    vm.expectRevert("bidWithAuctionMerkleProof::Invalid Merkle proof");
+    auctionHouse.bidWithAuctionMerkleProof(
+      address(nftContract),
+      firstTokenId,
+      auctionCreator,
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      malformedProof
+    );
+    vm.stopPrank();
+  }
+
+  function test_bidWithAuctionMerkleProof_EmptyProof() public {
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, , , uint256 firstTokenId) = _createFreshMerkleTree(3);
+
+    // Register the auction merkle root
+    vm.startPrank(auctionCreator);
+    auctionHouse.registerAuctionMerkleRoot(
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
+    vm.stopPrank();
+
+    // Setup: Approve the auction house to spend bidder's tokens
+    vm.startPrank(bidder);
+    uint256 requiredAmount = STARTING_AMOUNT +
+      IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT);
+    currencyContract.approve(address(auctionHouse), requiredAmount);
+    vm.stopPrank();
+
+    // Create empty proof
+    bytes32[] memory emptyProof = new bytes32[](0);
+
+    // Try to place bid with empty proof
+    vm.startPrank(bidder);
+    vm.expectRevert("bidWithAuctionMerkleProof::Invalid Merkle proof");
+    auctionHouse.bidWithAuctionMerkleProof(
+      address(nftContract),
+      firstTokenId,
+      auctionCreator,
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      emptyProof
+    );
+    vm.stopPrank();
+  }
+
+  function test_gas_bidWithLargeMerkleTree_ETH() public {
+    uint256 numTokens = 1000;
+
+    // --- Create Large Merkle Tree ---
+    uint256[] memory tokenIds = new uint256[](numTokens);
+    address[] memory contracts = new address[](numTokens);
+    bytes32[] memory leaves = new bytes32[](numTokens);
+
+    vm.startPrank(auctionCreator);
+    for (uint256 i = 0; i < numTokens; i++) {
+      tokenIds[i] = nftContract.mint(auctionCreator);
+      contracts[i] = address(nftContract);
+      nftContract.approve(address(auctionHouse), tokenIds[i]);
+      leaves[i] = keccak256(abi.encodePacked(contracts[i], tokenIds[i]));
+    }
+    vm.stopPrank();
+
+    bytes32 root = merkle.getRoot(leaves);
+    // Get proof for the middle token (index 500)
+    uint256 targetTokenIndex = numTokens / 2;
+    uint256 targetTokenId = tokenIds[targetTokenIndex];
+    bytes32[] memory proof = merkle.getProof(leaves, targetTokenIndex);
+    // --------------------------------
+
+    // Register the auction merkle root with ETH as currency
+    vm.startPrank(auctionCreator);
+    auctionHouse.registerAuctionMerkleRoot(
+      root,
+      address(0), // ETH
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
+    vm.stopPrank();
+
+    // Calculate required amount including fee
+    uint256 marketplaceFee = IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT);
+    uint256 requiredAmount = STARTING_AMOUNT + marketplaceFee;
+
+    // Mint ETH for the bidder
+    vm.deal(bidder, requiredAmount * 2); // Give bidder enough ETH
+
+    // Place bid with ETH for the target token
+    vm.startPrank(bidder);
+    auctionHouse.bidWithAuctionMerkleProof{value: requiredAmount}(
+      address(nftContract),
+      targetTokenId,
+      auctionCreator,
+      root,
+      address(0), // ETH
+      STARTING_AMOUNT,
+      proof
+    );
+    vm.stopPrank();
+
+    // Verify auction was created for the target token
+    (address creator, , , , , uint256 minimumBid, , , ) = auctionHouse.getAuctionDetails(
+      address(nftContract),
+      targetTokenId
+    );
+    assertEq(creator, auctionCreator, "Creator should be the one who created the Merkle root");
+    assertEq(minimumBid, STARTING_AMOUNT, "Bid amount should match");
+
+    // Verify current bidder and ETH bid for the target token
+    (address currentBidder, address bidCurrency, uint256 bidAmount, ) = auctionHouse.auctionBids(
+      address(nftContract),
+      targetTokenId
+    );
+    assertEq(currentBidder, bidder, "Bidder should be the current highest bidder");
+    assertEq(bidAmount, STARTING_AMOUNT, "Bid amount should match");
+    assertEq(bidCurrency, address(0), "Currency should be ETH");
+
+    // Verify contract ETH balance increased
+    assertEq(address(auctionHouse).balance, requiredAmount, "AuctionHouse ETH balance incorrect");
+  }
 }

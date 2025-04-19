@@ -136,17 +136,17 @@
     - [x] Test with ERC20 payments
     - [x] Test with unapproved currency
     - [x] Test with insufficient allowance
-    - [ ] Test with ETH payments
-    - [ ] Test with insufficient balance
-    - [ ] Test with non-existent token ID
+    - [x] Test with ETH payments
+    - [x] Test with insufficient balance
+    - [x] Test with non-existent token ID
     - [ ] Test with non-contract token address
   - [x] Merkle Proof Validation
     - [x] Test with invalid root
     - [x] Test with proof for different token
     - [x] Test with proof for different amount
     - [x] Test with proof for different currency
-    - [ ] Test with malformed proof array
-    - [ ] Test with empty proof array
+    - [x] Test with malformed proof array
+    - [x] Test with empty proof array
   - [x] Nonce and Configuration Tests
     - [x] Test bidding with outdated root nonce
     - [x] Test bidding with outdated token nonce
@@ -249,7 +249,7 @@
 - [ ] Implement recommended fixes
 
 ### 2. Additional Test Cases
-- [ ] Test gas consumption for various operations
+- [x] Test gas consumption for various operations
 - [ ] Test edge cases with large arrays of split recipients
 - [ ] Test concurrent auction operations
 - [ ] Test integration with external contracts
