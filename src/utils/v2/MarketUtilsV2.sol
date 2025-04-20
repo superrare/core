@@ -28,18 +28,17 @@ library MarketUtilsV2 {
   }
 
   /// @notice Checks to see if the approval manager has approval to transfer the NFT
-  /// @param _config The market config
   /// @param _addr Being checked if they've approved for all
   /// @param _originContract Contract address of the token being checked.
   /// @param _tokenId Token Id of the asset.
   function addressMustHaveMarketplaceApprovedForNFT(
-    MarketConfigV2.Config storage _config,
     address _addr,
     address _originContract,
     uint256 _tokenId
   ) internal view {
+    IERC721 nft = IERC721(_originContract);
     require(
-      _config.erc721ApprovalManager.hasApproval(IERC721(_originContract), _addr, _tokenId),
+      nft.isApprovedForAll(_addr, address(this)) || nft.getApproved(_tokenId) == address(this),
       "owner must have approved contract"
     );
   }
@@ -66,22 +65,16 @@ library MarketUtilsV2 {
   /// @notice Checks to see if the approval manager has approval to transfer tokens
   /// @dev This is for offers/buys/bids and the allowance of erc20 tokens.
   /// @dev Returns on zero address because no allowance is needed for eth.
-  /// @param _config The market config
   /// @param _currency The address of the currency being checked.
   /// @param _amount The total amount being checked.
-  function senderMustHaveMarketplaceApproved(
-    MarketConfigV2.Config storage _config,
-    address _currency,
-    uint256 _amount
-  ) internal view {
+  function senderMustHaveMarketplaceApproved(address _currency, uint256 _amount) internal view {
     if (_currency == address(0)) {
       return;
     }
 
-    require(
-      _config.erc20ApprovalManager.hasApproval(IERC20(_currency), msg.sender, _amount),
-      "sender needs to approve marketplace for currency"
-    );
+    IERC20 erc20 = IERC20(_currency);
+
+    require(erc20.allowance(msg.sender, address(this)) >= _amount, "sender needs to approve marketplace for currency");
   }
 
   /// @notice Checks the user has the correct amount and transfers to the marketplace.
@@ -106,7 +99,7 @@ library MarketUtilsV2 {
     IERC20 erc20 = IERC20(_currencyAddress);
     uint256 balanceBefore = erc20.balanceOf(address(this));
 
-    _config.erc20ApprovalManager.transferFromUser(erc20, msg.sender, address(this), _amount);
+    _config.erc20ApprovalManager.transferFrom(_currencyAddress, msg.sender, address(this), _amount);
 
     uint256 balanceAfter = erc20.balanceOf(address(this));
 

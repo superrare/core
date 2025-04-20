@@ -3,12 +3,13 @@ pragma solidity =0.8.18;
 
 import {Test} from "forge-std/Test.sol";
 import {TestToken} from "../utils/TestToken.sol";
-import {ERC20ApprovalManager} from "../../approver/ERC20ApprovalManager.sol";
+import {ERC20ApprovalManager} from "../../approver/ERC20/ERC20ApprovalManager.sol";
 
 contract ERC20ApprovalManagerTest is Test {
   // Events to test
   event RoleGranted(bytes32 indexed role, address indexed account, address indexed sender);
   event RoleRevoked(bytes32 indexed role, address indexed account, address indexed sender);
+  event ContractDisabled(address indexed disabler);
 
   // Constants
   bytes32 constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
@@ -119,33 +120,6 @@ contract ERC20ApprovalManagerTest is Test {
     assertEq(token.balanceOf(TOKEN_OWNER), INITIAL_BALANCE - TRANSFER_AMOUNT);
   }
 
-  function test_BatchTransferFrom() public {
-    vm.startPrank(ADMIN);
-    approvalManager.grantOperatorRole(OPERATOR);
-    vm.stopPrank();
-
-    address[] memory recipients = new address[](2);
-    recipients[0] = TOKEN_RECIPIENT;
-    recipients[1] = address(0x5);
-
-    uint256[] memory amounts = new uint256[](2);
-    amounts[0] = TRANSFER_AMOUNT;
-    amounts[1] = TRANSFER_AMOUNT;
-
-    uint256 totalAmount = TRANSFER_AMOUNT * 2;
-
-    vm.startPrank(TOKEN_OWNER);
-    token.approve(address(approvalManager), totalAmount);
-    vm.stopPrank();
-
-    vm.prank(OPERATOR);
-    approvalManager.batchTransferFrom(address(token), TOKEN_OWNER, recipients, amounts);
-
-    assertEq(token.balanceOf(recipients[0]), amounts[0]);
-    assertEq(token.balanceOf(recipients[1]), amounts[1]);
-    assertEq(token.balanceOf(TOKEN_OWNER), INITIAL_BALANCE - totalAmount);
-  }
-
   function test_TransferFromRevertsForNonOperator() public {
     vm.startPrank(TOKEN_OWNER);
     token.approve(address(approvalManager), TRANSFER_AMOUNT);
@@ -168,56 +142,14 @@ contract ERC20ApprovalManagerTest is Test {
     approvalManager.transferFrom(address(token), TOKEN_OWNER, TOKEN_RECIPIENT, TRANSFER_AMOUNT);
   }
 
-  function test_BatchTransferFromRevertsForInsufficientAllowance() public {
-    vm.startPrank(ADMIN);
-    approvalManager.grantOperatorRole(OPERATOR);
-    vm.stopPrank();
-
-    address[] memory recipients = new address[](2);
-    recipients[0] = TOKEN_RECIPIENT;
-    recipients[1] = address(0x5);
-
-    uint256[] memory amounts = new uint256[](2);
-    amounts[0] = TRANSFER_AMOUNT;
-    amounts[1] = TRANSFER_AMOUNT;
-
-    vm.startPrank(TOKEN_OWNER);
-    token.approve(address(approvalManager), TRANSFER_AMOUNT); // Only approve half of what's needed
-    vm.stopPrank();
-
-    vm.prank(OPERATOR);
-    vm.expectRevert("Insufficient allowance");
-    approvalManager.batchTransferFrom(address(token), TOKEN_OWNER, recipients, amounts);
-  }
-
-  function test_BatchTransferFromRevertsForLengthMismatch() public {
-    vm.startPrank(ADMIN);
-    approvalManager.grantOperatorRole(OPERATOR);
-    vm.stopPrank();
-
-    address[] memory recipients = new address[](2);
-    recipients[0] = TOKEN_RECIPIENT;
-    recipients[1] = address(0x5);
-
-    uint256[] memory amounts = new uint256[](1);
-    amounts[0] = TRANSFER_AMOUNT;
-
-    vm.startPrank(TOKEN_OWNER);
-    token.approve(address(approvalManager), TRANSFER_AMOUNT * 2);
-    vm.stopPrank();
-
-    vm.prank(OPERATOR);
-    vm.expectRevert("Length mismatch");
-    approvalManager.batchTransferFrom(address(token), TOKEN_OWNER, recipients, amounts);
-  }
-
   function test_HasAllowance() public {
     vm.startPrank(TOKEN_OWNER);
     token.approve(address(approvalManager), TRANSFER_AMOUNT);
     vm.stopPrank();
 
-    assertTrue(approvalManager.hasAllowance(address(token), TOKEN_OWNER, TRANSFER_AMOUNT));
-    assertFalse(approvalManager.hasAllowance(address(token), TOKEN_OWNER, TRANSFER_AMOUNT + 1));
+    assertEq(token.allowance(TOKEN_OWNER, address(approvalManager)), TRANSFER_AMOUNT);
+    assertTrue(token.allowance(TOKEN_OWNER, address(approvalManager)) >= TRANSFER_AMOUNT);
+    assertFalse(token.allowance(TOKEN_OWNER, address(approvalManager)) >= TRANSFER_AMOUNT + 1);
   }
 
   function test_OnlyManagerCanGrantRole() public {
@@ -226,5 +158,20 @@ contract ERC20ApprovalManagerTest is Test {
       abi.encodePacked("AccessControl: account ", vm.toString(OPERATOR), " is missing role ", vm.toString(MANAGER_ROLE))
     );
     approvalManager.grantOperatorRole(address(0x6));
+  }
+
+  function test_TransferFrom_RevertsWhenDisabled() public {
+    vm.startPrank(ADMIN);
+    approvalManager.grantOperatorRole(OPERATOR);
+    approvalManager.disable();
+    vm.stopPrank();
+
+    vm.startPrank(TOKEN_OWNER);
+    token.approve(address(approvalManager), TRANSFER_AMOUNT);
+    vm.stopPrank();
+
+    vm.prank(OPERATOR);
+    vm.expectRevert(ERC20ApprovalManager.ContractDisabledError.selector);
+    approvalManager.transferFrom(address(token), TOKEN_OWNER, TOKEN_RECIPIENT, TRANSFER_AMOUNT);
   }
 }

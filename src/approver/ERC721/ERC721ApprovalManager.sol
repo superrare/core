@@ -3,11 +3,12 @@ pragma solidity =0.8.18;
 
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {IERC721ApprovalManager} from "./IERC721ApprovalManager.sol";
 
 /// @title ERC721ApprovalManager
 /// @notice A central approval manager for ERC721 tokens that allows whitelisted contracts to transfer tokens
 /// @dev Uses role-based access control for operator management
-contract ERC721ApprovalManager is AccessControl {
+contract ERC721ApprovalManager is IERC721ApprovalManager, AccessControl {
   /// @notice Role for managing operators
   bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
   /// @notice Role for contracts allowed to transfer tokens
@@ -15,10 +16,32 @@ contract ERC721ApprovalManager is AccessControl {
 
   /// @notice Error thrown when caller is not an operator
   error NotOperator();
+  /// @notice Error thrown when contract is disabled
+  error ContractDisabledError();
+
+  /// @notice Whether the contract is disabled
+  bool public disabled;
+
+  /// @notice Event emitted when contract is disabled
+  event ContractDisabled(address indexed disabler);
 
   constructor() {
     _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     _grantRole(MANAGER_ROLE, msg.sender);
+    disabled = false;
+  }
+
+  /// @notice Modifier to check if contract is not disabled
+  modifier whenNotDisabled() {
+    if (disabled) revert ContractDisabledError();
+    _;
+  }
+
+  /// @notice Disables the contract permanently
+  /// @dev Only callable by MANAGER_ROLE
+  function disable() external onlyRole(MANAGER_ROLE) {
+    disabled = true;
+    emit ContractDisabled(msg.sender);
   }
 
   /// @notice Allows MANAGER_ROLE to grant OPERATOR_ROLE to a contract
@@ -55,11 +78,13 @@ contract ERC721ApprovalManager is AccessControl {
   /// @param from The current owner of the token
   /// @param to The recipient of the token
   /// @param tokenId The ID of the token to transfer
-  function transferFrom(address token, address from, address to, uint256 tokenId) external {
-    if (!hasRole(OPERATOR_ROLE, msg.sender)) revert NotOperator();
-
+  function transferFrom(
+    address token,
+    address from,
+    address to,
+    uint256 tokenId
+  ) external whenNotDisabled onlyRole(OPERATOR_ROLE) {
     IERC721 nft = IERC721(token);
-    require(_isApprovedOrOwner(nft, from, tokenId), "Not approved");
     nft.transferFrom(from, to, tokenId);
   }
 
@@ -70,19 +95,30 @@ contract ERC721ApprovalManager is AccessControl {
   /// @param to The recipient of the token
   /// @param tokenId The ID of the token to transfer
   /// @param data Additional data with no specified format
-  function safeTransferFrom(address token, address from, address to, uint256 tokenId, bytes calldata data) external {
-    if (!hasRole(OPERATOR_ROLE, msg.sender)) revert NotOperator();
-
+  function safeTransferFrom(
+    address token,
+    address from,
+    address to,
+    uint256 tokenId,
+    bytes calldata data
+  ) external whenNotDisabled onlyRole(OPERATOR_ROLE) {
     IERC721 nft = IERC721(token);
-    require(_isApprovedOrOwner(nft, from, tokenId), "Not approved");
     nft.safeTransferFrom(from, to, tokenId, data);
   }
 
-  /// @notice Checks if this contract can transfer a specific token
-  /// @param nft The NFT contract
+  /// @notice Safe transfers an NFT from one address to another
+  /// @dev Only operators can call this function
+  /// @param token The NFT contract address
   /// @param from The current owner of the token
-  /// @param tokenId The ID of the token to check
-  function _isApprovedOrOwner(IERC721 nft, address from, uint256 tokenId) internal view returns (bool) {
-    return nft.isApprovedForAll(from, address(this)) || nft.getApproved(tokenId) == address(this);
+  /// @param to The recipient of the token
+  /// @param tokenId The ID of the token to transfer
+  function safeTransferFrom(
+    address token,
+    address from,
+    address to,
+    uint256 tokenId
+  ) external whenNotDisabled onlyRole(OPERATOR_ROLE) {
+    IERC721 nft = IERC721(token);
+    nft.safeTransferFrom(from, to, tokenId, "");
   }
 }

@@ -3,7 +3,7 @@ pragma solidity =0.8.18;
 
 import {Test} from "forge-std/Test.sol";
 import {TestNFT} from "../utils/TestNFT.sol";
-import {ERC721ApprovalManager} from "../../approver/ERC721ApprovalManager.sol";
+import {ERC721ApprovalManager} from "../../approver/ERC721/ERC721ApprovalManager.sol";
 
 contract ERC721ApprovalManagerTest is Test {
   // Events to test
@@ -139,7 +139,14 @@ contract ERC721ApprovalManagerTest is Test {
     vm.stopPrank();
 
     vm.prank(address(0x6)); // Non-operator address
-    vm.expectRevert(ERC721ApprovalManager.NotOperator.selector);
+    vm.expectRevert(
+      abi.encodePacked(
+        "AccessControl: account ",
+        vm.toString(address(0x6)),
+        " is missing role ",
+        vm.toString(OPERATOR_ROLE)
+      )
+    );
     approvalManager.transferFrom(address(nft), TOKEN_OWNER, TOKEN_RECIPIENT, TOKEN_ID);
   }
 
@@ -151,7 +158,7 @@ contract ERC721ApprovalManagerTest is Test {
     // Note: Not setting approval for the approval manager
 
     vm.prank(OPERATOR);
-    vm.expectRevert("Not approved");
+    vm.expectRevert("ERC721: caller is not token owner or approved");
     approvalManager.transferFrom(address(nft), TOKEN_OWNER, TOKEN_RECIPIENT, TOKEN_ID);
   }
 
@@ -161,5 +168,35 @@ contract ERC721ApprovalManagerTest is Test {
       abi.encodePacked("AccessControl: account ", vm.toString(OPERATOR), " is missing role ", vm.toString(MANAGER_ROLE))
     );
     approvalManager.grantOperatorRole(address(0x6));
+  }
+
+  function test_TransferFrom_RevertsWhenDisabled() public {
+    vm.startPrank(ADMIN);
+    approvalManager.grantOperatorRole(OPERATOR);
+    approvalManager.disable();
+    vm.stopPrank();
+
+    vm.startPrank(TOKEN_OWNER);
+    nft.setApprovalForAll(address(approvalManager), true);
+    vm.stopPrank();
+
+    vm.prank(OPERATOR);
+    vm.expectRevert(ERC721ApprovalManager.ContractDisabledError.selector);
+    approvalManager.transferFrom(address(nft), TOKEN_OWNER, TOKEN_RECIPIENT, TOKEN_ID);
+  }
+
+  function test_SafeTransferFrom_RevertsWhenDisabled() public {
+    vm.startPrank(ADMIN);
+    approvalManager.grantOperatorRole(OPERATOR);
+    approvalManager.disable();
+    vm.stopPrank();
+
+    vm.startPrank(TOKEN_OWNER);
+    nft.setApprovalForAll(address(approvalManager), true);
+    vm.stopPrank();
+
+    vm.prank(OPERATOR);
+    vm.expectRevert(ERC721ApprovalManager.ContractDisabledError.selector);
+    approvalManager.safeTransferFrom(address(nft), TOKEN_OWNER, TOKEN_RECIPIENT, TOKEN_ID, "");
   }
 }

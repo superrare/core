@@ -7,8 +7,8 @@ import {IMarketplaceSettings} from "rareprotocol/aux/marketplace/IMarketplaceSet
 import {ISpaceOperatorRegistry} from "rareprotocol/aux/registry/interfaces/ISpaceOperatorRegistry.sol";
 import {IPayments} from "rareprotocol/aux/payments/IPayments.sol";
 import {IRoyaltyEngineV1} from "royalty-registry/IRoyaltyEngineV1.sol";
-import {IERC20ApprovalManager} from "../interfaces/IERC20ApprovalManager.sol";
-import {IERC721ApprovalManager} from "../interfaces/IERC721ApprovalManager.sol";
+import {IERC20ApprovalManager} from "../../approver/ERC20/IERC20ApprovalManager.sol";
+import {IERC721ApprovalManager} from "../../approver/ERC721/IERC721ApprovalManager.sol";
 
 import {IRareStakingRegistry} from "../../staking/registry/IRareStakingRegistry.sol";
 
