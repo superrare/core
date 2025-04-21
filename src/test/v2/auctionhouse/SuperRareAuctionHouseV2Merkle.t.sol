@@ -179,6 +179,11 @@ contract SuperRareAuctionHouseV2MerkleTest is Test {
       abi.encodeWithSelector(IMarketplaceSettings.markERC721Token.selector, address(nftContract)),
       abi.encode()
     );
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.hasERC721TokenSold.selector, address(nftContract)),
+      abi.encode(false)
+    );
 
     // Mock staking settings
     vm.mockCall(
@@ -394,7 +399,7 @@ contract SuperRareAuctionHouseV2MerkleTest is Test {
 
     // Try to cancel as non-owner
     vm.startPrank(bidder);
-    vm.expectRevert("Not root owner");
+    vm.expectRevert("cancelAuctionMerkleRoot::Not root owner");
     auctionHouse.cancelAuctionMerkleRoot(root);
     vm.stopPrank();
 
@@ -713,7 +718,11 @@ contract SuperRareAuctionHouseV2MerkleTest is Test {
       abi.encodeWithSelector(ISpaceOperatorRegistry.getPlatformCommission.selector, auctionCreator),
       abi.encode(uint8(0))
     );
-
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.hasERC721TokenSold.selector, address(nftContract), 6),
+      abi.encode(false)
+    );
     // Setup bidder with enough allowance for both bids including fees
     vm.startPrank(bidder);
     uint256 marketplaceFee = IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT);
@@ -794,9 +803,21 @@ contract SuperRareAuctionHouseV2MerkleTest is Test {
     );
     vm.stopPrank();
 
+    // Settle the auction for newFirstTokenId
+    vm.warp(block.timestamp + AUCTION_DURATION + 1);
+    auctionHouse.settleAuction(address(nftContract), newFirstTokenId);
+
     // Verify token nonce updated
     tokenNonce = auctionHouse.getTokenAuctionNonce(auctionCreator, newRoot, address(nftContract), newFirstTokenId);
     assertEq(tokenNonce, 1, "New token nonce should be 1 after sale under new root");
+
+    // 5. Simulate Token Return to Creator
+    vm.startPrank(bidder);
+    // Need to approve the token for transfer
+    nftContract.approve(auctionCreator, firstTokenId);
+    nftContract.transferFrom(bidder, auctionCreator, firstTokenId);
+    vm.stopPrank();
+    assertEq(nftContract.ownerOf(firstTokenId), auctionCreator, "Token should be back with creator");
   }
 
   function test_dualNonceSystem_multipleTokens() public {
@@ -882,6 +903,7 @@ contract SuperRareAuctionHouseV2MerkleTest is Test {
 
     // Register initial root
     vm.startPrank(auctionCreator);
+    nftContract.setApprovalForAll(address(erc721ApprovalManager), true);
     auctionHouse.registerAuctionMerkleRoot(
       root,
       address(currencyContract),
@@ -920,6 +942,16 @@ contract SuperRareAuctionHouseV2MerkleTest is Test {
     );
     vm.stopPrank();
 
+    // Settle the auction so the bidder gets the token
+    vm.warp(block.timestamp + AUCTION_DURATION + 1);
+    auctionHouse.settleAuction(address(nftContract), firstTokenId);
+
+    // Transfer token back to auctionCreator
+    vm.startPrank(bidder);
+    nftContract.approve(auctionCreator, firstTokenId);
+    nftContract.transferFrom(bidder, auctionCreator, firstTokenId);
+    vm.stopPrank();
+
     // Create new tokens and tree for reconfiguration
     (
       bytes32 newRoot,
@@ -930,6 +962,7 @@ contract SuperRareAuctionHouseV2MerkleTest is Test {
 
     // Register new root
     vm.startPrank(auctionCreator);
+    nftContract.setApprovalForAll(address(erc721ApprovalManager), true);
     auctionHouse.registerAuctionMerkleRoot(
       newRoot,
       address(currencyContract),
@@ -966,6 +999,10 @@ contract SuperRareAuctionHouseV2MerkleTest is Test {
     );
     vm.stopPrank();
 
+    // Settle the auction for newFirstTokenId
+    vm.warp(block.timestamp + AUCTION_DURATION + 1);
+    auctionHouse.settleAuction(address(nftContract), newFirstTokenId);
+
     // Verify final nonces
     token2Nonce = auctionHouse.getTokenAuctionNonce(auctionCreator, newRoot, address(nftContract), newFirstTokenId);
     assertEq(token2Nonce, 1, "Second token nonce should be 1 after bid");
@@ -981,13 +1018,6 @@ contract SuperRareAuctionHouseV2MerkleTest is Test {
       firstTokenId
     );
     assertEq(finalTokenNonce, 1, "Token nonce should be 1 after successful bid under reconfigured root");
-
-    // 9. Complete the sale by settling the auction
-    vm.warp(block.timestamp + AUCTION_DURATION + 1);
-    auctionHouse.settleAuction(address(nftContract), firstTokenId);
-
-    // Verify the token is transferred to the bidder
-    assertEq(nftContract.ownerOf(firstTokenId), bidder, "Token should be with bidder after settlement");
   }
 
   function test_bidWithAuctionMerkleProof_ETHPayment() public {
@@ -1337,6 +1367,8 @@ contract SuperRareAuctionHouseV2MerkleTest is Test {
 
     // 5. Simulate Token Return to Creator
     vm.startPrank(bidder);
+    // Need to approve the token for transfer
+    nftContract.approve(auctionCreator, firstTokenId);
     nftContract.transferFrom(bidder, auctionCreator, firstTokenId);
     vm.stopPrank();
     assertEq(nftContract.ownerOf(firstTokenId), auctionCreator, "Token should be back with creator");

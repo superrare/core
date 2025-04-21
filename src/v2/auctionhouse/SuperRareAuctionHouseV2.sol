@@ -323,7 +323,7 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
 
     // Return token if in contract
     if (erc721.ownerOf(_tokenId) == address(this)) {
-      marketConfig.transferERC721(_originContract, address(this), msg.sender, _tokenId);
+      erc721.transferFrom(address(this), msg.sender, _tokenId);
     }
 
     // Verify token was returned
@@ -465,7 +465,7 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
     delete auctionBids[_originContract][_tokenId];
 
     // Transfer token to winning bidder
-    marketConfig.transferERC721(_originContract, address(this), currentBid.bidder, _tokenId);
+    IERC721(_originContract).transferFrom(address(this), currentBid.bidder, _tokenId);
 
     // Execute payout
     marketConfig.payout(
