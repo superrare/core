@@ -20,6 +20,7 @@ import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.
 contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable, ReentrancyGuardUpgradeable {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.Bytes32Set;
+  using MarketConfigV2 for MarketConfigV2.Config;
 
   // Constants
   bytes32 public constant NO_AUCTION = keccak256("NO_AUCTION");
@@ -48,9 +49,9 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
   // Mapping from (creator, root) to nonce for that root
   mapping(address => mapping(bytes32 => uint256)) private creatorRootNonce;
 
-  // Mapping from (creator, root, token contract, token ID) to auction nonce
-  // Used to prevent replay attacks when bidding with the same token in multiple auctions
-  mapping(address => mapping(bytes32 => mapping(address => mapping(uint256 => uint256)))) private tokenAuctionNonce;
+  // Mapping of keccak256(creator, root, tokenContract, tokenId) to nonce
+  // Key is computed as: keccak256(abi.encodePacked(creator, root, tokenContract, tokenId))
+  mapping(bytes32 => uint256) private tokenAuctionNonce;
 
   /**
    * @dev Initializer function
@@ -200,8 +201,6 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
     MarketConfigV2.updateERC721ApprovalManager(marketConfig, _erc721ApprovalManager);
   }
 
-  // Implementation of functions will be completed in subsequent phases
-
   /*//////////////////////////////////////////////////////////////
                       STANDARD AUCTION FUNCTIONS 
   //////////////////////////////////////////////////////////////*/
@@ -219,15 +218,120 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
     address payable[] calldata _splitAddresses,
     uint8[] calldata _splitRatios
   ) external override {
-    // Implementation will be completed in Phase 2
-    revert("Not yet implemented");
+    // Check if currency is approved
+    MarketUtilsV2.checkIfCurrencyIsApproved(marketConfig, _currencyAddress);
+
+    // Get current auction data if it exists
+    Auction memory auction = tokenAuctions[_originContract][_tokenId];
+    IERC721 erc721 = IERC721(_originContract);
+
+    // Allow for re-configuring a scheduled auction that has not started
+    if (erc721.ownerOf(_tokenId) == address(this) && auction.startingTime > block.timestamp) {
+      // Verify sender is auction creator
+      require(auction.auctionCreator == msg.sender, "configureAuction::Must be auction creator");
+    } else {
+      // Verify sender is token owner
+      MarketUtilsV2.senderMustBeTokenOwner(_originContract, _tokenId);
+    }
+
+    // Verify token is approved for marketplace
+    MarketUtilsV2.addressMustHaveMarketplaceApprovedForNFT(msg.sender, _originContract, _tokenId);
+
+    // Validate split configuration
+    MarketUtilsV2.checkSplits(_splitAddresses, _splitRatios);
+
+    // Validate auction type
+    _checkValidAuctionType(_auctionType);
+
+    // Check auction parameters
+    require(_lengthOfAuction <= maxAuctionLength, "configureAuction::Auction too long");
+    require(_lengthOfAuction > 0, "configureAuction::Length must be > 0");
+
+    // Ensure no current bid exists
+    Bid memory staleBid = auctionBids[_originContract][_tokenId];
+    require(staleBid.bidder == address(0), "configureAuction::Bid shouldn't exist");
+
+    // Check auction type specific requirements
+    if (_auctionType == COLDIE_AUCTION) {
+      require(_startingAmount > 0, "configureAuction::Coldie starting price must be > 0");
+    } else if (_auctionType == SCHEDULED_AUCTION) {
+      require(_startTime > block.timestamp, "configureAuction::Scheduled auction cannot start in past");
+    }
+
+    // Ensure starting amount is within acceptable range
+    require(
+      _startingAmount <= marketConfig.marketplaceSettings.getMarketplaceMaxValue(),
+      "configureAuction::Cannot set starting price higher than max value"
+    );
+
+    // Ensure there's no Merkle auction with this token
+    // This is the exclusivity guard between standard and Merkle auctions
+    require(erc721.ownerOf(_tokenId) == msg.sender, "configureAuction::Sender must own the token");
+
+    // Create auction
+    tokenAuctions[_originContract][_tokenId] = Auction({
+      auctionCreator: payable(msg.sender),
+      creationBlock: block.number,
+      startingTime: _auctionType == COLDIE_AUCTION ? 0 : _startTime,
+      lengthOfAuction: _lengthOfAuction,
+      currencyAddress: _currencyAddress,
+      minimumBid: _startingAmount,
+      auctionType: _auctionType,
+      splitRecipients: _splitAddresses,
+      splitRatios: _splitRatios
+    });
+
+    // Transfer token to this contract if scheduled auction
+    if (_auctionType == SCHEDULED_AUCTION) {
+      MarketUtilsV2.transferERC721(marketConfig, _originContract, msg.sender, address(this), _tokenId);
+    }
+
+    emit NewAuction(
+      _originContract,
+      _tokenId,
+      msg.sender,
+      _currencyAddress,
+      _startTime,
+      _startingAmount,
+      _lengthOfAuction
+    );
   }
 
   /// @notice Cancels a configured Auction that has not started.
   /// @inheritdoc ISuperRareAuctionHouseV2
   function cancelAuction(address _originContract, uint256 _tokenId) external override {
-    // Implementation will be completed in Phase 2
-    revert("Not yet implemented");
+    // Get auction details
+    Auction memory auction = tokenAuctions[_originContract][_tokenId];
+
+    // Verify auction exists
+    require(auction.auctionType != NO_AUCTION, "cancelAuction::Must have an auction configured");
+
+    // Verify auction has not started
+    require(
+      auction.startingTime == 0 || block.timestamp < auction.startingTime,
+      "cancelAuction::Auction must not have started"
+    );
+
+    // Get token owner
+    IERC721 erc721 = IERC721(_originContract);
+
+    // Check permissions - only auction creator can cancel
+    // This is a more restrictive model than the original, following the task checklist's recommendation
+    require(auction.auctionCreator == msg.sender, "cancelAuction::Must be auction creator");
+
+    // Delete auction from storage
+    delete tokenAuctions[_originContract][_tokenId];
+
+    // Return token if in contract
+    if (erc721.ownerOf(_tokenId) == address(this)) {
+      marketConfig.transferERC721(_originContract, address(this), msg.sender, _tokenId);
+    }
+
+    // Verify token was returned
+    require(erc721.ownerOf(_tokenId) == msg.sender, "cancelAuction::Token transfer failed");
+
+    // Emit event
+    emit CancelAuction(_originContract, _tokenId, auction.auctionCreator);
   }
 
   /// @notice Places a bid on a valid auction.
@@ -238,15 +342,152 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
     address _currencyAddress,
     uint256 _amount
   ) external payable override nonReentrant {
-    // Implementation will be completed in Phase 2
-    revert("Not yet implemented");
+    // Calculate required amount (bid + marketplace fee)
+    uint256 requiredAmount = _amount + marketConfig.marketplaceSettings.calculateMarketplaceFee(_amount);
+
+    // Check that the sender has approved the marketplace for this amount
+    MarketUtilsV2.senderMustHaveMarketplaceApproved(_currencyAddress, requiredAmount);
+
+    // Get the current auction
+    Auction memory auction = tokenAuctions[_originContract][_tokenId];
+
+    // Verify auction exists
+    require(auction.auctionType != NO_AUCTION, "bid::Must have a current auction");
+
+    // Verify bidder is not the auction creator
+    require(auction.auctionCreator != msg.sender, "bid::Cannot bid on your own auction");
+
+    // Verify auction has started
+    require(block.timestamp >= auction.startingTime, "bid::Auction not active");
+
+    // For scheduled auctions, verify auction has not ended
+    if (auction.startingTime > 0) {
+      require(block.timestamp < auction.startingTime + auction.lengthOfAuction, "bid::Auction has ended");
+    }
+
+    // Verify bid currency matches auction currency
+    require(_currencyAddress == auction.currencyAddress, "bid::Currency does not match auction currency");
+
+    // Verify bid amount is valid
+    require(_amount >= auction.minimumBid, "bid::Bid amount too low");
+    require(_amount > 0, "bid::Bid amount must be greater than 0");
+    require(_amount <= marketConfig.marketplaceSettings.getMarketplaceMaxValue(), "bid::Bid exceeds max value");
+
+    // Get current bid
+    Bid memory currentBid = auctionBids[_originContract][_tokenId];
+    address previousBidder = currentBid.bidder;
+
+    // If not first bid, verify minimum increase percentage
+    if (previousBidder != address(0)) {
+      uint256 minBidIncrease = (currentBid.amount * minimumBidIncreasePercentage) / 100;
+      require(_amount >= currentBid.amount + minBidIncrease, "bid::Must increase bid by minimum percentage");
+    }
+
+    // Transfer tokens for bid
+    marketConfig.checkAmountAndTransfer(_currencyAddress, requiredAmount);
+
+    // Calculate auction extension if needed
+    uint256 newAuctionLength = 0;
+
+    // If close to end, extend auction
+    if (auction.startingTime > 0) {
+      uint256 timeLeft = (auction.startingTime + auction.lengthOfAuction) - block.timestamp;
+
+      if (timeLeft < auctionLengthExtension) {
+        newAuctionLength = auction.lengthOfAuction + auctionLengthExtension - timeLeft;
+
+        // Update auction length
+        tokenAuctions[_originContract][_tokenId].lengthOfAuction = newAuctionLength;
+      }
+    }
+
+    // For first bid on a Coldie auction
+    if (previousBidder == address(0) && auction.auctionType == COLDIE_AUCTION) {
+      // Transfer token from auction creator to this contract
+      if (IERC721(_originContract).ownerOf(_tokenId) == auction.auctionCreator) {
+        marketConfig.transferERC721(_originContract, auction.auctionCreator, address(this), _tokenId);
+      }
+    }
+
+    // Refund previous bidder if exists
+    if (previousBidder != address(0)) {
+      marketConfig.refund(
+        currentBid.currencyAddress,
+        currentBid.amount,
+        currentBid.marketplaceFeeAtTime,
+        previousBidder
+      );
+    }
+
+    // Record bid
+    auctionBids[_originContract][_tokenId] = Bid({
+      bidder: msg.sender,
+      currencyAddress: _currencyAddress,
+      amount: _amount,
+      marketplaceFeeAtTime: marketConfig.marketplaceSettings.getMarketplaceFeePercentage()
+    });
+
+    // Emit event
+    emit AuctionBid(
+      _originContract,
+      msg.sender,
+      _tokenId,
+      _currencyAddress,
+      _amount,
+      previousBidder == address(0), // firstBid
+      marketConfig.marketplaceSettings.getMarketplaceFeePercentage(),
+      previousBidder
+    );
   }
 
   /// @notice Settles an auction that has ended.
   /// @inheritdoc ISuperRareAuctionHouseV2
   function settleAuction(address _originContract, uint256 _tokenId) external override {
-    // Implementation will be completed in Phase 2
-    revert("Not yet implemented");
+    // Get auction and bid
+    Auction memory auction = tokenAuctions[_originContract][_tokenId];
+    Bid memory bid = auctionBids[_originContract][_tokenId];
+
+    // Verify auction exists
+    require(auction.auctionType != NO_AUCTION, "settleAuction::No auction exists");
+
+    // Verify auction has a bid
+    require(bid.bidder != address(0), "settleAuction::No bids placed");
+
+    // Verify auction has ended
+    if (auction.startingTime > 0) {
+      require(
+        block.timestamp >= auction.startingTime + auction.lengthOfAuction,
+        "settleAuction::Auction has not ended"
+      );
+    }
+
+    // Delete auction and bid from storage
+    delete tokenAuctions[_originContract][_tokenId];
+    delete auctionBids[_originContract][_tokenId];
+
+    // Transfer token to winning bidder
+    marketConfig.transferERC721(_originContract, address(this), bid.bidder, _tokenId);
+
+    // Execute payout
+    marketConfig.payout(
+      _originContract,
+      _tokenId,
+      bid.currencyAddress,
+      bid.amount,
+      auction.auctionCreator,
+      auction.splitRecipients,
+      auction.splitRatios
+    );
+
+    // Emit event
+    emit AuctionSettled(
+      _originContract,
+      _tokenId,
+      auction.auctionCreator,
+      bid.bidder,
+      bid.amount,
+      bid.marketplaceFeeAtTime
+    );
   }
 
   /// @notice Grabs the current auction details for a token.
@@ -260,8 +501,19 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
     override
     returns (address, uint256, uint256, uint256, address, uint256, bytes32, address payable[] memory, uint8[] memory)
   {
-    // Implementation will be completed in Phase 2
-    revert("Not yet implemented");
+    Auction memory auction = tokenAuctions[_originContract][_tokenId];
+
+    return (
+      auction.auctionCreator,
+      auction.creationBlock,
+      auction.startingTime,
+      auction.lengthOfAuction,
+      auction.currencyAddress,
+      auction.minimumBid,
+      auction.auctionType,
+      auction.splitRecipients,
+      auction.splitRatios
+    );
   }
 
   /*//////////////////////////////////////////////////////////////
@@ -278,15 +530,54 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
     address payable[] calldata splitAddresses,
     uint8[] calldata splitRatios
   ) external override {
-    // Implementation will be completed in Phase 2
-    revert("Not yet implemented");
+    // Check if currency is approved
+    marketConfig.checkIfCurrencyIsApproved(currency);
+
+    // Validate split configuration
+    MarketUtilsV2.checkSplits(splitAddresses, splitRatios);
+
+    // Verify duration is not too long
+    require(duration <= maxAuctionLength, "registerAuctionMerkleRoot::Duration too long");
+
+    // Verify starting amount is valid
+    require(
+      startingAmount <= marketConfig.marketplaceSettings.getMarketplaceMaxValue(),
+      "registerAuctionMerkleRoot::Starting amount exceeds maximum value"
+    );
+
+    // Add root to user's set of roots
+    creatorAuctionMerkleRoots[msg.sender].add(merkleRoot);
+
+    // Calculate new nonce
+    uint256 newNonce = creatorRootNonce[msg.sender][merkleRoot] + 1;
+    creatorRootNonce[msg.sender][merkleRoot] = newNonce;
+
+    creatorRootToConfig[msg.sender][merkleRoot] = MerkleAuctionConfig({
+      currency: currency,
+      startingAmount: startingAmount,
+      duration: duration,
+      splitAddresses: splitAddresses,
+      splitRatios: splitRatios,
+      nonce: newNonce
+    });
+
+    emit AuctionMerkleRootRegistered(msg.sender, merkleRoot, currency, startingAmount, duration, newNonce);
   }
 
   /// @notice Cancels a previously registered Merkle root
   /// @inheritdoc ISuperRareAuctionHouseV2
   function cancelAuctionMerkleRoot(bytes32 root) external override {
-    // Implementation will be completed in Phase 2
-    revert("Not yet implemented");
+    // Check if caller owns the root
+    require(creatorAuctionMerkleRoots[msg.sender].contains(root), "cancelAuctionMerkleRoot::Not root owner");
+
+    // Remove root from user's set
+    creatorAuctionMerkleRoots[msg.sender].remove(root);
+
+    // Clean up config data (note: we keep the nonce for security)
+    delete creatorRootToConfig[msg.sender][root];
+
+    // Emit event
+    emit AuctionMerkleRootCancelled(msg.sender, root);
   }
 
   /// @notice Places a bid using a Merkle proof to verify token inclusion
@@ -299,22 +590,80 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
     uint256 bidAmount,
     bytes32[] calldata proof
   ) external payable override nonReentrant {
-    // Implementation will be completed in Phase 2
-    revert("Not yet implemented");
-  }
+    // Verify token is in Merkle root
+    bytes32 leaf = keccak256(abi.encodePacked(originContract, tokenId));
+    require(MerkleProof.verify(proof, merkleRoot, leaf), "bidWithAuctionMerkleProof::Invalid Merkle proof");
 
-  /// @notice Gets all Merkle roots registered by a user
-  /// @inheritdoc ISuperRareAuctionHouseV2
-  function getUserAuctionMerkleRoots(address user) external view override returns (bytes32[] memory) {
-    // Implementation will be completed in Phase 2
-    revert("Not yet implemented");
-  }
+    // Verify Merkle root is registered and active
+    require(
+      creatorAuctionMerkleRoots[creator].contains(merkleRoot),
+      "bidWithAuctionMerkleProof::Merkle root not registered"
+    );
 
-  /// @notice Gets the current nonce for a user's Merkle root
-  /// @inheritdoc ISuperRareAuctionHouseV2
-  function getCreatorAuctionMerkleRootNonce(address user, bytes32 root) external view override returns (uint256) {
-    // Implementation will be completed in Phase 2
-    revert("Not yet implemented");
+    // Get config for this Merkle root
+    MerkleAuctionConfig memory config = creatorRootToConfig[creator][merkleRoot];
+
+    // Get token nonce key and verify it hasn't been used
+    bytes32 tokenNonceKey = keccak256(abi.encodePacked(creator, merkleRoot, originContract, tokenId));
+    uint256 currentNonce = creatorRootNonce[creator][merkleRoot];
+    require(
+      tokenAuctionNonce[tokenNonceKey] < currentNonce,
+      "bidWithAuctionMerkleProof::Token already used for this Merkle root"
+    );
+
+    // Verify no auction exists for this token
+    require(
+      tokenAuctions[originContract][tokenId].auctionType == NO_AUCTION,
+      "bidWithAuctionMerkleProof::Auction already exists"
+    );
+
+    // Verify bid amount is valid
+    require(bidAmount > 0, "bidWithAuctionMerkleProof::Cannot be 0");
+    require(
+      bidAmount <= marketConfig.marketplaceSettings.getMarketplaceMaxValue(),
+      "bidWithAuctionMerkleProof::Must be less than max value"
+    );
+    require(bidAmount >= config.startingAmount, "bidWithAuctionMerkleProof::Cannot be lower than minimum bid");
+
+    // Verify creator owns the token
+    IERC721 erc721 = IERC721(originContract);
+    require(erc721.ownerOf(tokenId) == creator, "bidWithAuctionMerkleProof::Not token owner");
+
+    // Check marketplace approval
+    MarketUtilsV2.addressMustHaveMarketplaceApprovedForNFT(creator, originContract, tokenId);
+
+    // Transfer bid amount
+    uint256 requiredAmount = bidAmount + marketConfig.marketplaceSettings.calculateMarketplaceFee(bidAmount);
+    MarketUtilsV2.checkAmountAndTransfer(marketConfig, config.currency, requiredAmount);
+
+    // Update token nonce to current creatorRootNonce
+    tokenAuctionNonce[tokenNonceKey] = currentNonce;
+
+    // Create auction
+    tokenAuctions[originContract][tokenId] = Auction({
+      auctionCreator: payable(creator),
+      creationBlock: block.number,
+      startingTime: block.timestamp,
+      lengthOfAuction: config.duration,
+      currencyAddress: config.currency,
+      minimumBid: config.startingAmount,
+      auctionType: COLDIE_AUCTION,
+      splitRecipients: config.splitAddresses,
+      splitRatios: config.splitRatios
+    });
+
+    // Record the bid
+    auctionBids[originContract][tokenId] = Bid({
+      bidder: msg.sender,
+      currencyAddress: config.currency,
+      amount: bidAmount,
+      marketplaceFeeAtTime: marketConfig.marketplaceSettings.getMarketplaceFeePercentage()
+    });
+
+    // Transfer token from creator to this contract
+    MarketUtilsV2.transferERC721(marketConfig, originContract, creator, address(this), tokenId);
+
+    emit AuctionMerkleBid(originContract, tokenId, msg.sender, creator, merkleRoot, bidAmount, currentNonce);
   }
 
   /// @notice Verifies if a token is included in a Merkle root
@@ -325,18 +674,8 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
     uint256 tokenId,
     bytes32[] calldata proof
   ) external pure override returns (bool) {
-    // Implementation will be completed in Phase 2
-    revert("Not yet implemented");
-  }
-
-  /// @notice Gets the Merkle auction configuration for a given creator and root
-  /// @inheritdoc ISuperRareAuctionHouseV2
-  function getMerkleAuctionConfig(
-    address creator,
-    bytes32 root
-  ) external view override returns (MerkleAuctionConfig memory) {
-    // Implementation will be completed in Phase 2
-    revert("Not yet implemented");
+    bytes32 leaf = keccak256(abi.encodePacked(origin, tokenId));
+    return MerkleProof.verify(proof, root, leaf);
   }
 
   /// @notice Gets the nonce for a specific token under a Merkle root
@@ -347,8 +686,29 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
     address tokenContract,
     uint256 tokenId
   ) external view override returns (uint256) {
-    // Implementation will be completed in Phase 2
-    revert("Not yet implemented");
+    bytes32 tokenNonceKey = keccak256(abi.encodePacked(creator, root, tokenContract, tokenId));
+    return tokenAuctionNonce[tokenNonceKey];
+  }
+
+  /// @notice Gets all Merkle roots registered by a user
+  /// @inheritdoc ISuperRareAuctionHouseV2
+  function getUserAuctionMerkleRoots(address user) external view override returns (bytes32[] memory) {
+    return creatorAuctionMerkleRoots[user].values();
+  }
+
+  /// @notice Gets the current nonce for a user's Merkle root
+  /// @inheritdoc ISuperRareAuctionHouseV2
+  function getCreatorAuctionMerkleRootNonce(address user, bytes32 root) external view override returns (uint256) {
+    return creatorRootNonce[user][root];
+  }
+
+  /// @notice Gets the Merkle auction configuration for a given creator and root
+  /// @inheritdoc ISuperRareAuctionHouseV2
+  function getMerkleAuctionConfig(
+    address creator,
+    bytes32 root
+  ) external view override returns (MerkleAuctionConfig memory) {
+    return creatorRootToConfig[creator][root];
   }
 
   /*//////////////////////////////////////////////////////////////
