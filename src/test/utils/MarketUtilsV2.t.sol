@@ -20,6 +20,7 @@ import {MarketConfigV2} from "../../utils/v2/MarketConfigV2.sol";
 import {IRareStakingRegistry} from "../../staking/registry/IRareStakingRegistry.sol";
 import {ERC20ApprovalManager} from "../../approver/ERC20/ERC20ApprovalManager.sol";
 import {ERC721ApprovalManager} from "../../approver/ERC721/ERC721ApprovalManager.sol";
+import {TestNFT} from "../utils/TestNft.sol";
 
 contract TestContract {
   using MarketUtilsV2 for MarketConfigV2.Config;
@@ -104,6 +105,10 @@ contract TestContract {
   ) public payable {
     config.payout(_originContract, _tokenId, _currencyAddress, _amount, _seller, _splitAddrs, _splitRatios);
   }
+
+  function transferERC721(address _originContract, address _from, address _to, uint256 _tokenId) public {
+    config.transferERC721(_originContract, _from, _to, _tokenId);
+  }
 }
 
 contract TestRare is ERC20 {
@@ -120,6 +125,7 @@ contract MarketUtilsV2Test is Test {
   TestContract tc;
   Payments payments;
   TestRare public rare;
+  TestNFT public nft;
   ERC20ApprovalManager public erc20ApprovalManager;
   ERC721ApprovalManager public erc721ApprovalManager;
   uint256 constant initialRare = 1000 * 1e18;
@@ -143,6 +149,9 @@ contract MarketUtilsV2Test is Test {
 
     // Deploy TestRare
     rare = new TestRare();
+
+    // Deploy TestNFT
+    nft = new TestNFT();
 
     // Deploy Payments
     payments = new Payments();
@@ -848,5 +857,21 @@ contract MarketUtilsV2Test is Test {
 
     assertEq(charlieBalanceAfter, charlieExpectedBalance, "incorrect first split receiver balance after payout");
     assertEq(bobBalanceAfter, bobExpectedBalance, "incorrect second split receiver balance after payout");
+  }
+
+  function test_transferERC721_Success() public {
+    // Mint NFT to alice
+    vm.prank(deployer);
+    uint256 tokenId = nft.mint(alice);
+
+    // Have alice approve the marketplace
+    vm.prank(alice);
+    nft.approve(address(erc721ApprovalManager), tokenId);
+
+    // Transfer NFT from alice to bob
+    tc.transferERC721(address(nft), alice, bob, tokenId);
+
+    // Verify the transfer happened
+    assertEq(nft.ownerOf(tokenId), bob, "NFT was not transferred to bob");
   }
 }

@@ -269,4 +269,20 @@ library MarketUtilsV2 {
       erc20.safeTransfer(_recipients[i], _amounts[i]);
     }
   }
+
+  /// @notice Transfers an ERC721 token using the approval manager
+  /// @param _config The market config
+  /// @param _originContract The address of the ERC721 contract
+  /// @param _from The current owner of the token
+  /// @param _to The recipient of the token
+  /// @param _tokenId The ID of the token being transferred
+  function transferERC721(
+    MarketConfigV2.Config storage _config,
+    address _originContract,
+    address _from,
+    address _to,
+    uint256 _tokenId
+  ) internal {
+    _config.erc721ApprovalManager.transferFrom(_originContract, _from, _to, _tokenId);
+  }
 }
