@@ -123,9 +123,14 @@ This document outlines the plan to create a **new** `SuperRareAuctionHouseV2` co
 **Phase 3: Testing**
 
 16. **[ ] Write/Adapt Tests for Merkle Logic (`SuperRareAuctionHouseV2Merkle.t.sol`):**
-    *   Copy tests from `src/test/auctionhouse/SuperRareAuctionHouseMerkle.t.sol`.
-    *   Adapt tests to target `SuperRareAuctionHouseV2.sol` and use `MarketUtilsV2` setups.
-    *   Ensure `tokenAuctionNonce` logic is thoroughly tested.
+    *   Copy tests from `src/test/auctionhouse/SuperRareAuctionHouseMerkle.t.sol` with minimal changes.
+    *   Focus on reusing as much of the existing test code as possible, only modifying what's necessary for:
+        * Contract references (from SuperRareAuctionHouse to SuperRareAuctionHouseV2)
+        * Setup functions to use the new initialization parameters
+        * MarketUtilsV2 integration
+        * Updated storage patterns (especially the tokenAuctionNonce keccak256 mapping)
+    *   Keep all existing test cases and scenarios intact to maintain coverage.
+    *   Ensure the `tokenAuctionNonce` logic with the new bytes32 mapping is thoroughly tested.
 17. **[ ] Write Tests for Standard `configureAuction` (`SuperRareAuctionHouseV2Standard.t.sol`):** Cover scenarios, permissions, exclusivity checks for the V2 implementation.
 18. **[ ] Write Tests for Standard `bid` (`SuperRareAuctionHouseV2Standard.t.sol`):** Cover bidding logic, `MarketUtilsV2` integration, exclusivity checks for V2.
 19. **[ ] Write Tests for Standard `cancelAuction` (`SuperRareAuctionHouseV2Standard.t.sol`):** Cover refined permissions, timing, state changes for V2.
