@@ -28,19 +28,16 @@ library MarketUtilsV2 {
   }
 
   /// @notice Checks to see if the approval manager has approval to transfer the NFT
-  /// @param _addr Being checked if they've approved for all
   /// @param _originContract Contract address of the token being checked.
   /// @param _tokenId Token Id of the asset.
   function addressMustHaveMarketplaceApprovedForNFT(
-    address _addr,
+    MarketConfigV2.Config storage _config,
+    address _address,
     address _originContract,
     uint256 _tokenId
   ) internal view {
     IERC721 nft = IERC721(_originContract);
-    require(
-      nft.isApprovedForAll(_addr, address(this)) || nft.getApproved(_tokenId) == address(this),
-      "owner must have approved contract"
-    );
+    require(nft.isApprovedForAll(_address, address(_config.erc721ApprovalManager)), "owner must have approved token");
   }
 
   /// @notice Verifies that the splits supplied are valid.

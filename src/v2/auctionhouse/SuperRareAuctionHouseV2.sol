@@ -21,9 +21,10 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.Bytes32Set;
   using MarketConfigV2 for MarketConfigV2.Config;
+  using MarketUtilsV2 for MarketConfigV2.Config;
 
   // Constants
-  bytes32 public constant NO_AUCTION = keccak256("NO_AUCTION");
+  bytes32 public constant NO_AUCTION = bytes32(0);
   bytes32 public constant SCHEDULED_AUCTION = keccak256("SCHEDULED_AUCTION");
   bytes32 public constant COLDIE_AUCTION = keccak256("COLDIE_AUCTION");
 
@@ -58,7 +59,6 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
    */
   function initialize(
     address _marketplaceSettings,
-    address _royaltyRegistry,
     address _royaltyEngine,
     address _spaceOperatorRegistry,
     address _approvedTokenRegistry,
@@ -70,7 +70,6 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
     address _erc721ApprovalManager
   ) public initializer {
     require(_marketplaceSettings != address(0), "initialize::marketplaceSettings cannot be 0 address");
-    require(_royaltyRegistry != address(0), "initialize::royaltyRegistry cannot be 0 address");
     require(_royaltyEngine != address(0), "initialize::royaltyEngine cannot be 0 address");
     require(_spaceOperatorRegistry != address(0), "initialize::spaceOperatorRegistry cannot be 0 address");
     require(_approvedTokenRegistry != address(0), "initialize::approvedTokenRegistry cannot be 0 address");
@@ -96,7 +95,7 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
     );
 
     // Initialize auction settings
-    minimumBidIncreasePercentage = 10;
+    minimumBidIncreasePercentage = 1;
     maxAuctionLength = 7 days;
     auctionLengthExtension = 15 minutes;
 
@@ -235,7 +234,7 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
     }
 
     // Verify token is approved for marketplace
-    MarketUtilsV2.addressMustHaveMarketplaceApprovedForNFT(msg.sender, _originContract, _tokenId);
+    marketConfig.addressMustHaveMarketplaceApprovedForNFT(msg.sender, _originContract, _tokenId);
 
     // Validate split configuration
     MarketUtilsV2.checkSplits(_splitAddresses, _splitRatios);
@@ -445,13 +444,13 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
   function settleAuction(address _originContract, uint256 _tokenId) external override {
     // Get auction and bid
     Auction memory auction = tokenAuctions[_originContract][_tokenId];
-    Bid memory bid = auctionBids[_originContract][_tokenId];
+    Bid memory currentBid = auctionBids[_originContract][_tokenId];
 
     // Verify auction exists
     require(auction.auctionType != NO_AUCTION, "settleAuction::No auction exists");
 
     // Verify auction has a bid
-    require(bid.bidder != address(0), "settleAuction::No bids placed");
+    require(currentBid.bidder != address(0), "settleAuction::No bids placed");
 
     // Verify auction has ended
     if (auction.startingTime > 0) {
@@ -466,14 +465,14 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
     delete auctionBids[_originContract][_tokenId];
 
     // Transfer token to winning bidder
-    marketConfig.transferERC721(_originContract, address(this), bid.bidder, _tokenId);
+    marketConfig.transferERC721(_originContract, address(this), currentBid.bidder, _tokenId);
 
     // Execute payout
     marketConfig.payout(
       _originContract,
       _tokenId,
-      bid.currencyAddress,
-      bid.amount,
+      currentBid.currencyAddress,
+      currentBid.amount,
       auction.auctionCreator,
       auction.splitRecipients,
       auction.splitRatios
@@ -484,9 +483,9 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
       _originContract,
       _tokenId,
       auction.auctionCreator,
-      bid.bidder,
-      bid.amount,
-      bid.marketplaceFeeAtTime
+      currentBid.bidder,
+      currentBid.amount,
+      currentBid.marketplaceFeeAtTime
     );
   }
 
@@ -630,7 +629,7 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
     require(erc721.ownerOf(tokenId) == creator, "bidWithAuctionMerkleProof::Not token owner");
 
     // Check marketplace approval
-    MarketUtilsV2.addressMustHaveMarketplaceApprovedForNFT(creator, originContract, tokenId);
+    marketConfig.addressMustHaveMarketplaceApprovedForNFT(creator, originContract, tokenId);
 
     // Transfer bid amount
     uint256 requiredAmount = bidAmount + marketConfig.marketplaceSettings.calculateMarketplaceFee(bidAmount);

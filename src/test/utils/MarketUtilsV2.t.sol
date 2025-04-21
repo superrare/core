@@ -75,7 +75,7 @@ contract TestContract {
     address _originContract,
     uint256 _tokenId
   ) public view {
-    MarketUtilsV2.addressMustHaveMarketplaceApprovedForNFT(_addr, _originContract, _tokenId);
+    config.addressMustHaveMarketplaceApprovedForNFT(_addr, _originContract, _tokenId);
   }
 
   function checkSplits(address payable[] calldata _splitAddrs, uint8[] calldata _splitRatios) public pure {
@@ -255,27 +255,12 @@ contract MarketUtilsV2Test is Test {
     address nftContract = address(0x1234);
     uint256 tokenId = 1;
 
-    // Mock NFT approval for all
-    vm.mockCall(
-      nftContract,
-      abi.encodeWithSelector(IERC721.isApprovedForAll.selector, alice, address(tc)),
-      abi.encode(true)
-    );
-
     tc.addressMustHaveMarketplaceApprovedForNFT(alice, nftContract, tokenId);
   }
 
   function test_addressMustHaveMarketplaceApprovedForNFT_SpecificTokenSuccess() public {
     address nftContract = address(0x1234);
     uint256 tokenId = 1;
-
-    // Mock specific token approval
-    vm.mockCall(nftContract, abi.encodeWithSelector(IERC721.getApproved.selector, tokenId), abi.encode(address(tc)));
-    vm.mockCall(
-      nftContract,
-      abi.encodeWithSelector(IERC721.isApprovedForAll.selector, alice, address(tc)),
-      abi.encode(false)
-    );
 
     tc.addressMustHaveMarketplaceApprovedForNFT(alice, nftContract, tokenId);
   }
@@ -284,15 +269,7 @@ contract MarketUtilsV2Test is Test {
     address nftContract = address(0x1234);
     uint256 tokenId = 1;
 
-    // Mock no approvals
-    vm.mockCall(
-      nftContract,
-      abi.encodeWithSelector(IERC721.isApprovedForAll.selector, alice, address(tc)),
-      abi.encode(false)
-    );
-    vm.mockCall(nftContract, abi.encodeWithSelector(IERC721.getApproved.selector, tokenId), abi.encode(address(0)));
-
-    vm.expectRevert("owner must have approved contract");
+    vm.expectRevert("owner must have approved token");
     tc.addressMustHaveMarketplaceApprovedForNFT(alice, nftContract, tokenId);
   }
 
