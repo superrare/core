@@ -1,128 +1,150 @@
-# SuperRare Auction House Implementation Plan
+# SuperRare Auction House V2 Implementation Plan
+
+## Implementation Status
+**Current Status:** Phase 1 completed. Ready to begin Phase 2 (Logic Implementation).
+
+**Completed:**
+- Initial V2 directory structure and contract skeletons
+- Interface definition
+- Storage variable definition
+- Implementation analysis
+- ETH fallback guard implementation
+- Test file structure
+
+**Next Steps:**
+- Copy and adapt Merkle auction logic with MarketUtilsV2 integration
+- Migrate and adapt standard auction functionality
+- Implement exclusivity guards between standard and Merkle auctions
 
 ## 1. Overview
 
-This document outlines the plan to consolidate auction functionality into the `SuperRareAuctionHouse` contract (`src/auctionhouse/SuperRareAuctionHouse.sol`), migrating necessary logic from the SuperRare Bazaar (`src/bazaar/SuperRareBazaar.sol`), integrating existing Merkle auction features, and ensuring full adoption of `MarketUtilsV2` (`src/utils/v2/MarketUtilsV2.sol`). The goal is to create a single, canonical auction contract for SuperRare, eventually replacing the auction capabilities of the Bazaar.
+This document outlines the plan to create a **new** `SuperRareAuctionHouseV2` contract, intended to become the canonical auction house for SuperRare. This new contract will consolidate standard auction functionality (migrated from the SuperRare Bazaar) with the existing Merkle auction features (copied from the current `SuperRareAuctionHouse`), ensuring full adoption of `MarketUtilsV2`.
 
-**Note:** This plan involves modifying and extending the *existing* `SuperRareAuctionHouse.sol` contract, rather than creating a completely new one from scratch, as it already contains the required Merkle auction logic and tests.
+**Note:** This plan involves creating a **new contract** (`SuperRareAuctionHouseV2.sol`) within a `v2` directory structure, rather than modifying the existing `src/auctionhouse/SuperRareAuctionHouse.sol`. The existing contract will eventually be superseded.
 
 ## 2. Core Objectives
 
-*   **Consolidate Auction Logic:** Migrate standard auction functionalities (create, bid, cancel, settle) from `SuperRareBazaar.sol` (or its base contracts) into `v2/SuperRareAuctionHouse.sol`.
-*   **Integrate Merkle Auctions:** Ensure the existing Merkle auction logic (`registerAuctionMerkleRoot`, `bidWithAuctionMerkleProof`) coexists seamlessly with standard auctions.
-*   **Adopt MarketUtilsV2:** Refactor all market interactions (fee calculation, payouts, approvals) within `SuperRareAuctionHouse.sol` to use `MarketUtilsV2`.
-*   **Remove Deprecated Logic:** Ensure functionality like `convertOfferToAuction` remains deprecated or is fully removed.
-*   **Test-Driven Development:** Write tests for all *newly migrated or refactored* logic. Leverage existing tests for Merkle auctions. Do *not* migrate tests for old Bazaar auction logic.
+*   **Create New V2 Contract:** Implement `src/v2/auctionhouse/SuperRareAuctionHouseV2.sol`.
+*   **Consolidate Standard Auctions:** Migrate relevant standard auction functionalities (create, bid, cancel, settle) from `src/bazaar/SuperRareBazaar.sol` (or its base contracts) into the new V2 contract.
+*   **Integrate Merkle Auctions:** Copy and integrate the existing Merkle auction logic (`registerAuctionMerkleRoot`, `bidWithAuctionMerkleProof`, etc.) from `src/auctionhouse/SuperRareAuctionHouse.sol` into the new V2 contract.
+*   **Adopt MarketUtilsV2:** Ensure all market interactions (fee calculation, payouts, approvals) within the new V2 contract use `src/utils/v2/MarketUtilsV2.sol`.
+*   **Self-Contained Storage:** Define and manage all necessary state variables directly within `SuperRareAuctionHouseV2.sol`.
+*   **Remove Deprecated Logic:** Do not migrate `convertOfferToAuction` logic.
+*   **Test-Driven Development:** Write comprehensive tests for all logic within the new V2 contract, potentially adapting existing Merkle tests.
 
 ## 3. Proposed Structure & Changes
 
-*   **Target Contract:** `src/auctionhouse/SuperRareAuctionHouse.sol`
-    *   This contract will be the primary focus, receiving migrated logic and updates.
+*   **Target Contract:** `src/v2/auctionhouse/SuperRareAuctionHouseV2.sol` (New file)
+    *   This contract will contain consolidated standard and Merkle auction logic, use `MarketUtilsV2`, and manage its own storage.
 *   **Key Utility:** `src/utils/v2/MarketUtilsV2.sol`
     *   All fee calculations, payouts, and market interactions must go through this library.
-*   **Source Contract (for Migration):** `src/bazaar/SuperRareBazaar.sol` (and potentially `SuperRareBazaarBase.sol`)
+*   **Source Contract (Standard Auctions):** `src/bazaar/SuperRareBazaar.sol` (and potentially `SuperRareBazaarBase.sol`)
     *   Identify and copy relevant functions/logic related to standard auctions.
-*   **Storage:** `src/bazaar/SuperRareBazaarStorage.sol`
-    *   Review if any storage variables related to standard auctions need to be migrated or adapted within `SuperRareAuctionHouse.sol`. Consider if a dedicated `SuperRareAuctionHouseStorage.sol` is beneficial for clarity, although modifying the existing `SuperRareBazaarStorage` might be simpler if dependencies allow. (Needs further investigation during implementation).
-*   **Interfaces:** `src/auctionhouse/ISuperRareAuctionHouse.sol`
-    *   Update this interface to reflect the consolidated functionality (standard + Merkle auctions).
-*   **Tests:** `src/test/auctionhouse/`
-    *   Create new test files (e.g., `SuperRareAuctionHouseStandard.t.sol`) for the migrated standard auction logic.
-    *   Leverage existing `SuperRareAuctionHouseMerkle.t.sol` for Merkle logic.
+*   **Source Contract (Merkle Auctions):** `src/auctionhouse/SuperRareAuctionHouse.sol`
+    *   Identify and copy relevant functions, events, and storage definitions related to Merkle auctions.
+*   **Storage:** Defined directly within `SuperRareAuctionHouseV2.sol`.
+    *   The V2 contract will manage its own state variables internally.
+    *   **Upgradeability Note:** As this contract might be upgradeable, new state variables must be appended at the end of the variable declarations to maintain storage layout compatibility for proxies (UUPS, Transparent).
+*   **Interfaces:** `src/v2/auctionhouse/ISuperRareAuctionHouseV2.sol` (New file)
+    *   Define the interface for the new V2 contract, including both standard and Merkle auction functions.
+*   **Tests:** `src/test/v2/auctionhouse/` (New directory)
+    *   Create new test files (e.g., `SuperRareAuctionHouseV2Standard.t.sol`, `SuperRareAuctionHouseV2Merkle.t.sol`) for the V2 contract.
 
 ## 4. Contracts/Modules Analysis
 
-*   **To Be Modified/Extended:**
-    *   `src/auctionhouse/SuperRareAuctionHouse.sol`: Add standard auction logic, refactor to `MarketUtilsV2`.
-    *   `src/auctionhouse/ISuperRareAuctionHouse.sol`: Update interface definitions.
-    *   `src/bazaar/SuperRareBazaarStorage.sol`: Potentially add/modify storage slots if not creating a separate storage contract.
+*   **To Be Created:**
+    *   `src/v2/auctionhouse/SuperRareAuctionHouseV2.sol`: The main V2 contract.
+    *   `src/v2/auctionhouse/ISuperRareAuctionHouseV2.sol`: The V2 interface.
+    *   New test files under `src/test/v2/auctionhouse/` (e.g., `SuperRareAuctionHouseV2Standard.t.sol`, `SuperRareAuctionHouseV2Merkle.t.sol`).
 *   **To Be Referenced/Used:**
     *   `src/utils/v2/MarketUtilsV2.sol`: Core utility for market operations.
     *   `src/bazaar/SuperRareBazaar.sol` / `SuperRareBazaarBase.sol`: Source for migrating standard auction logic.
-*   **To Be Created:**
-    *   New test files under `src/test/auctionhouse/` for standard auction functionality.
+    *   `src/auctionhouse/SuperRareAuctionHouse.sol`: Source for copying Merkle auction logic.
+    *   `src/test/auctionhouse/SuperRareAuctionHouseMerkle.t.sol`: Source for adapting Merkle auction tests.
 *   **To Be Ignored/Removed (Functionality):**
-    *   `convertOfferToAuction` logic (already marked deprecated).
-    *   Any auction logic remaining *only* in `SuperRareBazaar.sol` after migration.
-    *   Tests related to the old Bazaar auction implementation.
+    *   `convertOfferToAuction` logic from Bazaar/original AuctionHouse.
+    *   Auction logic remaining *only* in `SuperRareBazaar.sol` after migration.
+*   **To Be Deprecated/Superseded:**
+    *   `src/auctionhouse/SuperRareAuctionHouse.sol` and `src/auctionhouse/ISuperRareAuctionHouse.sol`.
 
 ## 5. Implementation Task Checklist
 
-**Phase 1: Setup & Refactoring**
+**Phase 1: Setup & Initial V2 Contract Structure**
 
-1.  **[ ] Analyze `SuperRareBazaar.sol` / `SuperRareBazaarBase.sol`:** Identify exact functions, events, and storage related to standard auctions (`configureAuction`, `bid`, `cancelAuction`, `settleAuction`, associated events/structs).
-2.  **[ ] Analyze `SuperRareBazaarStorage.sol`:** Determine which auction-related storage variables are needed in the consolidated `SuperRareAuctionHouse`. Decide on storage strategy (modify existing vs. new contract).
-3.  **[ ] Refactor `SuperRareAuctionHouse.sol` - `MarketUtilsV2` Integration:**
-    *   Replace all instances of fee calculation (e.g., `marketplaceSettings.calculateMarketplaceFee`) with `MarketUtilsV2.calculateFee`.
-    *   Refactor payout logic (e.g., `_payout`, `_refund`) to use `MarketUtilsV2` functions (e.g., `_handlePayment`, `_handlePayout`).
-    *   Update currency/payment checks (`_checkIfCurrencyIsApproved`, `_checkAmountAndTransfer`) to align with `MarketUtilsV2` methods if applicable.
-    *   Ensure marketplace approval checks (`_senderMustHaveMarketplaceApproved`, `_ownerMustHaveMarketplaceApprovedForNFT`) are compatible or replaced by `MarketUtilsV2` equivalents if available.
-4.  **[ ] Update `ISuperRareAuctionHouse.sol`:** Add function signatures for standard auctions (`configureAuction`, `bid`, `cancelAuction`, `settleAuction`) and any associated events/structs identified in step 1.
+1.  **[x] Create V2 Directory Structure:** Create `src/v2/auctionhouse/` and `src/test/v2/auctionhouse/`.
+2.  **[x] Create Initial `SuperRareAuctionHouseV2.sol`:** Set up the basic contract structure (imports, OwnableUpgradeable, ReentrancyGuardUpgradeable, inherits V2 interface).
+3.  **[x] Create `ISuperRareAuctionHouseV2.sol`:** Define initial interface structure.
+4.  **[x] Analyze `SuperRareBazaar.sol` / `SuperRareBazaarBase.sol`:** Identify standard auction functions, events, and storage needs for migration.
+5.  **[x] Analyze `SuperRareAuctionHouse.sol`:** Identify Merkle auction functions, events, and storage needs for copying.
+6.  **[x] Define Internal Storage for `SuperRareAuctionHouseV2.sol`:** Based on analysis (Tasks 4 & 5), define the required internal storage variables (mappings, structs) within `SuperRareAuctionHouseV2.sol`, respecting upgradeability rules.
+7.  **[x] Create Implementation Analysis Document:** Document findings and create a detailed analysis of required components, storage, and functionality for reference during implementation phases.
+8.  **[x] Create Test File Skeletons:** Create basic structure for test files (`SuperRareAuctionHouseV2Standard.t.sol` and `SuperRareAuctionHouseV2Merkle.t.sol`).
 
-**Phase 2: Standard Auction Logic Migration**
+**Phase 1 Summary:** All Phase 1 tasks have been completed. The initial structure for the V2 contract has been set up including directory structure, interface definition, and implementation skeleton. Storage variables have been defined based on the analysis of existing contracts. The ETH fallback guard has also been implemented. Test file skeletons are in place, and a comprehensive implementation analysis document has been created to guide the implementation in subsequent phases.
 
-5.  **[ ] Copy & Adapt `configureAuction`:**
-    *   Migrate `configureAuction` logic from Bazaar to `SuperRareAuctionHouse.sol`.
-    *   Ensure it uses `MarketUtilsV2` for any relevant checks/interactions.
-    *   Adapt storage interactions based on the decided storage strategy.
-    *   Verify compatibility with existing Merkle logic (no conflicts in state/functionality).
-6.  **[ ] Copy & Adapt `bid`:**
-    *   Migrate `bid` logic from Bazaar to `SuperRareAuctionHouse.sol`.
-    *   Ensure full `MarketUtilsV2` integration (fee calculation, payment handling, refunds).
-    *   Adapt storage.
-    *   Ensure correct event emission.
-7.  **[ ] Copy & Adapt `cancelAuction`:**
-    *   Migrate `cancelAuction` logic from Bazaar to `SuperRareAuctionHouse.sol`.
-    *   Adapt storage.
-    *   Ensure correct event emission.
-8.  **[ ] Copy & Adapt `settleAuction`:**
-    *   Migrate `settleAuction` logic from Bazaar to `SuperRareAuctionHouse.sol`.
+**Phase 2: Logic Implementation (Standard & Merkle)**
+
+9.  **[ ] Copy & Adapt Merkle Auction Logic:**
+    *   Copy relevant functions (`registerAuctionMerkleRoot`, `bidWithAuctionMerkleProof`, `cancelAuctionMerkleRoot`, getters, etc.), events, and structs from `src/auctionhouse/SuperRareAuctionHouse.sol` to `SuperRareAuctionHouseV2.sol`.
+    *   Adapt storage interactions to use the internally defined V2 variables (Task 6).
+    *   **Refactor copied Merkle logic to use `MarketUtilsV2`** for fees, payments, approvals, etc.
+10. **[ ] Copy & Adapt Standard Auction Logic (`configureAuction`):**
+    *   Migrate `configureAuction` logic from Bazaar to `SuperRareAuctionHouseV2.sol`.
+    *   Ensure it uses `MarketUtilsV2`.
+    *   Adapt storage interactions to use internal V2 variables.
+    *   Implement exclusivity guards (Task 7).
+11. **[ ] Copy & Adapt Standard Auction Logic (`bid`):**
+    *   Migrate `bid` logic from Bazaar to `SuperRareAuctionHouseV2.sol`.
+    *   Ensure full `MarketUtilsV2` integration.
+    *   Adapt storage interactions.
+    *   Implement exclusivity guards.
+12. **[ ] Copy & Adapt Standard Auction Logic (`cancelAuction`):**
+    *   Migrate `cancelAuction` logic from Bazaar to `SuperRareAuctionHouseV2.sol`.
+    *   **Refine Permissions:** Default to `msg.sender == auctionCreator`. Decide on `tokenOwner`/curator roles.
+    *   Adapt storage interactions.
+13. **[ ] Copy & Adapt Standard Auction Logic (`settleAuction`):**
+    *   Migrate `settleAuction` logic from Bazaar to `SuperRareAuctionHouseV2.sol`.
     *   Ensure payout uses `MarketUtilsV2._handlePayout`.
-    *   Adapt storage and NFT transfer logic.
-    *   Ensure correct event emission.
-9.  **[ ] Migrate Auction Structs & Events:** Copy relevant structs (like `Auction`, `Bid` if different from existing ones) and events (`NewAuction`, `AuctionBid`, `CancelAuction`, `AuctionSettled`) from Bazaar/Storage/Interfaces to `SuperRareAuctionHouse.sol` or its interface/storage as appropriate. Ensure no naming conflicts.
+    *   Adapt storage interactions and NFT transfer logic.
+14. **[ ] Harmonize Structs & Events in V2:** Review and standardize structs (`Auction`, `Bid`, etc.) and events across standard and Merkle flows within `SuperRareAuctionHouseV2.sol` and `ISuperRareAuctionHouseV2.sol`. Aim for consistent naming and parameters.
+15. **[ ] Update `ISuperRareAuctionHouseV2.sol`:** Finalize the V2 interface with all public/external function signatures and event definitions.
 
 **Phase 3: Testing**
 
-10. **[ ] Write Tests for `configureAuction`:** Create tests in a new file (e.g., `SuperRareAuctionHouseStandard.t.sol`) covering various scenarios (coldie, scheduled, valid/invalid inputs, permissions).
-11. **[ ] Write Tests for `bid`:** Add tests covering bidding logic (first bid, subsequent bids, minimum increase, currency validation, end-of-auction extension, `MarketUtilsV2` integration).
-12. **[ ] Write Tests for `cancelAuction`:** Add tests covering cancellation logic (permissions, timing constraints, state changes).
-13. **[ ] Write Tests for `settleAuction`:** Add tests covering settlement logic (auction ended, winner payout via `MarketUtilsV2`, token transfer, no-bidder scenario).
-14. **[ ] Review Existing Merkle Tests:** Ensure `SuperRareAuctionHouseMerkle.t.sol` still passes after refactoring and adding standard auction logic. Add interaction tests if necessary (e.g., ensure a standard bid can't happen on a Merkle-initiated auction and vice-versa, unless intended).
+16. **[ ] Write/Adapt Tests for Merkle Logic (`SuperRareAuctionHouseV2Merkle.t.sol`):**
+    *   Copy tests from `src/test/auctionhouse/SuperRareAuctionHouseMerkle.t.sol`.
+    *   Adapt tests to target `SuperRareAuctionHouseV2.sol` and use `MarketUtilsV2` setups.
+    *   Ensure `tokenAuctionNonce` logic is thoroughly tested.
+17. **[ ] Write Tests for Standard `configureAuction` (`SuperRareAuctionHouseV2Standard.t.sol`):** Cover scenarios, permissions, exclusivity checks for the V2 implementation.
+18. **[ ] Write Tests for Standard `bid` (`SuperRareAuctionHouseV2Standard.t.sol`):** Cover bidding logic, `MarketUtilsV2` integration, exclusivity checks for V2.
+19. **[ ] Write Tests for Standard `cancelAuction` (`SuperRareAuctionHouseV2Standard.t.sol`):** Cover refined permissions, timing, state changes for V2.
+20. **[ ] Write Tests for Standard `settleAuction` (`SuperRareAuctionHouseV2Standard.t.sol`):** Cover settlement logic, `MarketUtilsV2` payouts, token transfer for V2.
+21. **[ ] Add Interaction & Exclusivity Tests (`SuperRareAuctionHouseV2*.t.sol`):** Explicitly test interactions and exclusivity rules between standard and Merkle flows in the V2 contract.
+22. **[ ] Perform Gas Benchmarking:** Run gas benchmarks for key V2 functions.
 
 **Phase 4: Cleanup & Review**
 
-15. **[ ] Code Review:** Perform a thorough review focusing on `MarketUtilsV2` integration, security (reentrancy, access control), correctness, gas efficiency, and adherence to the plan.
-16. **[ ] Remove Redundant Bazaar Logic:** Once confident in the `SuperRareAuctionHouse` implementation, identify and mark for removal (or comment out initially) the now-redundant auction logic within `SuperRareBazaar.sol`.
-17. **[ ] Documentation:** Update any relevant documentation (READMEs, NatSpec comments) to reflect the consolidated auction house.
+23. **[ ] Code Review:** Perform a thorough review of `SuperRareAuctionHouseV2.sol`, `ISuperRareAuctionHouseV2.sol`, and tests. Focus on correctness, `MarketUtilsV2` integration, security, gas efficiency, event consistency, storage layout, and adherence to the plan.
+24. **[x] Add Fallback ETH Guard:** Implement `receive()`/`fallback()` guard in `SuperRareAuctionHouseV2.sol`.
+25. **[ ] Document State Transitions:** Document the V2 auction states (`Configured`, `Running`, `Unsettled`, Cleared).
 
 ## 6. Testing Strategy
 
-*   **New Logic (Standard Auctions):** Implement comprehensive unit and integration tests using Foundry for all migrated functions (`configureAuction`, `bid`, `cancelAuction`, `settleAuction`) and their interactions within `SuperRareAuctionHouse.sol`. Focus on edge cases, permissions, and correct integration with `MarketUtilsV2`.
-*   **Existing Logic (Merkle Auctions):** Rely on the existing tests in `src/test/auctionhouse/SuperRareAuctionHouseMerkle.t.sol`. Verify these tests continue to pass after the refactoring. Add minimal integration tests if standard/Merkle interactions need specific verification.
-*   **Excluded Logic:** Do *not* migrate or write tests for the deprecated `convertOfferToAuction` function or the original auction implementation within `SuperRareBazaar.sol`.
+*   **V2 Contract Logic:** Implement comprehensive unit and integration tests using Foundry for *all* functions (standard and Merkle) within `SuperRareAuctionHouseV2.sol`. Adapt existing Merkle tests where possible.
+*   **Focus Areas:** Edge cases, permissions, `MarketUtilsV2` integration, exclusivity rules, event emission, state transitions, Merkle replay protection (`tokenAuctionNonce`).
+*   **Excluded Logic:** Do *not* test deprecated Bazaar functions or the original `src/auctionhouse/SuperRareAuctionHouse.sol`.
 
 ## 7. Open Questions
 
-*   **Storage Strategy:** Should auction-related state remain in `SuperRareBazaarStorage.sol` (potentially renamed or refactored), or should a new, dedicated `SuperRareAuctionHouseStorage.sol` be created? Using the existing storage might simplify state management but could tightly couple the Auction House to the Bazaar's storage structure.
-*   **Curator Cancellation:** The original plan asked about curator cancellation. The `cancelAuction` logic identified seems to rely on `msg.sender == auctionCreator` or `msg.sender == tokenOwner`. Should specific curator roles/permissions be added for cancellation?
-*   **Fallback Function:** Does the `SuperRareAuctionHouse` require specific `receive()` or `fallback()` logic for ETH handling, or is this sufficiently covered by explicit functions like `bid`? (Assume explicit functions are sufficient unless otherwise specified).
-*   **Event Naming/Consistency:** Review event names (`NewAuction` vs. `AuctionMerkleBid`, etc.) for consistency across standard and Merkle auctions. Should they be harmonized?
-*   **Access Control:** Beyond `OwnableUpgradeable` and basic sender checks, are there other roles (e.g., admin, pauser) required for managing the auction house functions or settings?
+*   **Curator Cancellation:** Define final permissions for `cancelAuction` in V2 (creator only, owner, specific roles?).
+*   **Auction Exclusivity:** Confirm mutual exclusivity approach for V2 implementation.
+*   **Access Control:** Are roles beyond `Ownable` needed for V2 (admin, pauser)?
+*   **Upgradeability:** Confirm V2 contract is intended to be upgradeable and ensure storage rules are strictly followed.
+*   **Naming:** Finalize naming for V2 contract (`SuperRareAuctionHouseV2.sol`?) and interface.
 
 ## 8. Potential Optimizations & Considerations
 
-*   **Gas Optimization:**
-    *   Review storage reads/writes in auction lifecycle functions. Minimize redundant SLOAD/SSTORE operations.
-    *   Analyze calldata usage, especially for `configureAuction` and Merkle proofs.
-    *   Ensure `MarketUtilsV2` usage is efficient.
-*   **Modularity:**
-    *   Consider if further logic abstraction into internal libraries is beneficial, especially if standard and Merkle auctions share common validation or state transition logic.
-    *   Evaluate the chosen storage strategy's impact on modularity.
-*   **Security Hardening:**
-    *   Ensure robust reentrancy guards (`nonReentrant`) on all functions involving external calls or state changes after interactions (bids, settlements).
-    *   Double-check access control modifiers on all functions.
-    *   Validate all external inputs thoroughly (amounts, addresses, timestamps, splits).
-    *   Verify correct NFT ownership and approval checks throughout the auction lifecycle.
-    *   Ensure Merkle proof verification and replay protection (`tokenAuctionNonce`) are correctly implemented and tested.
+*   **Gas Optimization:** Review V2 storage, calldata, `MarketUtilsV2` usage.
+*   **Modularity:** Consider internal libraries for shared logic within V2.
+*   **Security Hardening:** Apply all previous points (reentrancy, access control, input validation, ownership checks, Merkle proof/nonce, fallback guard) to the new V2 contract. Strictly follow storage layout rules for upgradeability.
 
