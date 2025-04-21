@@ -138,7 +138,7 @@ contract ERC20ApprovalManagerTest is Test {
     // Note: Not approving the approval manager
 
     vm.prank(OPERATOR);
-    vm.expectRevert("Insufficient allowance");
+    vm.expectRevert("ERC20: insufficient allowance");
     approvalManager.transferFrom(address(token), TOKEN_OWNER, TOKEN_RECIPIENT, TRANSFER_AMOUNT);
   }
 
