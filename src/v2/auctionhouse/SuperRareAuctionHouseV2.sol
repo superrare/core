@@ -263,10 +263,6 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
       "configureAuction::Cannot set starting price higher than max value"
     );
 
-    // Ensure there's no Merkle auction with this token
-    // This is the exclusivity guard between standard and Merkle auctions
-    require(erc721.ownerOf(_tokenId) == msg.sender, "configureAuction::Sender must own the token");
-
     // Create auction
     tokenAuctions[_originContract][_tokenId] = Auction({
       auctionCreator: payable(msg.sender),
@@ -281,7 +277,7 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
     });
 
     // Transfer token to this contract if scheduled auction
-    if (_auctionType == SCHEDULED_AUCTION) {
+    if (_auctionType == SCHEDULED_AUCTION && erc721.ownerOf(_tokenId) != address(this)) {
       MarketUtilsV2.transferERC721(marketConfig, _originContract, msg.sender, address(this), _tokenId);
     }
 
@@ -345,7 +341,7 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
     uint256 requiredAmount = _amount + marketConfig.marketplaceSettings.calculateMarketplaceFee(_amount);
 
     // Check that the sender has approved the marketplace for this amount
-    MarketUtilsV2.senderMustHaveMarketplaceApproved(_currencyAddress, requiredAmount);
+    marketConfig.senderMustHaveMarketplaceApproved(_currencyAddress, requiredAmount);
 
     // Get the current auction
     Auction memory auction = tokenAuctions[_originContract][_tokenId];
@@ -449,34 +445,31 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
     // Verify auction exists
     require(auction.auctionType != NO_AUCTION, "settleAuction::No auction exists");
 
-    // Verify auction has a bid
-    require(currentBid.bidder != address(0), "settleAuction::No bids placed");
-
     // Verify auction has ended
-    if (auction.startingTime > 0) {
-      require(
-        block.timestamp >= auction.startingTime + auction.lengthOfAuction,
-        "settleAuction::Auction has not ended"
-      );
-    }
+    require(block.timestamp >= auction.startingTime + auction.lengthOfAuction, "settleAuction::Auction has not ended");
 
     // Delete auction and bid from storage
     delete tokenAuctions[_originContract][_tokenId];
     delete auctionBids[_originContract][_tokenId];
 
-    // Transfer token to winning bidder
-    IERC721(_originContract).transferFrom(address(this), currentBid.bidder, _tokenId);
+    if (currentBid.bidder != address(0)) {
+      // Transfer token to winning bidder
+      IERC721(_originContract).transferFrom(address(this), currentBid.bidder, _tokenId);
 
-    // Execute payout
-    marketConfig.payout(
-      _originContract,
-      _tokenId,
-      currentBid.currencyAddress,
-      currentBid.amount,
-      auction.auctionCreator,
-      auction.splitRecipients,
-      auction.splitRatios
-    );
+      // Execute payout
+      marketConfig.payout(
+        _originContract,
+        _tokenId,
+        currentBid.currencyAddress,
+        currentBid.amount,
+        auction.auctionCreator,
+        auction.splitRecipients,
+        auction.splitRatios
+      );
+    } else {
+      // If no bids, return token to creator
+      IERC721(_originContract).transferFrom(address(this), auction.auctionCreator, _tokenId);
+    }
 
     // Emit event
     emit AuctionSettled(

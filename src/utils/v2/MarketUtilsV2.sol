@@ -64,14 +64,20 @@ library MarketUtilsV2 {
   /// @dev Returns on zero address because no allowance is needed for eth.
   /// @param _currency The address of the currency being checked.
   /// @param _amount The total amount being checked.
-  function senderMustHaveMarketplaceApproved(address _currency, uint256 _amount) internal view {
+  function senderMustHaveMarketplaceApproved(
+    MarketConfigV2.Config storage _config,
+    address _currency,
+    uint256 _amount
+  ) internal view {
     if (_currency == address(0)) {
       return;
     }
 
     IERC20 erc20 = IERC20(_currency);
-
-    require(erc20.allowance(msg.sender, address(this)) >= _amount, "sender needs to approve marketplace for currency");
+    require(
+      erc20.allowance(msg.sender, address(_config.erc20ApprovalManager)) >= _amount,
+      "sender needs to approve ERC20ApprovalManager for currency"
+    );
   }
 
   /// @notice Checks the user has the correct amount and transfers to the marketplace.

@@ -83,7 +83,7 @@ contract TestContract {
   }
 
   function senderMustHaveMarketplaceApproved(address _currency, uint256 _amount) public view {
-    MarketUtilsV2.senderMustHaveMarketplaceApproved(_currency, _amount);
+    config.senderMustHaveMarketplaceApproved(_currency, _amount);
   }
 
   function checkAmountAndTransfer(address _currencyAddress, uint256 _amount) public payable {

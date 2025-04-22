@@ -7,7 +7,7 @@ If there are any files, schemas, types, or data relevant to the task, you must r
 Prioritize correctness and context awareness over speed. Always double-check that you have complete and accurate information.
 
 ## Implementation Status
-**Current Status:** Phase 2 completed. Ready to begin Phase 3 (Testing).
+**Current Status:** Phase 3 completed. Ready to begin Phase 4 (Cleanup & Review).
 
 **Completed:**
 - Initial V2 directory structure and contract skeletons
@@ -19,11 +19,12 @@ Prioritize correctness and context awareness over speed. Always double-check tha
 - Merkle auction logic implementation with MarketUtilsV2 integration
 - Standard auction functionality migration 
 - Exclusivity guards between standard and Merkle auctions
+- Comprehensive test suite for both standard and Merkle auction functionality
+- Gas benchmarking
 
 **Next Steps:**
-- Write comprehensive tests for standard auction functionality
-- Write comprehensive tests for Merkle auction functionality
-- Add integration tests for auction exclusivity
+- Perform final code review
+- Document state transitions
 
 ## 1. Overview
 
@@ -122,21 +123,21 @@ This document outlines the plan to create a **new** `SuperRareAuctionHouseV2` co
 
 **Phase 3: Testing**
 
-16. **[ ] Write/Adapt Tests for Merkle Logic (`SuperRareAuctionHouseV2Merkle.t.sol`):**
+16. **[x] Write/Adapt Tests for Merkle Logic (`SuperRareAuctionHouseV2Merkle.t.sol`):**
     *   Copy tests from `src/test/auctionhouse/SuperRareAuctionHouseMerkle.t.sol` with minimal changes.
     *   Focus on reusing as much of the existing test code as possible, only modifying what's necessary for:
         * Contract references (from SuperRareAuctionHouse to SuperRareAuctionHouseV2)
         * Setup functions to use the new initialization parameters
         * MarketUtilsV2 integration
-        * Updated storage patterns (especially the tokenAuctionNonce keccak256 mapping)
+        * Updated storage patterns (especially the tokenAuctionNonce mapping)
     *   Keep all existing test cases and scenarios intact to maintain coverage.
     *   Ensure the `tokenAuctionNonce` logic with the new bytes32 mapping is thoroughly tested.
-17. **[ ] Write Tests for Standard `configureAuction` (`SuperRareAuctionHouseV2Standard.t.sol`):** Cover scenarios, permissions, exclusivity checks for the V2 implementation.
-18. **[ ] Write Tests for Standard `bid` (`SuperRareAuctionHouseV2Standard.t.sol`):** Cover bidding logic, `MarketUtilsV2` integration, exclusivity checks for V2.
-19. **[ ] Write Tests for Standard `cancelAuction` (`SuperRareAuctionHouseV2Standard.t.sol`):** Cover refined permissions, timing, state changes for V2.
-20. **[ ] Write Tests for Standard `settleAuction` (`SuperRareAuctionHouseV2Standard.t.sol`):** Cover settlement logic, `MarketUtilsV2` payouts, token transfer for V2.
-21. **[ ] Add Interaction & Exclusivity Tests (`SuperRareAuctionHouseV2*.t.sol`):** Explicitly test interactions and exclusivity rules between standard and Merkle flows in the V2 contract.
-22. **[ ] Perform Gas Benchmarking:** Run gas benchmarks for key V2 functions.
+17. **[x] Write Tests for Standard `configureAuction` (`SuperRareAuctionHouseV2Standard.t.sol`):** Cover scenarios, permissions, exclusivity checks for the V2 implementation.
+18. **[x] Write Tests for Standard `bid` (`SuperRareAuctionHouseV2Standard.t.sol`):** Cover bidding logic, `MarketUtilsV2` integration, exclusivity checks for V2.
+19. **[x] Write Tests for Standard `cancelAuction` (`SuperRareAuctionHouseV2Standard.t.sol`):** Cover refined permissions, timing, state changes for V2.
+20. **[x] Write Tests for Standard `settleAuction` (`SuperRareAuctionHouseV2Standard.t.sol`):** Cover settlement logic, `MarketUtilsV2` payouts, token transfer for V2.
+21. **[x] Add Interaction & Exclusivity Tests (`SuperRareAuctionHouseV2*.t.sol`):** Explicitly test interactions and exclusivity rules between standard and Merkle flows in the V2 contract.
+22. **[x] Perform Gas Benchmarking:** Run gas benchmarks for key V2 functions.
 
 **Phase 4: Cleanup & Review**
 
