@@ -3,8 +3,6 @@ pragma solidity ^0.8.0;
 pragma abicoder v2;
 
 import "forge-std/Test.sol";
-import {SuperRareAuctionHouseV2} from "../../../v2/auctionhouse/SuperRareAuctionHouseV2.sol";
-import {ISuperRareAuctionHouseV2} from "../../../v2/auctionhouse/ISuperRareAuctionHouseV2.sol";
 import {IERC721} from "openzeppelin-contracts/token/ERC721/IERC721.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {Merkle} from "murky/Merkle.sol";
@@ -16,11 +14,14 @@ import {IRoyaltyEngineV1} from "royalty-registry/IRoyaltyEngineV1.sol";
 import {ISpaceOperatorRegistry} from "rareprotocol/aux/registry/interfaces/ISpaceOperatorRegistry.sol";
 import {IApprovedTokenRegistry} from "rareprotocol/aux/registry/interfaces/IApprovedTokenRegistry.sol";
 import {IPayments} from "rareprotocol/aux/payments/IPayments.sol";
+
+import {SuperRareAuctionHouseV2} from "../../../v2/auctionhouse/SuperRareAuctionHouseV2.sol";
+import {ISuperRareAuctionHouseV2} from "../../../v2/auctionhouse/ISuperRareAuctionHouseV2.sol";
 import {IStakingSettings} from "../../../marketplace/IStakingSettings.sol";
-import {TestNFT} from "../../utils/TestNft.sol";
-import {TestToken} from "../../utils/TestToken.sol";
-import {ERC20ApprovalManager} from "../../../approver/ERC20/ERC20ApprovalManager.sol";
-import {ERC721ApprovalManager} from "../../../approver/ERC721/ERC721ApprovalManager.sol";
+import {TestNFT} from "../utils/TestNft.sol";
+import {TestToken} from "../utils/TestToken.sol";
+import {ERC20ApprovalManager} from "../../../v2/approver/ERC20/ERC20ApprovalManager.sol";
+import {ERC721ApprovalManager} from "../../../v2/approver/ERC721/ERC721ApprovalManager.sol";
 
 /// @title SuperRareAuctionHouseV2MerkleTest
 /// @notice Tests for the Merkle auction functionality in SuperRareAuctionHouseV2

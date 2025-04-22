@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.18;
+pragma solidity ^0.8.18;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-import {IERC20ApprovalManager} from "./IERC20ApprovalManager.sol";
-/// @title ERC20ApprovalManager
-/// @notice A central approval manager for ERC20 tokens that allows whitelisted contracts to transfer tokens
-/// @dev Uses role-based access control for operator management
-contract ERC20ApprovalManager is IERC20ApprovalManager, AccessControl {
-  using SafeERC20 for IERC20;
+import {IERC721ApprovalManager} from "./IERC721ApprovalManager.sol";
 
+/// @title ERC721ApprovalManager
+/// @notice A central approval manager for ERC721 tokens that allows whitelisted contracts to transfer tokens
+/// @dev Uses role-based access control for operator management
+contract ERC721ApprovalManager is IERC721ApprovalManager, AccessControl {
   /// @notice Role for managing operators
   bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
   /// @notice Role for contracts allowed to transfer tokens
@@ -74,16 +72,53 @@ contract ERC20ApprovalManager is IERC20ApprovalManager, AccessControl {
     }
   }
 
-  /// @notice Transfers tokens from one address to another
+  /// @notice Transfers an NFT from one address to another
   /// @dev Only operators can call this function
-  /// @param token The token contract address
-  /// @param from The address to transfer from
-  /// @param to The address to transfer to
-  /// @param amount The amount of tokens to transfer
-  function transferFrom(address token, address from, address to, uint256 amount) external whenNotDisabled {
-    if (!hasRole(OPERATOR_ROLE, msg.sender)) revert NotOperator();
+  /// @param token The NFT contract address
+  /// @param from The current owner of the token
+  /// @param to The recipient of the token
+  /// @param tokenId The ID of the token to transfer
+  function transferFrom(
+    address token,
+    address from,
+    address to,
+    uint256 tokenId
+  ) external whenNotDisabled onlyRole(OPERATOR_ROLE) {
+    IERC721 nft = IERC721(token);
+    nft.transferFrom(from, to, tokenId);
+  }
 
-    IERC20 erc20 = IERC20(token);
-    erc20.safeTransferFrom(from, to, amount);
+  /// @notice Safe transfers an NFT from one address to another
+  /// @dev Only operators can call this function
+  /// @param token The NFT contract address
+  /// @param from The current owner of the token
+  /// @param to The recipient of the token
+  /// @param tokenId The ID of the token to transfer
+  /// @param data Additional data with no specified format
+  function safeTransferFrom(
+    address token,
+    address from,
+    address to,
+    uint256 tokenId,
+    bytes calldata data
+  ) external whenNotDisabled onlyRole(OPERATOR_ROLE) {
+    IERC721 nft = IERC721(token);
+    nft.safeTransferFrom(from, to, tokenId, data);
+  }
+
+  /// @notice Safe transfers an NFT from one address to another
+  /// @dev Only operators can call this function
+  /// @param token The NFT contract address
+  /// @param from The current owner of the token
+  /// @param to The recipient of the token
+  /// @param tokenId The ID of the token to transfer
+  function safeTransferFrom(
+    address token,
+    address from,
+    address to,
+    uint256 tokenId
+  ) external whenNotDisabled onlyRole(OPERATOR_ROLE) {
+    IERC721 nft = IERC721(token);
+    nft.safeTransferFrom(from, to, tokenId, "");
   }
 }

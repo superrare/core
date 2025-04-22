@@ -4,10 +4,10 @@ pragma solidity ^0.8.18;
 import {Test} from "forge-std/Test.sol";
 import {SuperRareAuctionHouseV2} from "../../../v2/auctionhouse/SuperRareAuctionHouseV2.sol";
 import {ISuperRareAuctionHouseV2} from "../../../v2/auctionhouse/ISuperRareAuctionHouseV2.sol";
-import {TestNFT} from "../../utils/TestNft.sol";
-import {TestToken} from "../../utils/TestToken.sol";
-import {ERC20ApprovalManager} from "../../../approver/ERC20/ERC20ApprovalManager.sol";
-import {ERC721ApprovalManager} from "../../../approver/ERC721/ERC721ApprovalManager.sol";
+import {TestNFT} from "../utils/TestNft.sol";
+import {TestToken} from "../utils/TestToken.sol";
+import {ERC20ApprovalManager} from "../../../v2/approver/ERC20/ERC20ApprovalManager.sol";
+import {ERC721ApprovalManager} from "../../../v2/approver/ERC721/ERC721ApprovalManager.sol";
 
 /// @title SuperRareAuctionHouseV2StandardTest
 /// @notice Tests for the standard auction functionality in SuperRareAuctionHouseV2

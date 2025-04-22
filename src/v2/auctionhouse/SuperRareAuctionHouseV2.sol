@@ -6,11 +6,12 @@ import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/sec
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "openzeppelin-contracts/token/ERC721/IERC721.sol";
-import {MarketUtilsV2} from "../../utils/v2/MarketUtilsV2.sol";
-import {MarketConfigV2} from "../../utils/v2/MarketConfigV2.sol";
-import {ISuperRareAuctionHouseV2} from "./ISuperRareAuctionHouseV2.sol";
 import {MerkleProof} from "openzeppelin-contracts/utils/cryptography/MerkleProof.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
+
+import {MarketUtilsV2} from "../utils/MarketUtilsV2.sol";
+import {MarketConfigV2} from "../utils/MarketConfigV2.sol";
+import {ISuperRareAuctionHouseV2} from "./ISuperRareAuctionHouseV2.sol";
 
 /// @author SuperRare Labs
 /// @title SuperRareAuctionHouseV2
@@ -112,13 +113,6 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
                       ADMIN FUNCTIONS 
   //////////////////////////////////////////////////////////////*/
 
-  /// @notice Sets the marketplace settings address
-  /// @param _marketplaceSettings The new marketplace settings address
-  function setMarketplaceSettings(address _marketplaceSettings) external onlyOwner {
-    require(_marketplaceSettings != address(0), "setMarketplaceSettings::Cannot be 0 address");
-    MarketConfigV2.updateMarketplaceSettings(marketConfig, _marketplaceSettings);
-  }
-
   /// @notice Sets the minimum bid increase percentage
   /// @param _minimumBidIncreasePercentage The new minimum bid increase percentage
   function setMinimumBidIncreasePercentage(uint8 _minimumBidIncreasePercentage) external onlyOwner {
@@ -135,69 +129,6 @@ contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable
   /// @param _auctionLengthExtension The new auction length extension in seconds
   function setAuctionLengthExtension(uint256 _auctionLengthExtension) external onlyOwner {
     auctionLengthExtension = _auctionLengthExtension;
-  }
-
-  /// @notice Sets the royalty registry address
-  /// @param _royaltyEngine The new royalty engine address
-  function setRoyaltyEngine(address _royaltyEngine) external onlyOwner {
-    require(_royaltyEngine != address(0), "setRoyaltyEngine::Cannot be 0 address");
-    MarketConfigV2.updateRoyaltyEngine(marketConfig, _royaltyEngine);
-  }
-
-  /// @notice Sets the space operator registry address
-  /// @param _spaceOperatorRegistry The new space operator registry address
-  function setSpaceOperatorRegistry(address _spaceOperatorRegistry) external onlyOwner {
-    require(_spaceOperatorRegistry != address(0), "setSpaceOperatorRegistry::Cannot be 0 address");
-    MarketConfigV2.updateSpaceOperatorRegistry(marketConfig, _spaceOperatorRegistry);
-  }
-
-  /// @notice Sets the payments address
-  /// @param _payments The new payments address
-  function setPayments(address _payments) external onlyOwner {
-    require(_payments != address(0), "setPayments::Cannot be 0 address");
-    MarketConfigV2.updatePayments(marketConfig, _payments);
-  }
-
-  /// @notice Sets the approved token registry address
-  /// @param _approvedTokenRegistry The new approved token registry address
-  function setApprovedTokenRegistry(address _approvedTokenRegistry) external onlyOwner {
-    require(_approvedTokenRegistry != address(0), "setApprovedTokenRegistry::Cannot be 0 address");
-    MarketConfigV2.updateApprovedTokenRegistry(marketConfig, _approvedTokenRegistry);
-  }
-
-  /// @notice Sets the staking settings address
-  /// @param _stakingSettings The new staking settings address
-  function setStakingSettings(address _stakingSettings) external onlyOwner {
-    require(_stakingSettings != address(0), "setStakingSettings::Cannot be 0 address");
-    MarketConfigV2.updateStakingSettings(marketConfig, _stakingSettings);
-  }
-
-  /// @notice Sets the staking registry address
-  /// @param _stakingRegistry The new staking registry address
-  function setStakingRegistry(address _stakingRegistry) external onlyOwner {
-    require(_stakingRegistry != address(0), "setStakingRegistry::Cannot be 0 address");
-    MarketConfigV2.updateStakingRegistry(marketConfig, _stakingRegistry);
-  }
-
-  /// @notice Sets the network beneficiary address
-  /// @param _networkBeneficiary The new network beneficiary address
-  function setNetworkBeneficiary(address _networkBeneficiary) external onlyOwner {
-    require(_networkBeneficiary != address(0), "setNetworkBeneficiary::Cannot be 0 address");
-    MarketConfigV2.updateNetworkBeneficiary(marketConfig, _networkBeneficiary);
-  }
-
-  /// @notice Sets the ERC20 approval manager address
-  /// @param _erc20ApprovalManager The new ERC20 approval manager address
-  function setERC20ApprovalManager(address _erc20ApprovalManager) external onlyOwner {
-    require(_erc20ApprovalManager != address(0), "setERC20ApprovalManager::Cannot be 0 address");
-    MarketConfigV2.updateERC20ApprovalManager(marketConfig, _erc20ApprovalManager);
-  }
-
-  /// @notice Sets the ERC721 approval manager address
-  /// @param _erc721ApprovalManager The new ERC721 approval manager address
-  function setERC721ApprovalManager(address _erc721ApprovalManager) external onlyOwner {
-    require(_erc721ApprovalManager != address(0), "setERC721ApprovalManager::Cannot be 0 address");
-    MarketConfigV2.updateERC721ApprovalManager(marketConfig, _erc721ApprovalManager);
   }
 
   /*//////////////////////////////////////////////////////////////

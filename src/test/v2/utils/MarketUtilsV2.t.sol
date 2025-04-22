@@ -15,11 +15,11 @@ import {IApprovedTokenRegistry} from "rareprotocol/aux/registry/interfaces/IAppr
 import {IRoyaltyEngineV1} from "royalty-registry/IRoyaltyEngineV1.sol";
 import {ERC20} from "openzeppelin-contracts/token/ERC20/ERC20.sol";
 
-import {MarketUtilsV2} from "../../utils/v2/MarketUtilsV2.sol";
-import {MarketConfigV2} from "../../utils/v2/MarketConfigV2.sol";
-import {IRareStakingRegistry} from "../../staking/registry/IRareStakingRegistry.sol";
-import {ERC20ApprovalManager} from "../../approver/ERC20/ERC20ApprovalManager.sol";
-import {ERC721ApprovalManager} from "../../approver/ERC721/ERC721ApprovalManager.sol";
+import {MarketUtilsV2} from "../../../v2/utils/MarketUtilsV2.sol";
+import {MarketConfigV2} from "../../../v2/utils/MarketConfigV2.sol";
+import {IRareStakingRegistry} from "../../../staking/registry/IRareStakingRegistry.sol";
+import {ERC20ApprovalManager} from "../../../v2/approver/ERC20/ERC20ApprovalManager.sol";
+import {ERC721ApprovalManager} from "../../../v2/approver/ERC721/ERC721ApprovalManager.sol";
 import {TestNFT} from "../utils/TestNft.sol";
 
 contract TestContract {
@@ -252,25 +252,37 @@ contract MarketUtilsV2Test is Test {
   }
 
   function test_addressMustHaveMarketplaceApprovedForNFT_Success() public {
-    address nftContract = address(0x1234);
-    uint256 tokenId = 1;
+    // Mint NFT to alice
+    vm.prank(deployer);
+    uint256 tokenId = nft.mint(alice);
 
-    tc.addressMustHaveMarketplaceApprovedForNFT(alice, nftContract, tokenId);
+    // Have alice approve the marketplace
+    vm.prank(alice);
+    nft.setApprovalForAll(address(erc721ApprovalManager), true);
+
+    tc.addressMustHaveMarketplaceApprovedForNFT(alice, address(nft), tokenId);
   }
 
   function test_addressMustHaveMarketplaceApprovedForNFT_SpecificTokenSuccess() public {
-    address nftContract = address(0x1234);
-    uint256 tokenId = 1;
+    // Mint NFT to alice
+    vm.prank(deployer);
+    uint256 tokenId = nft.mint(alice);
 
-    tc.addressMustHaveMarketplaceApprovedForNFT(alice, nftContract, tokenId);
+    // Have alice approve the marketplace
+    vm.prank(alice);
+    nft.setApprovalForAll(address(erc721ApprovalManager), true);
+
+    tc.addressMustHaveMarketplaceApprovedForNFT(alice, address(nft), tokenId);
   }
 
   function test_addressMustHaveMarketplaceApprovedForNFT_Failure() public {
-    address nftContract = address(0x1234);
-    uint256 tokenId = 1;
+    // Mint NFT to alice
+    vm.prank(deployer);
+    uint256 tokenId = nft.mint(alice);
 
+    // Don't approve the marketplace - this should fail
     vm.expectRevert("owner must have approved token");
-    tc.addressMustHaveMarketplaceApprovedForNFT(alice, nftContract, tokenId);
+    tc.addressMustHaveMarketplaceApprovedForNFT(alice, address(nft), tokenId);
   }
 
   function test_checkSplits_Success() public {
@@ -330,11 +342,12 @@ contract MarketUtilsV2Test is Test {
   function test_senderMustHaveMarketplaceApproved_ERC20Success() public {
     uint256 amount = 1 ether;
 
-    vm.mockCall(
-      address(rare),
-      abi.encodeWithSelector(IERC20.allowance.selector, address(this), address(tc)),
-      abi.encode(amount)
-    );
+    // Transfer RARE tokens to this contract
+    vm.prank(deployer);
+    rare.transfer(address(this), amount);
+
+    // Approve the ERC20ApprovalManager to spend tokens
+    rare.approve(address(erc20ApprovalManager), amount);
 
     tc.senderMustHaveMarketplaceApproved(address(rare), amount);
   }
@@ -342,13 +355,14 @@ contract MarketUtilsV2Test is Test {
   function test_senderMustHaveMarketplaceApproved_ERC20Failure() public {
     uint256 amount = 1 ether;
 
-    vm.mockCall(
-      address(rare),
-      abi.encodeWithSelector(IERC20.allowance.selector, address(this), address(tc)),
-      abi.encode(amount - 1)
-    );
+    // Transfer RARE tokens to this contract
+    vm.prank(deployer);
+    rare.transfer(address(this), amount);
 
-    vm.expectRevert("sender needs to approve marketplace for currency");
+    // Approve less than the required amount
+    rare.approve(address(erc20ApprovalManager), amount - 1);
+
+    vm.expectRevert("sender needs to approve ERC20ApprovalManager for currency");
     tc.senderMustHaveMarketplaceApproved(address(rare), amount);
   }
 

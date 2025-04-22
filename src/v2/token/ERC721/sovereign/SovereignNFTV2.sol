@@ -8,10 +8,11 @@ import "openzeppelin-contracts-upgradeable/utils/introspection/ERC165Upgradeable
 import "openzeppelin-contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "openzeppelin-contracts-upgradeable/utils/CountersUpgradeable.sol";
 import "openzeppelin-contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
-import "../../extensions/ITokenCreator.sol";
-import "../../extensions/ERC2981Upgradeable.sol";
 
-contract SovereignNFT is
+import "../../../../token/extensions/ITokenCreator.sol";
+import "../../../../token/extensions/ERC2981Upgradeable.sol";
+
+contract SovereignNFTV2 is
   OwnableUpgradeable,
   ERC165Upgradeable,
   ERC721Upgradeable,
