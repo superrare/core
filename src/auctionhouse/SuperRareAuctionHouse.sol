@@ -7,10 +7,7 @@ import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol"
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "openzeppelin-contracts/token/ERC721/IERC721.sol";
 import {SuperRareBazaarBase} from "../bazaar/SuperRareBazaarBase.sol";
-import {SuperRareBazaarStorage} from "../bazaar/SuperRareBazaarStorage.sol";
 import {ISuperRareAuctionHouse} from "./ISuperRareAuctionHouse.sol";
-import {MerkleProof} from "openzeppelin-contracts/utils/cryptography/MerkleProof.sol";
-import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
 /// @author koloz
 /// @title SuperRareAuctionHouse
@@ -22,7 +19,6 @@ contract SuperRareAuctionHouse is
   SuperRareBazaarBase
 {
   using SafeERC20 for IERC20;
-  using EnumerableSet for EnumerableSet.Bytes32Set;
 
   /// @notice Configures an Auction for a given asset.
   /// @dev If auction type is coldie (reserve) then _startingAmount cant be 0.
@@ -129,7 +125,7 @@ contract SuperRareAuctionHouse is
     address payable[] calldata _splitAddresses,
     uint8[] calldata _splitRatios
   ) external override {
-    require(false, "convertOfferToAuction::Deprecated");
+    require(false, 'convertOfferToAuction::Deprecated');
     _senderMustBeTokenOwner(_originContract, _tokenId);
     _ownerMustHaveMarketplaceApprovedForNFT(_originContract, _tokenId);
     _checkSplits(_splitAddresses, _splitRatios);
@@ -342,10 +338,7 @@ contract SuperRareAuctionHouse is
 
     if (currBid.bidder == address(0)) {
       erc721.transferFrom(address(this), auction.auctionCreator, _tokenId);
-      require(
-        erc721.ownerOf(_tokenId) == auction.auctionCreator,
-        "settleAuction::Failed to return token to auction creator"
-      );
+      require(erc721.ownerOf(_tokenId) == auction.auctionCreator , "settleAuction::Failed to return token to auction creator");
     } else {
       erc721.transferFrom(address(this), currBid.bidder, _tokenId);
 
@@ -360,8 +353,9 @@ contract SuperRareAuctionHouse is
       );
 
       marketplaceSettings.markERC721Token(_originContract, _tokenId, true);
-      require(erc721.ownerOf(_tokenId) == currBid.bidder, "settleAuction::Failed to transfer to auction winner");
+      require(erc721.ownerOf(_tokenId) == currBid.bidder , "settleAuction::Failed to transfer to auction winner");
     }
+
 
     emit AuctionSettled(
       _originContract,
@@ -407,216 +401,5 @@ contract SuperRareAuctionHouse is
     if (_auctionType != COLDIE_AUCTION && _auctionType != SCHEDULED_AUCTION) {
       revert("Invalid Auction Type");
     }
-  }
-
-  /// @notice Registers a new Merkle root for auction configuration
-  /// @param merkleRoot The root hash of the Merkle tree containing token IDs
-  /// @param currency The currency address for the auction
-  /// @param startingAmount The starting amount for the auction
-  /// @param duration The duration of the auction
-  /// @param splitAddresses Addresses to split the sellers commission with
-  /// @param splitRatios Ratios for splitting the commission
-  function registerAuctionMerkleRoot(
-    bytes32 merkleRoot,
-    address currency,
-    uint256 startingAmount,
-    uint256 duration,
-    address payable[] calldata splitAddresses,
-    uint8[] calldata splitRatios
-  ) external override {
-    // Check if currency is approved
-    _checkIfCurrencyIsApproved(currency);
-
-    // Add root to user's set of roots
-    _userAuctionMerkleRoots[msg.sender].add(merkleRoot);
-
-    // Get current config if it exists
-    MerkleAuctionConfig memory currentConfig = auctionMerkleConfigs[msg.sender][merkleRoot];
-
-    // Calculate new nonce
-    uint256 newNonce = creatorRootNonce[keccak256(abi.encodePacked(msg.sender, merkleRoot))] + 1;
-    creatorRootNonce[keccak256(abi.encodePacked(msg.sender, merkleRoot))] = newNonce;
-
-    // Create and store new config
-    auctionMerkleConfigs[msg.sender][merkleRoot] = MerkleAuctionConfig({
-      currency: currency,
-      startingAmount: startingAmount,
-      duration: duration,
-      splitAddresses: splitAddresses,
-      splitRatios: splitRatios
-    });
-
-    emit NewAuctionMerkleRoot(msg.sender, merkleRoot, newNonce);
-  }
-
-  /// @notice Cancels a previously registered Merkle root
-  /// @param root The Merkle root to cancel
-  function cancelAuctionMerkleRoot(bytes32 root) external override {
-    // Check if caller owns the root
-    require(_userAuctionMerkleRoots[msg.sender].contains(root), "Not root owner");
-
-    // Remove root from user's set
-    _userAuctionMerkleRoots[msg.sender].remove(root);
-
-    // Clean up config data
-    delete auctionMerkleConfigs[msg.sender][root];
-
-    // Emit event
-    emit AuctionMerkleRootCancelled(msg.sender, root);
-  }
-
-  /// @notice Places a bid using a Merkle proof to verify token inclusion
-  /// @param originContract The contract address of the token
-  /// @param tokenId The ID of the token being bid on
-  /// @param creator The creator of the auction
-  /// @param merkleRoot The root hash of the Merkle tree
-  /// @param bidAmount The amount of the bid
-  /// @param proof The Merkle proof verifying token inclusion
-  function bidWithAuctionMerkleProof(
-    address originContract,
-    uint256 tokenId,
-    address creator,
-    bytes32 merkleRoot,
-    uint256 bidAmount,
-    bytes32[] calldata proof
-  ) external payable override nonReentrant {
-    // Verify token is in Merkle root
-    bytes32 leaf = keccak256(abi.encodePacked(originContract, tokenId));
-    require(MerkleProof.verify(proof, merkleRoot, leaf), "bidWithAuctionMerkleProof::Invalid Merkle proof");
-
-    // Verify Merkle root is registered and active
-    require(
-      _userAuctionMerkleRoots[creator].contains(merkleRoot),
-      "bidWithAuctionMerkleProof::Merkle root not registered"
-    );
-
-    // Get config for this Merkle root
-    MerkleAuctionConfig memory config = auctionMerkleConfigs[creator][merkleRoot];
-
-    // Get token nonce key and verify it hasn't been used
-    bytes32 tokenNonceKey = keccak256(abi.encodePacked(creator, merkleRoot, originContract, tokenId));
-    uint256 currentNonce = creatorRootNonce[keccak256(abi.encodePacked(creator, merkleRoot))];
-    require(
-      tokenAuctionNonce[tokenNonceKey] < currentNonce,
-      "bidWithAuctionMerkleProof::Token already used for this Merkle root"
-    );
-
-    // Verify no auction exists for this token
-    require(
-      tokenAuctions[originContract][tokenId].auctionType == NO_AUCTION,
-      "bidWithAuctionMerkleProof::Auction already exists"
-    );
-
-    // Verify bid amount is valid
-    require(bidAmount > 0, "bidWithAuctionMerkleProof::Cannot be 0");
-    require(
-      bidAmount <= marketplaceSettings.getMarketplaceMaxValue(),
-      "bidWithAuctionMerkleProof::Must be less than max value"
-    );
-    require(bidAmount >= config.startingAmount, "bidWithAuctionMerkleProof::Cannot be lower than minimum bid");
-
-    // Verify creator owns the token
-    require(IERC721(originContract).ownerOf(tokenId) == creator, "bidWithAuctionMerkleProof::Not token owner");
-
-    // Transfer bid amount
-    uint256 requiredAmount = bidAmount + marketplaceSettings.calculateMarketplaceFee(bidAmount);
-    _checkAmountAndTransfer(config.currency, requiredAmount);
-
-    // Update token nonce to current creatorRootNonce
-    tokenAuctionNonce[tokenNonceKey] = currentNonce;
-
-    // Create auction
-    tokenAuctions[originContract][tokenId] = Auction(
-      payable(creator),
-      block.number,
-      block.timestamp,
-      config.duration,
-      config.currency,
-      config.startingAmount,
-      COLDIE_AUCTION,
-      config.splitAddresses,
-      config.splitRatios
-    );
-
-    // Record the bid
-    auctionBids[originContract][tokenId] = Bid(
-      payable(msg.sender),
-      config.currency,
-      bidAmount,
-      marketplaceSettings.getMarketplaceFeePercentage()
-    );
-
-    // Transfer token from creator to auction house
-    IERC721(originContract).transferFrom(creator, address(this), tokenId);
-
-    emit AuctionMerkleBid(
-      originContract,
-      msg.sender,
-      tokenId,
-      config.currency,
-      bidAmount,
-      merkleRoot,
-      true, // startedAuction
-      0, // newAuctionLength
-      address(0) // previousBidder
-    );
-  }
-
-  /// @notice Gets all Merkle roots registered by a user
-  /// @param user The address of the user
-  /// @return An array of Merkle roots
-  function getUserAuctionMerkleRoots(address user) external view override returns (bytes32[] memory) {
-    return _userAuctionMerkleRoots[user].values();
-  }
-
-  /// @notice Gets the current nonce for a user's Merkle root
-  /// @param user The address of the user
-  /// @param root The Merkle root
-  /// @return The current nonce value
-  function getCreatorAuctionMerkleRootNonce(address user, bytes32 root) external view override returns (uint256) {
-    return creatorRootNonce[keccak256(abi.encodePacked(user, root))];
-  }
-
-  /// @notice Verifies if a token is included in a Merkle root
-  /// @param root The Merkle root to check against
-  /// @param origin The contract address of the token
-  /// @param tokenId The ID of the token
-  /// @param proof The Merkle proof for verification
-  /// @return True if the token is included in the root, false otherwise
-  function isTokenInRoot(
-    bytes32 root,
-    address origin,
-    uint256 tokenId,
-    bytes32[] calldata proof
-  ) external pure override returns (bool) {
-    bytes32 leaf = keccak256(abi.encodePacked(origin, tokenId));
-    return MerkleProof.verify(proof, root, leaf);
-  }
-
-  /// @notice Gets the Merkle auction configuration for a given creator and root
-  /// @param creator The address of the creator
-  /// @param root The Merkle root
-  /// @return The MerkleAuctionConfig struct containing the auction configuration
-  function getMerkleAuctionConfig(
-    address creator,
-    bytes32 root
-  ) external view override returns (SuperRareBazaarStorage.MerkleAuctionConfig memory) {
-    return auctionMerkleConfigs[creator][root];
-  }
-
-  /// @notice Gets the nonce for a specific token under a Merkle root
-  /// @param creator The creator of the auction
-  /// @param root The Merkle root
-  /// @param tokenContract The token contract address
-  /// @param tokenId The token ID
-  /// @return The current nonce for this token
-  function getTokenAuctionNonce(
-    address creator,
-    bytes32 root,
-    address tokenContract,
-    uint256 tokenId
-  ) external view returns (uint256) {
-    bytes32 tokenNonceKey = keccak256(abi.encodePacked(creator, root, tokenContract, tokenId));
-    return tokenAuctionNonce[tokenNonceKey];
   }
 }

@@ -7,14 +7,11 @@ import {IPayments} from "rareprotocol/aux/payments/IPayments.sol";
 import {ISpaceOperatorRegistry} from "rareprotocol/aux/registry/interfaces/ISpaceOperatorRegistry.sol";
 import {IApprovedTokenRegistry} from "rareprotocol/aux/registry/interfaces/IApprovedTokenRegistry.sol";
 import {IRoyaltyEngineV1} from "royalty-registry/IRoyaltyEngineV1.sol";
-import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
 /// @author koloz
 /// @title SuperRareBazaar Storage Contract
 /// @dev STORAGE CAN ONLY BE APPENDED NOT INSERTED OR MODIFIED
 contract SuperRareBazaarStorage {
-  using EnumerableSet for EnumerableSet.Bytes32Set;
-
   /////////////////////////////////////////////////////////////////////////
   // Constants
   /////////////////////////////////////////////////////////////////////////
@@ -81,21 +78,6 @@ contract SuperRareBazaarStorage {
     address currencyAddress;
     uint256 amount;
     uint8 marketplaceFee;
-  }
-
-  // Structure for Merkle Auction Configuration:
-  // currency - address of the erc20 token used for the auction
-  // startingAmount - minimum bid amount
-  // duration - length of auction in seconds
-  // splitAddresses - addresses to split the proceeds with
-  // splitRatios - ratios for each split address
-  // nonce - version number of this configuration
-  struct MerkleAuctionConfig {
-    address currency;
-    uint256 startingAmount;
-    uint256 duration;
-    address payable[] splitAddresses;
-    uint8[] splitRatios;
   }
 
   /////////////////////////////////////////////////////////////////////////
@@ -180,29 +162,6 @@ contract SuperRareBazaarStorage {
     uint256 _amount
   );
 
-  event NewAuctionMerkleRoot(address indexed user, bytes32 indexed root, uint256 nonce);
-  event AuctionMerkleRootCancelled(address indexed user, bytes32 indexed root);
-  event BidWithAuctionMerkleProof(
-    address indexed originContract,
-    uint256 indexed tokenId,
-    address indexed bidder,
-    bytes32 merkleRoot,
-    address currency,
-    uint256 amount
-  );
-
-  event AuctionMerkleBid(
-    address indexed originContract,
-    address indexed bidder,
-    uint256 indexed tokenId,
-    address currencyAddress,
-    uint256 amount,
-    bytes32 merkleRoot,
-    bool startedAuction,
-    uint256 newAuctionLength,
-    address previousBidder
-  );
-
   /////////////////////////////////////////////////////////////////////////
   // State Variables
   /////////////////////////////////////////////////////////////////////////
@@ -261,27 +220,6 @@ contract SuperRareBazaarStorage {
   // Mapping from contract to mapping of tokenId to Bid.
   mapping(address => mapping(uint256 => Bid)) public auctionBids;
 
-  uint256[46] private __gap;
+  uint256[50] private __gap;
   /// ALL NEW STORAGE MUST COME AFTER THIS
-
-  /////////////////////////////////////////////////////////////////////////
-  // Merkle Auction Storage
-  /////////////////////////////////////////////////////////////////////////
-
-  // Mapping of user to their Merkle roots
-  mapping(address => EnumerableSet.Bytes32Set) internal _userAuctionMerkleRoots;
-
-  // Mapping of (creator, root) to config
-  mapping(address => mapping(bytes32 => MerkleAuctionConfig)) public auctionMerkleConfigs;
-
-  // Mapping of proof key to usage status for replay protection
-  mapping(bytes32 => bool) public auctionMerkleProofUsed;
-
-  // Mapping of keccak256(creator, root) to nonce
-  // Key is computed as: keccak256(abi.encodePacked(creator, root))
-  mapping(bytes32 => uint256) public creatorRootNonce;
-
-  // Mapping of keccak256(creator, root, tokenContract, tokenId) to nonce
-  // Key is computed as: keccak256(abi.encodePacked(creator, root, tokenContract, tokenId))
-  mapping(bytes32 => uint256) public tokenAuctionNonce;
 }

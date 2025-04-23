@@ -3,7 +3,6 @@ pragma solidity ^0.8.18;
 
 import {OwnableUpgradeable} from "openzeppelin-contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "openzeppelin-contracts/token/ERC721/IERC721.sol";
 import {MerkleProof} from "openzeppelin-contracts/utils/cryptography/MerkleProof.sol";
@@ -19,7 +18,6 @@ import {ISuperRareAuctionHouseV2} from "./ISuperRareAuctionHouseV2.sol";
 /// @dev This contract consolidates standard auction functionality from the SuperRare Bazaar
 /// with the existing Merkle auction features, ensuring full adoption of MarketUtilsV2.
 contract SuperRareAuctionHouseV2 is ISuperRareAuctionHouseV2, OwnableUpgradeable, ReentrancyGuardUpgradeable {
-  using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.Bytes32Set;
   using MarketConfigV2 for MarketConfigV2.Config;
   using MarketUtilsV2 for MarketConfigV2.Config;

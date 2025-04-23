@@ -37,7 +37,7 @@ if [ -z "$VERBOSITY" ]; then
 fi
 
 # Prepare the base forge command
-FORGE_CMD="forge script script/auctionhouse/superrare-auctionhouse-v2-deploy/SuperRareAuctionHouseV2Deploy.s.sol:SuperRareAuctionHouseV2Deploy --rpc-url ${RPC_URL} -vv --libraries src/utils/v2/MarketUtilsV2.sol:MarketUtilsV2=${MARKET_UTILS_LIB_ADDRESS}"
+FORGE_CMD="forge script script/auctionhouse/superrare-auctionhouse-v2-deploy/SuperRareAuctionHouseV2Deploy.s.sol:SuperRareAuctionHouseV2Deploy --rpc-url ${RPC_URL} -vv "
 FORGE_CMD_BROADCAST="${FORGE_CMD} --broadcast --verify --etherscan-api-key ${ETHERSCAN_API_KEY} --chain-id ${CHAIN_ID}"
 
 # Add broadcast flag if specified
@@ -46,5 +46,5 @@ if [ "$BROADCAST" = true ]; then
     FORGE_CMD="${FORGE_CMD} --broadcast --verify --etherscan-api-key ${ETHERSCAN_API_KEY} --chain-id ${CHAIN_ID}"
 else
     echo "Running in simulation mode (no broadcasting)..."
-    eval "${FORGE_CMD}"
 fi
+eval "${FORGE_CMD}"
