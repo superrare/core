@@ -15,8 +15,8 @@ import {ISpaceOperatorRegistry} from "rareprotocol/aux/registry/interfaces/ISpac
 import {IApprovedTokenRegistry} from "rareprotocol/aux/registry/interfaces/IApprovedTokenRegistry.sol";
 import {IPayments} from "rareprotocol/aux/payments/IPayments.sol";
 
-import {SuperRareAuctionHouseV2} from "../../../v2/auctionhouse/SuperRareAuctionHouseV2.sol";
-import {ISuperRareAuctionHouseV2} from "../../../v2/auctionhouse/ISuperRareAuctionHouseV2.sol";
+import {RareBatchAuctionHouse} from "../../../v2/auctionhouse/RareBatchAuctionHouse.sol";
+import {IRareBatchAuctionHouse} from "../../../v2/auctionhouse/IRareBatchAuctionHouse.sol";
 import {IStakingSettings} from "../../../marketplace/IStakingSettings.sol";
 import {TestNFT} from "../utils/TestNft.sol";
 import {TestToken} from "../utils/TestToken.sol";
@@ -25,8 +25,8 @@ import {ERC721ApprovalManager} from "../../../v2/approver/ERC721/ERC721ApprovalM
 
 /// @title SuperRareAuctionHouseV2MerkleTest
 /// @notice Tests for the Merkle auction functionality in SuperRareAuctionHouseV2
-contract SuperRareAuctionHouseV2MerkleTest is Test {
-  SuperRareAuctionHouseV2 public auctionHouse;
+contract RareBatchAuctionHouseTest is Test {
+  RareBatchAuctionHouse public auctionHouse;
   // Mock addresses for dependencies
   address marketplaceSettings = makeAddr("marketplaceSettings");
   address royaltyEngine = makeAddr("royaltyEngine");
@@ -52,7 +52,7 @@ contract SuperRareAuctionHouseV2MerkleTest is Test {
   uint256 public tokenId;
   bytes32 public merkleRoot;
   bytes32[] public merkleProof;
-  ISuperRareAuctionHouseV2.MerkleAuctionConfig public auctionConfig;
+  IRareBatchAuctionHouse.MerkleAuctionConfig public auctionConfig;
 
   // Helper contract
   Merkle public merkle;
@@ -73,7 +73,7 @@ contract SuperRareAuctionHouseV2MerkleTest is Test {
     erc721ApprovalManager = new ERC721ApprovalManager();
 
     // Deploy other contracts
-    auctionHouse = new SuperRareAuctionHouseV2();
+    auctionHouse = new RareBatchAuctionHouse();
     merkle = new Merkle();
     nftContract = new TestNFT();
     currencyContract = new TestToken();
@@ -114,7 +114,7 @@ contract SuperRareAuctionHouseV2MerkleTest is Test {
     uint8[] memory splitRatios = new uint8[](1);
     splitRatios[0] = 100;
 
-    auctionConfig = ISuperRareAuctionHouseV2.MerkleAuctionConfig({
+    auctionConfig = IRareBatchAuctionHouse.MerkleAuctionConfig({
       currency: address(currencyContract),
       startingAmount: STARTING_AMOUNT,
       duration: AUCTION_DURATION,
@@ -1383,7 +1383,7 @@ contract SuperRareAuctionHouseV2MerkleTest is Test {
     bytes32[] memory rootsAfterCancel = auctionHouse.getUserAuctionMerkleRoots(auctionCreator);
     assertEq(rootsAfterCancel.length, 0, "Root should be cancelled");
     // Check config is zeroed out
-    ISuperRareAuctionHouseV2.MerkleAuctionConfig memory config = auctionHouse.getMerkleAuctionConfig(
+    IRareBatchAuctionHouse.MerkleAuctionConfig memory config = auctionHouse.getMerkleAuctionConfig(
       auctionCreator,
       root
     );

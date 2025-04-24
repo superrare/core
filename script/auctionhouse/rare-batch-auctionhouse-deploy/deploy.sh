@@ -37,7 +37,7 @@ if [ -z "$VERBOSITY" ]; then
 fi
 
 # Prepare the base forge command
-FORGE_CMD="forge script script/auctionhouse/superrare-auctionhouse-v2-deploy/SuperRareAuctionHouseV2Deploy.s.sol:SuperRareAuctionHouseV2Deploy --rpc-url ${RPC_URL} -vv "
+FORGE_CMD="forge script script/auctionhouse/rare-batch-auctionhouse-deploy/RareBatchAuctionHouseDeploy.s.sol:RareBatchAuctionHouseDeploy --rpc-url ${RPC_URL} -vv "
 FORGE_CMD_BROADCAST="${FORGE_CMD} --broadcast --verify --etherscan-api-key ${ETHERSCAN_API_KEY} --chain-id ${CHAIN_ID}"
 
 # Add broadcast flag if specified
