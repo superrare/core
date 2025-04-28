@@ -182,7 +182,7 @@ contract RareBatchListingMarketplace is IRareBatchListingMarketplace, OwnableUpg
     _tokenSalePriceNonce[tokenNonceKey] = currentNonce;
 
     // Transfer NFT
-    erc721.transferFrom(_creator, msg.sender, _tokenId);
+    MarketUtilsV2.transferERC721(_marketConfig, _originContract, _creator, msg.sender, _tokenId);
 
     // Process payment
     _marketConfig.payout(
