@@ -169,7 +169,6 @@ interface IRareBatchAuctionHouse {
     uint256 indexed tokenId,
     address currencyAddress,
     uint256 amount,
-    bool firstBid,
     uint256 marketplaceFee,
     address previousBidder
   );
@@ -181,6 +180,7 @@ interface IRareBatchAuctionHouse {
     address seller,
     address bidder,
     uint256 amount,
+    address currencyAddress,
     uint256 marketplaceFee
   );
 

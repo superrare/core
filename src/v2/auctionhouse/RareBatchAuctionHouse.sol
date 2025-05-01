@@ -232,7 +232,6 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
       _tokenId,
       _currencyAddress,
       _amount,
-      previousBidder == address(0), // firstBid
       marketConfig.marketplaceSettings.getMarketplaceFeePercentage(),
       previousBidder
     );
@@ -281,6 +280,7 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
       auction.auctionCreator,
       currentBid.bidder,
       currentBid.amount,
+      currentBid.currencyAddress,
       currentBid.marketplaceFeeAtTime
     );
   }
