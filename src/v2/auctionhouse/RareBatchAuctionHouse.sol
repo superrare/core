@@ -429,7 +429,16 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
     // Transfer token from creator to this contract
     MarketUtilsV2.transferERC721(marketConfig, _originContract, _creator, address(this), _tokenId);
 
-    emit AuctionMerkleBid(_originContract, _tokenId, msg.sender, _creator, _merkleRoot, _bidAmount, currentNonce);
+    emit AuctionMerkleBid(
+      _originContract,
+      _tokenId,
+      msg.sender,
+      _creator,
+      _currencyAddress,
+      _merkleRoot,
+      _bidAmount,
+      currentNonce
+    );
   }
 
   /// @notice Verifies if a token is included in a Merkle root

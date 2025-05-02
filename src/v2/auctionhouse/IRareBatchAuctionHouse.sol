@@ -199,6 +199,7 @@ interface IRareBatchAuctionHouse {
     uint256 indexed tokenId,
     address indexed bidder,
     address creator,
+    address currencyAddress,
     bytes32 merkleRoot,
     uint128 amount,
     uint32 nonce
