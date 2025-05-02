@@ -40,6 +40,9 @@ contract RareBatchListingMarketplace is IRareBatchListingMarketplace, OwnableUpg
   /// @notice Mapping of keccak256(creator, root, tokenContract, tokenId) to nonce
   mapping(bytes32 => uint256) private _tokenSalePriceNonce;
 
+  /// @notice Mapping from (creator, merkleRoot) to AllowListConfig
+  mapping(address => mapping(bytes32 => AllowListConfig)) private _allowListConfigs;
+
   /// @notice Delay required before an offer can be cancelled (in seconds)
   uint256 public constant OFFER_CANCELATION_DELAY = 2 minutes;
 
@@ -138,13 +141,25 @@ contract RareBatchListingMarketplace is IRareBatchListingMarketplace, OwnableUpg
   }
 
   /// @inheritdoc IRareBatchListingMarketplace
+  function setAllowListConfig(bytes32 _merkleRoot, bytes32 _allowListRoot, uint256 _endTimestamp) external override {
+    // Verify caller owns the merkle root
+    require(_creatorSalePriceMerkleRoots[msg.sender].contains(_merkleRoot), "setAllowListConfig::Not root owner");
+
+    // Store configuration
+    _allowListConfigs[msg.sender][_merkleRoot] = AllowListConfig({root: _allowListRoot, endTimestamp: _endTimestamp});
+
+    emit AllowListConfigSet(msg.sender, _merkleRoot, _allowListRoot, _endTimestamp);
+  }
+
+  /// @inheritdoc IRareBatchListingMarketplace
   function buyWithMerkleProof(
     address _originContract,
     uint256 _tokenId,
     address _creator,
     bytes32 _merkleRoot,
-    bytes32[] calldata _proof
-  ) external payable override {
+    bytes32[] calldata _proof,
+    bytes32[] calldata _allowListProof
+  ) external payable override nonReentrant {
     // Verify token is in Merkle root
     bytes32 leaf = keccak256(abi.encodePacked(_originContract, _tokenId));
     require(MerkleProof.verify(_proof, _merkleRoot, leaf), "buyWithMerkleProof::Invalid Merkle proof");
@@ -154,6 +169,20 @@ contract RareBatchListingMarketplace is IRareBatchListingMarketplace, OwnableUpg
       _creatorSalePriceMerkleRoots[_creator].contains(_merkleRoot),
       "buyWithMerkleProof::Merkle root not registered"
     );
+
+    // Check allowlist if configured
+    AllowListConfig memory allowListConfig = _allowListConfigs[_creator][_merkleRoot];
+    if (allowListConfig.root != bytes32(0)) {
+      // Allowlist is configured, verify it hasn't expired
+      require(block.timestamp < allowListConfig.endTimestamp, "buyWithMerkleProof::Allowlist period has ended");
+
+      // Verify buyer is on allowlist
+      bytes32 allowListLeaf = keccak256(abi.encodePacked(msg.sender));
+      require(
+        MerkleProof.verify(_allowListProof, allowListConfig.root, allowListLeaf),
+        "buyWithMerkleProof::Not on allowlist"
+      );
+    }
 
     // Get config for this Merkle root
     MerkleSalePriceConfig memory config = creatorRootToConfig[_creator][_merkleRoot];
@@ -247,5 +276,13 @@ contract RareBatchListingMarketplace is IRareBatchListingMarketplace, OwnableUpg
     bytes32 _root
   ) external view override returns (MerkleSalePriceConfig memory) {
     return creatorRootToConfig[_creator][_root];
+  }
+
+  /// @inheritdoc IRareBatchListingMarketplace
+  function getAllowListConfig(
+    address _creator,
+    bytes32 _merkleRoot
+  ) external view override returns (AllowListConfig memory) {
+    return _allowListConfigs[_creator][_merkleRoot];
   }
 }

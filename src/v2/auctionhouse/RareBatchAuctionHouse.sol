@@ -8,6 +8,7 @@ import {IERC721} from "openzeppelin-contracts/token/ERC721/IERC721.sol";
 import {MerkleProof} from "openzeppelin-contracts/utils/cryptography/MerkleProof.sol";
 import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
 
+import {IMarketplaceSettings} from "../../marketplace/IMarketplaceSettings.sol";
 import {MarketUtilsV2} from "../utils/MarketUtilsV2.sol";
 import {MarketConfigV2} from "../utils/MarketConfigV2.sol";
 import {IRareBatchAuctionHouse} from "./IRareBatchAuctionHouse.sol";
@@ -21,10 +22,6 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
   using EnumerableSet for EnumerableSet.Bytes32Set;
   using MarketConfigV2 for MarketConfigV2.Config;
   using MarketUtilsV2 for MarketConfigV2.Config;
-
-  // Constants
-  bytes32 public constant NO_AUCTION = bytes32(0);
-  bytes32 public constant COLDIE_AUCTION = keccak256("COLDIE_AUCTION");
 
   // Config
   MarketConfigV2.Config internal marketConfig;
@@ -46,11 +43,11 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
   mapping(address => mapping(bytes32 => MerkleAuctionConfig)) public creatorRootToConfig;
 
   // Mapping from (creator, root) to nonce for that root
-  mapping(address => mapping(bytes32 => uint256)) private creatorRootNonce;
+  mapping(address => mapping(bytes32 => uint32)) private creatorRootNonce;
 
   // Mapping of keccak256(creator, root, tokenContract, tokenId) to nonce
   // Key is computed as: keccak256(abi.encodePacked(creator, root, tokenContract, tokenId))
-  mapping(bytes32 => uint256) private tokenAuctionNonce;
+  mapping(bytes32 => uint32) private tokenAuctionNonce;
 
   /**
    * @dev Initializer function
@@ -132,16 +129,16 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
                       STANDARD AUCTION FUNCTIONS 
   //////////////////////////////////////////////////////////////*/
 
-  /// @notice Places a bid on a valid auction.
+  /// @notice Places a bid on a running auction.
   /// @inheritdoc IRareBatchAuctionHouse
   function bid(
     address _originContract,
     uint256 _tokenId,
     address _currencyAddress,
-    uint256 _amount
+    uint128 _amount
   ) external payable override nonReentrant {
     // Calculate required amount (bid + marketplace fee)
-    uint256 requiredAmount = _amount + marketConfig.marketplaceSettings.calculateMarketplaceFee(_amount);
+    uint128 requiredAmount = _amount + uint128(marketConfig.marketplaceSettings.calculateMarketplaceFee(_amount));
 
     // Check that the sender has approved the marketplace for this amount
     marketConfig.senderMustHaveMarketplaceApproved(_currencyAddress, requiredAmount);
@@ -150,18 +147,12 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
     Auction memory auction = tokenAuctions[_originContract][_tokenId];
 
     // Verify auction exists
-    require(auction.auctionType != NO_AUCTION, "bid::Must have a current auction");
+    require(auction.startingTime > 0, "bid::Must have a current auction");
 
     // Verify bidder is not the auction creator
     require(auction.auctionCreator != msg.sender, "bid::Cannot bid on your own auction");
 
-    // Verify auction has started
-    require(block.timestamp >= auction.startingTime, "bid::Auction not active");
-
-    // For scheduled auctions, verify auction has not ended
-    if (auction.startingTime > 0) {
-      require(block.timestamp < auction.startingTime + auction.lengthOfAuction, "bid::Auction has ended");
-    }
+    require(block.timestamp < auction.startingTime + auction.lengthOfAuction, "bid::Auction has ended");
 
     // Verify bid currency matches auction currency
     require(_currencyAddress == auction.currencyAddress, "bid::Currency does not match auction currency");
@@ -182,7 +173,7 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
     }
 
     // Transfer tokens for bid
-    marketConfig.checkAmountAndTransfer(_currencyAddress, requiredAmount);
+    marketConfig.checkAmountAndTransfer(auction.currencyAddress, requiredAmount);
 
     // Calculate auction extension if needed
     uint256 newAuctionLength = 0;
@@ -195,32 +186,15 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
         newAuctionLength = auction.lengthOfAuction + auctionLengthExtension - timeLeft;
 
         // Update auction length
-        tokenAuctions[_originContract][_tokenId].lengthOfAuction = newAuctionLength;
+        tokenAuctions[_originContract][_tokenId].lengthOfAuction = uint64(newAuctionLength);
       }
     }
 
-    // For first bid on a Coldie auction
-    if (previousBidder == address(0) && auction.auctionType == COLDIE_AUCTION) {
-      // Transfer token from auction creator to this contract
-      if (IERC721(_originContract).ownerOf(_tokenId) == auction.auctionCreator) {
-        marketConfig.transferERC721(_originContract, auction.auctionCreator, address(this), _tokenId);
-      }
-    }
-
-    // Refund previous bidder if exists
-    if (previousBidder != address(0)) {
-      marketConfig.refund(
-        currentBid.currencyAddress,
-        currentBid.amount,
-        currentBid.marketplaceFeeAtTime,
-        previousBidder
-      );
-    }
+    marketConfig.refund(auction.currencyAddress, currentBid.amount, currentBid.marketplaceFeeAtTime, previousBidder);
 
     // Record bid
     auctionBids[_originContract][_tokenId] = Bid({
       bidder: msg.sender,
-      currencyAddress: _currencyAddress,
       amount: _amount,
       marketplaceFeeAtTime: marketConfig.marketplaceSettings.getMarketplaceFeePercentage()
     });
@@ -245,7 +219,7 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
     Bid memory currentBid = auctionBids[_originContract][_tokenId];
 
     // Verify auction exists
-    require(auction.auctionType != NO_AUCTION, "settleAuction::No auction exists");
+    require(auction.startingTime > 0, "settleAuction::No auction exists");
 
     // Verify auction has ended
     require(block.timestamp >= auction.startingTime + auction.lengthOfAuction, "settleAuction::Auction has not ended");
@@ -262,7 +236,7 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
       marketConfig.payout(
         _originContract,
         _tokenId,
-        currentBid.currencyAddress,
+        auction.currencyAddress,
         currentBid.amount,
         auction.auctionCreator,
         auction.splitRecipients,
@@ -280,7 +254,7 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
       auction.auctionCreator,
       currentBid.bidder,
       currentBid.amount,
-      currentBid.currencyAddress,
+      auction.currencyAddress,
       currentBid.marketplaceFeeAtTime
     );
   }
@@ -294,7 +268,7 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
     external
     view
     override
-    returns (address, uint256, uint256, uint256, address, uint256, bytes32, address payable[] memory, uint8[] memory)
+    returns (address, uint32, uint64, uint64, address, uint128, address payable[] memory, uint8[] memory)
   {
     Auction memory auction = tokenAuctions[_originContract][_tokenId];
 
@@ -305,7 +279,6 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
       auction.lengthOfAuction,
       auction.currencyAddress,
       auction.minimumBid,
-      auction.auctionType,
       auction.splitRecipients,
       auction.splitRatios
     );
@@ -320,8 +293,8 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
   function registerAuctionMerkleRoot(
     bytes32 _merkleRoot,
     address _currency,
-    uint256 _startingAmount,
-    uint256 _duration,
+    uint128 _startingAmount,
+    uint64 _duration,
     address payable[] calldata _splitAddresses,
     uint8[] calldata _splitRatios
   ) external override {
@@ -344,7 +317,7 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
     creatorAuctionMerkleRoots[msg.sender].add(_merkleRoot);
 
     // Calculate new nonce
-    uint256 newNonce = creatorRootNonce[msg.sender][_merkleRoot] + 1;
+    uint32 newNonce = creatorRootNonce[msg.sender][_merkleRoot] + 1;
     creatorRootNonce[msg.sender][_merkleRoot] = newNonce;
 
     creatorRootToConfig[msg.sender][_merkleRoot] = MerkleAuctionConfig({
@@ -378,17 +351,19 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
   /// @notice Places a bid using a Merkle proof to verify token inclusion
   /// @inheritdoc IRareBatchAuctionHouse
   function bidWithAuctionMerkleProof(
+    address _currencyAddress,
     address _originContract,
     uint256 _tokenId,
     address _creator,
     bytes32 _merkleRoot,
-    uint256 _bidAmount,
+    uint128 _bidAmount,
     bytes32[] calldata _proof
   ) external payable override nonReentrant {
     // Verify token is in Merkle root
     bytes32 leaf = keccak256(abi.encodePacked(_originContract, _tokenId));
     require(MerkleProof.verify(_proof, _merkleRoot, leaf), "bidWithAuctionMerkleProof::Invalid Merkle proof");
 
+    IMarketplaceSettings settings = marketConfig.marketplaceSettings;
     // Verify Merkle root is registered and active
     require(
       creatorAuctionMerkleRoots[_creator].contains(_merkleRoot),
@@ -397,10 +372,11 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
 
     // Get config for this Merkle root
     MerkleAuctionConfig memory config = creatorRootToConfig[_creator][_merkleRoot];
+    require(config.currency == _currencyAddress, "bidWithAuctionMerkleProof::Currency does not match");
 
     // Get token nonce key and verify it hasn't been used
     bytes32 tokenNonceKey = keccak256(abi.encodePacked(_creator, _merkleRoot, _originContract, _tokenId));
-    uint256 currentNonce = creatorRootNonce[_creator][_merkleRoot];
+    uint32 currentNonce = creatorRootNonce[_creator][_merkleRoot];
     require(
       tokenAuctionNonce[tokenNonceKey] < currentNonce,
       "bidWithAuctionMerkleProof::Token already used for this Merkle root"
@@ -408,16 +384,13 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
 
     // Verify no auction exists for this token
     require(
-      tokenAuctions[_originContract][_tokenId].auctionType == NO_AUCTION,
+      tokenAuctions[_originContract][_tokenId].startingTime == 0,
       "bidWithAuctionMerkleProof::Auction already exists"
     );
 
     // Verify bid amount is valid
     require(_bidAmount > 0, "bidWithAuctionMerkleProof::Cannot be 0");
-    require(
-      _bidAmount <= marketConfig.marketplaceSettings.getMarketplaceMaxValue(),
-      "bidWithAuctionMerkleProof::Must be less than max value"
-    );
+    require(_bidAmount <= settings.getMarketplaceMaxValue(), "bidWithAuctionMerkleProof::Must be less than max value");
     require(_bidAmount >= config.startingAmount, "bidWithAuctionMerkleProof::Cannot be lower than minimum bid");
 
     // Verify creator owns the token
@@ -428,7 +401,7 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
     marketConfig.addressMustHaveMarketplaceApprovedForNFT(_creator, _originContract, _tokenId);
 
     // Transfer bid amount
-    uint256 requiredAmount = _bidAmount + marketConfig.marketplaceSettings.calculateMarketplaceFee(_bidAmount);
+    uint256 requiredAmount = _bidAmount + settings.calculateMarketplaceFee(_bidAmount);
     MarketUtilsV2.checkAmountAndTransfer(marketConfig, config.currency, requiredAmount);
 
     // Update token nonce to current creatorRootNonce
@@ -437,12 +410,11 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
     // Create auction
     tokenAuctions[_originContract][_tokenId] = Auction({
       auctionCreator: payable(_creator),
-      creationBlock: block.number,
-      startingTime: block.timestamp,
-      lengthOfAuction: config.duration,
       currencyAddress: config.currency,
-      minimumBid: config.startingAmount,
-      auctionType: COLDIE_AUCTION,
+      creationBlock: uint32(block.number),
+      startingTime: uint64(block.timestamp),
+      lengthOfAuction: uint64(config.duration),
+      minimumBid: uint128(config.startingAmount),
       splitRecipients: config.splitAddresses,
       splitRatios: config.splitRatios
     });
@@ -450,9 +422,8 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
     // Record the bid
     auctionBids[_originContract][_tokenId] = Bid({
       bidder: msg.sender,
-      currencyAddress: config.currency,
       amount: _bidAmount,
-      marketplaceFeeAtTime: marketConfig.marketplaceSettings.getMarketplaceFeePercentage()
+      marketplaceFeeAtTime: settings.getMarketplaceFeePercentage()
     });
 
     // Transfer token from creator to this contract
@@ -480,7 +451,7 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
     bytes32 _root,
     address _tokenContract,
     uint256 _tokenId
-  ) external view override returns (uint256) {
+  ) external view override returns (uint32) {
     bytes32 tokenNonceKey = keccak256(abi.encodePacked(_creator, _root, _tokenContract, _tokenId));
     return tokenAuctionNonce[tokenNonceKey];
   }
@@ -493,7 +464,7 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
 
   /// @notice Gets the current nonce for a user's Merkle root
   /// @inheritdoc IRareBatchAuctionHouse
-  function getCreatorAuctionMerkleRootNonce(address _user, bytes32 _root) external view override returns (uint256) {
+  function getCreatorAuctionMerkleRootNonce(address _user, bytes32 _root) external view override returns (uint32) {
     return creatorRootNonce[_user][_root];
   }
 
@@ -514,19 +485,10 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
     external
     view
     override
-    returns (address bidder, address currencyAddress, uint256 amount, uint256 marketplaceFeeAtTime)
+    returns (address bidder, address currencyAddress, uint128 amount, uint8 marketplaceFeeAtTime)
   {
-    Bid memory bid = auctionBids[_originContract][_tokenId];
-    return (bid.bidder, bid.currencyAddress, bid.amount, bid.marketplaceFeeAtTime);
-  }
-
-  /*//////////////////////////////////////////////////////////////
-                      INTERNAL FUNCTIONS
-  //////////////////////////////////////////////////////////////*/
-
-  /// @dev Validates an auction type
-  /// @param _auctionType The auction type to validate
-  function _checkValidAuctionType(bytes32 _auctionType) internal pure {
-    require(_auctionType == COLDIE_AUCTION, "checkValidAuctionType::Invalid auction type");
+    Bid memory auctionBid = auctionBids[_originContract][_tokenId];
+    Auction memory auction = tokenAuctions[_originContract][_tokenId];
+    return (auctionBid.bidder, auction.currencyAddress, auctionBid.amount, auctionBid.marketplaceFeeAtTime);
   }
 }

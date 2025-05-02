@@ -37,6 +37,12 @@ interface IRareBatchListingMarketplace {
     uint256 nonce;
   }
 
+  /// @notice Configuration for allowlist Merkle root
+  struct AllowListConfig {
+    bytes32 root;
+    uint256 endTimestamp;
+  }
+
   /*//////////////////////////////////////////////////////////////////////////
                                     Events
     //////////////////////////////////////////////////////////////////////////*/
@@ -87,6 +93,13 @@ interface IRareBatchListingMarketplace {
     uint256 nonce
   );
 
+  event AllowListConfigSet(
+    address indexed creator,
+    bytes32 indexed merkleRoot,
+    bytes32 indexed allowListRoot,
+    uint256 endTimestamp
+  );
+
   /*//////////////////////////////////////////////////////////////////////////
                             Merkle Sale Functions
     //////////////////////////////////////////////////////////////////////////*/
@@ -105,18 +118,26 @@ interface IRareBatchListingMarketplace {
     uint8[] calldata _splitRatios
   ) external;
 
+  /// @notice Set allowlist configuration for a sale price Merkle root
+  /// @param _merkleRoot The sale price Merkle root to set allowlist for
+  /// @param _allowListRoot The Merkle root of allowed addresses
+  /// @param _endTimestamp The timestamp after which the allowlist expires
+  function setAllowListConfig(bytes32 _merkleRoot, bytes32 _allowListRoot, uint256 _endTimestamp) external;
+
   /// @notice Buy a token using a Merkle proof
   /// @param _originContract The contract address of the token
   /// @param _tokenId The token ID
   /// @param _creator The creator who registered the Merkle root
   /// @param _merkleRoot The Merkle root containing this token
   /// @param _proof The Merkle proof for this token
+  /// @param _allowListProof The Merkle proof for the allowlist (empty if no allowlist)
   function buyWithMerkleProof(
     address _originContract,
     uint256 _tokenId,
     address _creator,
     bytes32 _merkleRoot,
-    bytes32[] calldata _proof
+    bytes32[] calldata _proof,
+    bytes32[] calldata _allowListProof
   ) external payable;
 
   /// @notice Verify if a token is included in a Merkle root
@@ -162,4 +183,10 @@ interface IRareBatchListingMarketplace {
     address _creator,
     bytes32 _root
   ) external view returns (MerkleSalePriceConfig memory);
+
+  /// @notice Gets the allowlist configuration for a given creator and sale price root
+  /// @param _creator The address of the creator
+  /// @param _merkleRoot The sale price Merkle root
+  /// @return The AllowListConfig struct containing the allowlist configuration
+  function getAllowListConfig(address _creator, bytes32 _merkleRoot) external view returns (AllowListConfig memory);
 }

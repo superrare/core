@@ -58,8 +58,8 @@ contract RareBatchAuctionHouseTest is Test {
   Merkle public merkle;
 
   // Constants
-  uint256 public constant AUCTION_DURATION = 1 days;
-  uint256 public constant STARTING_AMOUNT = 1 ether;
+  uint64 public constant AUCTION_DURATION = 1 days;
+  uint128 public constant STARTING_AMOUNT = 1 ether;
   uint8 public constant SPLIT_RATIO = 100;
 
   function setUp() public {
@@ -435,6 +435,7 @@ contract RareBatchAuctionHouseTest is Test {
     // Place bid
     vm.startPrank(bidder);
     auctionHouse.bidWithAuctionMerkleProof(
+      address(currencyContract),
       address(nftContract),
       firstTokenId,
       auctionCreator,
@@ -445,14 +446,22 @@ contract RareBatchAuctionHouseTest is Test {
     vm.stopPrank();
 
     // Verify auction was created
-    (address creator, , uint256 startTime, uint256 lengthOfAuction, , uint256 minimumBid, , , ) = auctionHouse
-      .getAuctionDetails(address(nftContract), firstTokenId);
-    assertEq(creator, auctionCreator, "Creator should be the one who created the Merkle root");
+    (
+      address auctionCreatorAddr,
+      uint32 creationBlock,
+      uint64 startTime,
+      uint64 lengthOfAuction,
+      address currencyAddr,
+      uint128 minimumBid,
+      ,
+
+    ) = auctionHouse.getAuctionDetails(address(nftContract), firstTokenId);
+    assertEq(auctionCreatorAddr, auctionCreator, "Creator should be the one who created the Merkle root");
     assertEq(minimumBid, STARTING_AMOUNT, "Bid amount should match");
     assertEq(startTime + lengthOfAuction, block.timestamp + AUCTION_DURATION, "Auction duration should be correct");
 
     // Verify current bidder
-    (address currentBidder, address bidCurrency, uint256 bidAmount, ) = auctionHouse.auctionBids(
+    (address currentBidder, address bidCurrency, uint128 bidAmount, ) = auctionHouse.getCurrentBid(
       address(nftContract),
       firstTokenId
     );
@@ -492,6 +501,7 @@ contract RareBatchAuctionHouseTest is Test {
     vm.startPrank(bidder);
     vm.expectRevert("bidWithAuctionMerkleProof::Invalid Merkle proof");
     auctionHouse.bidWithAuctionMerkleProof(
+      address(currencyContract),
       address(nftContract),
       firstTokenId,
       auctionCreator,
@@ -536,13 +546,29 @@ contract RareBatchAuctionHouseTest is Test {
 
     // Place first bid
     vm.startPrank(bidder);
-    auctionHouse.bidWithAuctionMerkleProof(address(nftContract), tokenId, auctionCreator, root, STARTING_AMOUNT, proof);
+    auctionHouse.bidWithAuctionMerkleProof(
+      address(currencyContract),
+      address(nftContract),
+      tokenId,
+      auctionCreator,
+      root,
+      STARTING_AMOUNT,
+      proof
+    );
     vm.stopPrank();
 
     // Try to place same bid again
     vm.startPrank(bidder);
     vm.expectRevert("bidWithAuctionMerkleProof::Token already used for this Merkle root");
-    auctionHouse.bidWithAuctionMerkleProof(address(nftContract), tokenId, auctionCreator, root, STARTING_AMOUNT, proof);
+    auctionHouse.bidWithAuctionMerkleProof(
+      address(currencyContract),
+      address(nftContract),
+      tokenId,
+      auctionCreator,
+      root,
+      STARTING_AMOUNT,
+      proof
+    );
     vm.stopPrank();
   }
 
@@ -576,6 +602,7 @@ contract RareBatchAuctionHouseTest is Test {
     vm.startPrank(bidder);
     vm.expectRevert("bidWithAuctionMerkleProof::Not token owner");
     auctionHouse.bidWithAuctionMerkleProof(
+      address(currencyContract),
       address(nftContract),
       firstTokenId,
       auctionCreator, // Wrong owner
@@ -726,13 +753,16 @@ contract RareBatchAuctionHouseTest is Test {
     );
     // Setup bidder with enough allowance for both bids including fees
     vm.startPrank(bidder);
-    uint256 marketplaceFee = IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT);
-    uint256 totalRequiredAmount = (STARTING_AMOUNT + marketplaceFee) * 2; // Enough for two bids including fees
+    uint128 marketplaceFee = uint128(
+      IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT)
+    );
+    uint128 totalRequiredAmount = (STARTING_AMOUNT + marketplaceFee) * 2; // Enough for two bids including fees
     currencyContract.approve(address(erc20ApprovalManager), totalRequiredAmount);
     vm.stopPrank();
 
     vm.startPrank(bidder);
     auctionHouse.bidWithAuctionMerkleProof(
+      address(currencyContract),
       address(nftContract),
       firstTokenId,
       auctionCreator,
@@ -759,6 +789,7 @@ contract RareBatchAuctionHouseTest is Test {
     vm.startPrank(bidder);
     vm.expectRevert("bidWithAuctionMerkleProof::Token already used for this Merkle root");
     auctionHouse.bidWithAuctionMerkleProof(
+      address(currencyContract),
       address(nftContract),
       firstTokenId,
       auctionCreator,
@@ -795,6 +826,7 @@ contract RareBatchAuctionHouseTest is Test {
     // Now new token can be sold under new configuration
     vm.startPrank(bidder);
     auctionHouse.bidWithAuctionMerkleProof(
+      address(currencyContract),
       address(nftContract),
       newFirstTokenId,
       auctionCreator,
@@ -845,6 +877,7 @@ contract RareBatchAuctionHouseTest is Test {
     // Bid on first token
     vm.startPrank(bidder);
     auctionHouse.bidWithAuctionMerkleProof(
+      address(currencyContract),
       address(nftContract),
       firstTokenId,
       auctionCreator,
@@ -877,6 +910,7 @@ contract RareBatchAuctionHouseTest is Test {
     // Bid on first token of new tree
     vm.startPrank(bidder);
     auctionHouse.bidWithAuctionMerkleProof(
+      address(currencyContract),
       address(nftContract),
       newFirstTokenId,
       auctionCreator,
@@ -927,13 +961,16 @@ contract RareBatchAuctionHouseTest is Test {
     );
 
     vm.startPrank(bidder);
-    uint256 marketplaceFee = IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT);
-    uint256 totalRequiredAmount = (STARTING_AMOUNT + marketplaceFee) * 2; // Enough for two bids including fees
+    uint128 marketplaceFee = uint128(
+      IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT)
+    );
+    uint128 totalRequiredAmount = (STARTING_AMOUNT + marketplaceFee) * 2; // Enough for two bids including fees
     currencyContract.approve(address(erc20ApprovalManager), totalRequiredAmount);
     vm.stopPrank();
 
     vm.startPrank(bidder);
     auctionHouse.bidWithAuctionMerkleProof(
+      address(currencyContract),
       address(nftContract),
       firstTokenId,
       auctionCreator,
@@ -991,6 +1028,7 @@ contract RareBatchAuctionHouseTest is Test {
     // Bid on new token
     vm.startPrank(bidder);
     auctionHouse.bidWithAuctionMerkleProof(
+      address(currencyContract),
       address(nftContract),
       newFirstTokenId,
       auctionCreator,
@@ -1042,14 +1080,17 @@ contract RareBatchAuctionHouseTest is Test {
     vm.deal(bidder, STARTING_AMOUNT * 2); // Give bidder some ETH
 
     // Calculate required amount including fee
-    uint256 marketplaceFee = IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT);
-    uint256 requiredAmount = STARTING_AMOUNT + marketplaceFee;
-    (, , , , , , bytes32 auctionType, , ) = auctionHouse.getAuctionDetails(address(nftContract), firstTokenId);
-    assertEq(auctionType, auctionHouse.NO_AUCTION(), "Auction type should be NO_AUCTION");
+    uint128 marketplaceFee = uint128(
+      IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT)
+    );
+    uint128 requiredAmount = STARTING_AMOUNT + marketplaceFee;
+    (address creator, , , , , , , ) = auctionHouse.getAuctionDetails(address(nftContract), firstTokenId);
+    assertEq(creator, address(0), "No auction should exist yet");
     // Place bid with ETH
     vm.startPrank(bidder);
     currencyContract.increaseAllowance(address(erc20ApprovalManager), requiredAmount);
     auctionHouse.bidWithAuctionMerkleProof{value: requiredAmount}(
+      address(0), // ETH
       address(nftContract),
       firstTokenId,
       auctionCreator,
@@ -1060,14 +1101,22 @@ contract RareBatchAuctionHouseTest is Test {
     vm.stopPrank();
 
     // Verify auction was created
-    (address creator, , uint256 startTime, uint256 lengthOfAuction, , uint256 minimumBid, , , ) = auctionHouse
-      .getAuctionDetails(address(nftContract), firstTokenId);
-    assertEq(creator, auctionCreator, "Creator should be the one who created the Merkle root");
+    (
+      address auctionCreatorAddr,
+      uint32 creationBlock,
+      uint64 startTime,
+      uint64 lengthOfAuction,
+      address currencyAddr,
+      uint128 minimumBid,
+      ,
+
+    ) = auctionHouse.getAuctionDetails(address(nftContract), firstTokenId);
+    assertEq(auctionCreatorAddr, auctionCreator, "Creator should be the one who created the Merkle root");
     assertEq(minimumBid, STARTING_AMOUNT, "Bid amount should match");
     assertEq(startTime + lengthOfAuction, block.timestamp + AUCTION_DURATION, "Auction duration should be correct");
 
     // Verify current bidder and ETH bid
-    (address currentBidder, address bidCurrency, uint256 bidAmount, ) = auctionHouse.auctionBids(
+    (address currentBidder, address bidCurrency, uint128 bidAmount, ) = auctionHouse.getCurrentBid(
       address(nftContract),
       firstTokenId
     );
@@ -1100,13 +1149,16 @@ contract RareBatchAuctionHouseTest is Test {
     vm.deal(bidder, STARTING_AMOUNT / 2);
 
     // Calculate required amount including fee
-    uint256 marketplaceFee = IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT);
-    uint256 requiredAmount = STARTING_AMOUNT + marketplaceFee;
+    uint128 marketplaceFee = uint128(
+      IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT)
+    );
+    uint128 requiredAmount = STARTING_AMOUNT + marketplaceFee;
 
     // Try to place bid with insufficient ETH
     vm.startPrank(bidder);
     vm.expectRevert("not enough eth sent");
     auctionHouse.bidWithAuctionMerkleProof{value: STARTING_AMOUNT / 2}(
+      address(0), // ETH
       address(nftContract),
       firstTokenId,
       auctionCreator,
@@ -1135,8 +1187,8 @@ contract RareBatchAuctionHouseTest is Test {
 
     // Setup: Approve the auction house to spend bidder's tokens
     vm.startPrank(bidder);
-    uint256 requiredAmount = STARTING_AMOUNT +
-      IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT);
+    uint128 requiredAmount = STARTING_AMOUNT +
+      uint128(IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT));
     currencyContract.approve(address(erc20ApprovalManager), requiredAmount);
     vm.stopPrank();
 
@@ -1147,6 +1199,7 @@ contract RareBatchAuctionHouseTest is Test {
     // Note: The Merkle proof validation happens first, so that's the expected revert.
     vm.expectRevert("bidWithAuctionMerkleProof::Invalid Merkle proof");
     auctionHouse.bidWithAuctionMerkleProof(
+      address(currencyContract),
       address(nftContract),
       nonExistentTokenId,
       auctionCreator,
@@ -1175,8 +1228,8 @@ contract RareBatchAuctionHouseTest is Test {
 
     // Setup: Approve the auction house to spend bidder's tokens
     vm.startPrank(bidder);
-    uint256 requiredAmount = STARTING_AMOUNT +
-      IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT);
+    uint128 requiredAmount = STARTING_AMOUNT +
+      uint128(IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT));
     currencyContract.approve(address(erc20ApprovalManager), requiredAmount);
     vm.stopPrank();
 
@@ -1193,6 +1246,7 @@ contract RareBatchAuctionHouseTest is Test {
     vm.startPrank(bidder);
     vm.expectRevert("bidWithAuctionMerkleProof::Invalid Merkle proof");
     auctionHouse.bidWithAuctionMerkleProof(
+      address(currencyContract),
       address(nftContract),
       firstTokenId,
       auctionCreator,
@@ -1221,8 +1275,8 @@ contract RareBatchAuctionHouseTest is Test {
 
     // Setup: Approve the auction house to spend bidder's tokens
     vm.startPrank(bidder);
-    uint256 requiredAmount = STARTING_AMOUNT +
-      IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT);
+    uint128 requiredAmount = STARTING_AMOUNT +
+      uint128(IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT));
     currencyContract.approve(address(erc20ApprovalManager), requiredAmount);
     vm.stopPrank();
 
@@ -1233,6 +1287,7 @@ contract RareBatchAuctionHouseTest is Test {
     vm.startPrank(bidder);
     vm.expectRevert("bidWithAuctionMerkleProof::Invalid Merkle proof");
     auctionHouse.bidWithAuctionMerkleProof(
+      address(currencyContract),
       address(nftContract),
       firstTokenId,
       auctionCreator,
@@ -1280,8 +1335,10 @@ contract RareBatchAuctionHouseTest is Test {
     vm.stopPrank();
 
     // Calculate required amount including fee
-    uint256 marketplaceFee = IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT);
-    uint256 requiredAmount = STARTING_AMOUNT + marketplaceFee;
+    uint128 marketplaceFee = uint128(
+      IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT)
+    );
+    uint128 requiredAmount = STARTING_AMOUNT + marketplaceFee;
 
     // Mint ETH for the bidder
     vm.deal(bidder, requiredAmount * 2); // Give bidder enough ETH
@@ -1289,6 +1346,7 @@ contract RareBatchAuctionHouseTest is Test {
     // Place bid with ETH for the target token
     vm.startPrank(bidder);
     auctionHouse.bidWithAuctionMerkleProof{value: requiredAmount}(
+      address(0), // ETH
       address(nftContract),
       targetTokenId,
       auctionCreator,
@@ -1299,7 +1357,7 @@ contract RareBatchAuctionHouseTest is Test {
     vm.stopPrank();
 
     // Verify auction was created for the target token
-    (address creator, , , , , uint256 minimumBid, , , ) = auctionHouse.getAuctionDetails(
+    (address creator, , , , , uint128 minimumBid, , ) = auctionHouse.getAuctionDetails(
       address(nftContract),
       targetTokenId
     );
@@ -1307,7 +1365,7 @@ contract RareBatchAuctionHouseTest is Test {
     assertEq(minimumBid, STARTING_AMOUNT, "Bid amount should match");
 
     // Verify current bidder and ETH bid for the target token
-    (address currentBidder, address bidCurrency, uint256 bidAmount, ) = auctionHouse.auctionBids(
+    (address currentBidder, address bidCurrency, uint128 bidAmount, ) = auctionHouse.getCurrentBid(
       address(nftContract),
       targetTokenId
     );
@@ -1348,10 +1406,11 @@ contract RareBatchAuctionHouseTest is Test {
 
     // 3. Simulate Auction: Place initial bid to create auction state
     vm.startPrank(bidder);
-    uint256 requiredAmount = STARTING_AMOUNT +
-      IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT);
+    uint128 requiredAmount = STARTING_AMOUNT +
+      uint128(IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT));
     currencyContract.approve(address(erc20ApprovalManager), requiredAmount);
     auctionHouse.bidWithAuctionMerkleProof(
+      address(currencyContract),
       address(nftContract),
       firstTokenId,
       auctionCreator,
@@ -1413,8 +1472,8 @@ contract RareBatchAuctionHouseTest is Test {
 
     // 8. Attempt Bid under New Nonce Configuration
     vm.startPrank(bidder);
-    uint256 newStartingAmount = STARTING_AMOUNT + 1 ether;
-    uint256 newMarketplaceFee = (newStartingAmount * 3) / 100;
+    uint128 newStartingAmount = STARTING_AMOUNT + 1 ether;
+    uint128 newMarketplaceFee = uint128((newStartingAmount * 3) / 100);
 
     // Mock marketplace fee calculation for new amount
     vm.mockCall(
@@ -1430,7 +1489,7 @@ contract RareBatchAuctionHouseTest is Test {
       abi.encode(newMarketplaceFee)
     );
 
-    uint256 newRequiredAmount = newStartingAmount + newMarketplaceFee;
+    uint128 newRequiredAmount = newStartingAmount + newMarketplaceFee;
     // Ensure enough allowance for the new amount
     currencyContract.approve(address(erc20ApprovalManager), newRequiredAmount);
     vm.stopPrank();
@@ -1438,6 +1497,7 @@ contract RareBatchAuctionHouseTest is Test {
     // Place bid using the original proof but against the reconfigured root (nonce 2)
     vm.startPrank(bidder);
     auctionHouse.bidWithAuctionMerkleProof(
+      address(currencyContract),
       address(nftContract),
       firstTokenId, // Same token that was returned
       auctionCreator,
@@ -1451,11 +1511,10 @@ contract RareBatchAuctionHouseTest is Test {
     (
       address creator,
       ,
-      uint256 startTime,
-      uint256 lengthOfAuction,
+      uint64 startTime,
+      uint64 lengthOfAuction,
       address auctionCurrency,
-      uint256 minimumBid,
-      ,
+      uint128 minimumBid,
       ,
 
     ) = auctionHouse.getAuctionDetails(address(nftContract), firstTokenId);
