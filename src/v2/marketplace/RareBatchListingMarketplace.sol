@@ -175,6 +175,8 @@ contract RareBatchListingMarketplace is IRareBatchListingMarketplace, OwnableUpg
   function buyWithMerkleProof(
     address _originContract,
     uint256 _tokenId,
+    address _currency,
+    uint256 _amount,
     address _creator,
     bytes32 _merkleRoot,
     bytes32[] calldata _proof,
@@ -206,6 +208,8 @@ contract RareBatchListingMarketplace is IRareBatchListingMarketplace, OwnableUpg
 
     // Get config for this Merkle root
     MerkleSalePriceConfig memory config = creatorRootToConfig[_creator][_merkleRoot];
+    require(config.currency == _currency, "buyWithMerkleProof::Currency mismatch");
+    require(config.amount == _amount, "buyWithMerkleProof::Amount mismatch");
 
     // Get token nonce key and verify it hasn't been used
     bytes32 tokenNonceKey = keccak256(abi.encodePacked(_creator, _merkleRoot, _originContract, _tokenId));
@@ -251,9 +255,9 @@ contract RareBatchListingMarketplace is IRareBatchListingMarketplace, OwnableUpg
       _originContract,
       _tokenId,
       msg.sender,
-      _creator,
-      _merkleRoot,
+      config.currency,
       config.amount,
+      _merkleRoot,
       currentNonce
     );
   }
