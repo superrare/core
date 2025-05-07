@@ -255,6 +255,7 @@ contract RareBatchListingMarketplace is IRareBatchListingMarketplace, OwnableUpg
       _originContract,
       _tokenId,
       msg.sender,
+      _creator,
       config.currency,
       config.amount,
       _merkleRoot,

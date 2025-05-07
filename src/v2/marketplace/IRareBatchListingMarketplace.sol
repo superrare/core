@@ -41,6 +41,7 @@ interface IRareBatchListingMarketplace {
     address indexed contractAddress,
     uint256 indexed tokenId,
     address indexed buyer,
+    address seller,
     address currency,
     uint256 amount,
     bytes32 merkleRoot,
