@@ -924,4 +924,95 @@ contract RareBatchListingMarketplaceTest is Test {
     marketplace.buyWithMerkleProof(address(nftContract), firstTokenId, creator, root, proof, allowListProof);
     vm.stopPrank();
   }
+
+  function test_cancelSalePriceMerkleRoot() public {
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, , , ) = _createFreshMerkleTree(3);
+
+    // Register the root
+    vm.startPrank(creator);
+    marketplace.registerSalePriceMerkleRoot(
+      root,
+      address(currencyContract),
+      SALE_PRICE,
+      salePriceConfig.splitRecipients,
+      salePriceConfig.splitRatios
+    );
+    vm.stopPrank();
+
+    // Verify root is registered
+    bytes32[] memory roots = marketplace.getUserSalePriceMerkleRoots(creator);
+    assertEq(roots.length, 1, "Root should be registered");
+
+    // Set allowlist config to verify it gets cleaned up
+    vm.startPrank(creator);
+    marketplace.setAllowListConfig(root, bytes32(uint256(1)), block.timestamp + 1 days);
+    vm.stopPrank();
+
+    // Verify allowlist config exists
+    IRareBatchListingMarketplace.AllowListConfig memory allowListConfig = marketplace.getAllowListConfig(creator, root);
+    assertEq(allowListConfig.root, bytes32(uint256(1)), "Allowlist should be set");
+
+    // Cancel the root
+    vm.startPrank(creator);
+    marketplace.cancelSalePriceMerkleRoot(root);
+    vm.stopPrank();
+
+    // Verify root is removed
+    roots = marketplace.getUserSalePriceMerkleRoots(creator);
+    assertEq(roots.length, 0, "Root should be removed");
+
+    // Verify config is cleaned up
+    IRareBatchListingMarketplace.MerkleSalePriceConfig memory config = marketplace.getMerkleSalePriceConfig(
+      creator,
+      root
+    );
+    assertEq(config.currency, address(0), "Config should be cleaned up");
+    assertEq(config.amount, 0, "Config should be cleaned up");
+
+    // Verify allowlist config is cleaned up
+    allowListConfig = marketplace.getAllowListConfig(creator, root);
+    assertEq(allowListConfig.root, bytes32(0), "Allowlist should be cleaned up");
+    assertEq(allowListConfig.endTimestamp, 0, "Allowlist should be cleaned up");
+
+    // Verify nonce is preserved
+    uint256 nonce = marketplace.getCreatorSalePriceMerkleRootNonce(creator, root);
+    assertEq(nonce, 1, "Nonce should be preserved");
+  }
+
+  function test_cancelSalePriceMerkleRoot_notOwner() public {
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, , , ) = _createFreshMerkleTree(3);
+
+    // Register the root
+    vm.startPrank(creator);
+    marketplace.registerSalePriceMerkleRoot(
+      root,
+      address(currencyContract),
+      SALE_PRICE,
+      salePriceConfig.splitRecipients,
+      salePriceConfig.splitRatios
+    );
+    vm.stopPrank();
+
+    // Try to cancel as non-owner
+    vm.startPrank(buyer);
+    vm.expectRevert("cancelSalePriceMerkleRoot::Not root owner");
+    marketplace.cancelSalePriceMerkleRoot(root);
+    vm.stopPrank();
+
+    // Verify root is still registered
+    bytes32[] memory roots = marketplace.getUserSalePriceMerkleRoots(creator);
+    assertEq(roots.length, 1, "Root should still be registered");
+  }
+
+  function test_cancelSalePriceMerkleRoot_nonexistentRoot() public {
+    bytes32 nonexistentRoot = bytes32(uint256(1));
+
+    // Try to cancel non-existent root
+    vm.startPrank(creator);
+    vm.expectRevert("cancelSalePriceMerkleRoot::Not root owner");
+    marketplace.cancelSalePriceMerkleRoot(nonexistentRoot);
+    vm.stopPrank();
+  }
 }

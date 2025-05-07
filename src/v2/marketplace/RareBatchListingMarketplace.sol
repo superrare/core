@@ -141,6 +141,26 @@ contract RareBatchListingMarketplace is IRareBatchListingMarketplace, OwnableUpg
   }
 
   /// @inheritdoc IRareBatchListingMarketplace
+  function cancelSalePriceMerkleRoot(bytes32 _merkleRoot) external override {
+    // Verify caller owns the merkle root
+    require(
+      _creatorSalePriceMerkleRoots[msg.sender].contains(_merkleRoot),
+      "cancelSalePriceMerkleRoot::Not root owner"
+    );
+
+    // Remove root from user's set
+    _creatorSalePriceMerkleRoots[msg.sender].remove(_merkleRoot);
+
+    // Clean up config data (note: we keep the nonce for security)
+    delete creatorRootToConfig[msg.sender][_merkleRoot];
+
+    // Clean up allowlist config if it exists
+    delete _allowListConfigs[msg.sender][_merkleRoot];
+
+    emit SalePriceMerkleRootCancelled(msg.sender, _merkleRoot);
+  }
+
+  /// @inheritdoc IRareBatchListingMarketplace
   function setAllowListConfig(bytes32 _merkleRoot, bytes32 _allowListRoot, uint256 _endTimestamp) external override {
     // Verify caller owns the merkle root
     require(_creatorSalePriceMerkleRoots[msg.sender].contains(_merkleRoot), "setAllowListConfig::Not root owner");
@@ -225,7 +245,7 @@ contract RareBatchListingMarketplace is IRareBatchListingMarketplace, OwnableUpg
     );
 
     // Mark token as sold
-    _marketConfig.marketplaceSettings.markERC721Token(_originContract, _tokenId, true);
+    try _marketConfig.marketplaceSettings.markERC721Token(_originContract, _tokenId, true) {} catch {}
 
     emit MerkleSalePriceExecuted(
       _originContract,

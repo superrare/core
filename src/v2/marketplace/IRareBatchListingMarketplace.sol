@@ -10,24 +10,6 @@ interface IRareBatchListingMarketplace {
                                     Types
     //////////////////////////////////////////////////////////////////////////*/
 
-  /// @notice Standard sale price configuration
-  struct SalePrice {
-    address payable seller;
-    address currency;
-    uint256 amount;
-    address payable[] splitRecipients;
-    uint8[] splitRatios;
-  }
-
-  /// @notice Offer configuration
-  struct Offer {
-    address payable buyer;
-    uint256 amount;
-    uint256 timestamp;
-    uint8 marketplaceFee;
-    bool convertible;
-  }
-
   /// @notice Configuration for a Merkle sale price root
   struct MerkleSalePriceConfig {
     address currency;
@@ -46,34 +28,6 @@ interface IRareBatchListingMarketplace {
   /*//////////////////////////////////////////////////////////////////////////
                                     Events
     //////////////////////////////////////////////////////////////////////////*/
-
-  event OfferPlaced(
-    address indexed originContract,
-    address indexed bidder,
-    address indexed currencyAddress,
-    uint256 amount,
-    uint256 tokenId,
-    bool convertible
-  );
-
-  event SetSalePrice(
-    address indexed originContract,
-    address indexed currencyAddress,
-    address indexed target,
-    uint256 amount,
-    uint256 tokenId,
-    address payable[] splitAddresses,
-    uint8[] splitRatios
-  );
-
-  event Sold(
-    address indexed originContract,
-    address indexed buyer,
-    address indexed seller,
-    address currencyAddress,
-    uint256 amount,
-    uint256 tokenId
-  );
 
   event SalePriceMerkleRootRegistered(
     address indexed creator,
@@ -100,6 +54,8 @@ interface IRareBatchListingMarketplace {
     uint256 endTimestamp
   );
 
+  event SalePriceMerkleRootCancelled(address indexed creator, bytes32 indexed merkleRoot);
+
   /*//////////////////////////////////////////////////////////////////////////
                             Merkle Sale Functions
     //////////////////////////////////////////////////////////////////////////*/
@@ -117,6 +73,10 @@ interface IRareBatchListingMarketplace {
     address payable[] calldata _splitAddresses,
     uint8[] calldata _splitRatios
   ) external;
+
+  /// @notice Cancels a previously registered sale price Merkle root
+  /// @param _merkleRoot The Merkle root to cancel
+  function cancelSalePriceMerkleRoot(bytes32 _merkleRoot) external;
 
   /// @notice Set allowlist configuration for a sale price Merkle root
   /// @param _merkleRoot The sale price Merkle root to set allowlist for

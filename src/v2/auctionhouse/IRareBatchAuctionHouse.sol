@@ -155,9 +155,6 @@ interface IRareBatchAuctionHouse {
   }
   // Events
 
-  /// @notice Emitted when an auction is cancelled
-  event CancelAuction(address indexed contractAddress, uint256 indexed tokenId, address auctionCreator);
-
   /// @notice Emitted when a bid is placed
   event AuctionBid(
     address indexed contractAddress,

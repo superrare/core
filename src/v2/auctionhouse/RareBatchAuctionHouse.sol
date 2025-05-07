@@ -242,6 +242,7 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
         auction.splitRecipients,
         auction.splitRatios
       );
+      try marketConfig.marketplaceSettings.markERC721Token(_originContract, _tokenId, true) {} catch {}
     } else {
       // If no bids, return token to creator
       IERC721(_originContract).transferFrom(address(this), auction.auctionCreator, _tokenId);
