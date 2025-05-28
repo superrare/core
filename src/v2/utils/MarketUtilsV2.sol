@@ -10,6 +10,12 @@ import {MarketConfigV2} from "./MarketConfigV2.sol";
 library MarketUtilsV2 {
   using SafeERC20 for IERC20;
 
+  /// @notice Maximum number of royalty recipients allowed to prevent DoS attacks
+  uint256 public constant MAX_ROYALTY_RECIPIENTS = 5;
+
+  /// @notice Error thrown when too many royalty recipients are returned
+  error TooManyRoyaltyRecipients();
+
   /// @notice Checks to see if the currency address is eth or an approved erc20 token.
   /// @param _currencyAddress Address of currency (Zero address if eth).
   function checkIfCurrencyIsApproved(MarketConfigV2.Config storage _config, address _currencyAddress) internal view {
@@ -164,6 +170,43 @@ library MarketUtilsV2 {
     address payable[] memory _splitAddrs,
     uint8[] memory _splitRatios
   ) internal {
+    payoutWithMarketplaceFee(
+      _config,
+      _originContract,
+      _tokenId,
+      _currencyAddress,
+      _amount,
+      _seller,
+      _splitAddrs,
+      _splitRatios,
+      _config.marketplaceSettings.getMarketplaceFeePercentage()
+    );
+  }
+
+  /// @notice Sends a payout to all the necessary parties with a specific marketplace fee percentage.
+  /// @dev Note that _splitAddrs and _splitRatios are not checked for validity. Make sure supplied values are correct by using _checkSplits.
+  /// @dev Sends payments to the network, royalty if applicable, and splits for the rest.
+  /// @dev Forwards payments to the payment contract if payout is happening in eth.
+  /// @dev Total amount of ratios should be 100 and is relative to the total ratio left.
+  /// @param _originContract Contract address of asset triggering a payout.
+  /// @param _tokenId Token Id of the asset.
+  /// @param _currencyAddress Address of currency being paid out.
+  /// @param _amount Total amount to be paid out.
+  /// @param _seller Address of the person selling the asset.
+  /// @param _splitAddrs Addresses that funds need to be split against.
+  /// @param _splitRatios Ratios for split pertaining to each address.
+  /// @param _marketplaceFeePercentage The marketplace fee percentage to use for this payout.
+  function payoutWithMarketplaceFee(
+    MarketConfigV2.Config storage _config,
+    address _originContract,
+    uint256 _tokenId,
+    address _currencyAddress,
+    uint256 _amount,
+    address _seller,
+    address payable[] memory _splitAddrs,
+    uint8[] memory _splitRatios,
+    uint8 _marketplaceFeePercentage
+  ) internal {
     require(_splitAddrs.length == _splitRatios.length, "Number of split addresses and ratios must be equal.");
 
     /*
@@ -178,16 +221,20 @@ library MarketUtilsV2 {
 
     uint256 remainingAmount = _amount;
 
-    // Marketplace fee
-    uint256 marketplaceFee = _config.marketplaceSettings.calculateMarketplaceFee(_amount);
+    // Marketplace fee - use the provided fee percentage instead of current settings
+    uint256 marketplaceFee = (_amount * _marketplaceFeePercentage) / 100;
 
     address payable[] memory mktFeeRecip = new address payable[](2);
     mktFeeRecip[0] = payable(_config.networkBeneficiary);
     mktFeeRecip[1] = payable(_config.stakingRegistry.getRewardAccumulatorAddressForUser(_seller));
     mktFeeRecip[1] = mktFeeRecip[1] == address(0) ? payable(_config.networkBeneficiary) : mktFeeRecip[1];
     uint256[] memory mktFee = new uint256[](2);
-    mktFee[0] = _config.stakingSettings.calculateMarketplacePayoutFee(_amount);
-    mktFee[1] = _config.stakingSettings.calculateStakingFee(_amount);
+    require(
+      marketplaceFee - _config.stakingSettings.calculateStakingFee(_amount) >= 0,
+      "Marketplace fee is less than staking fee"
+    );
+    mktFee[0] = marketplaceFee - _config.stakingSettings.calculateStakingFee(_amount); // All marketplace fee goes to network beneficiary
+    mktFee[1] = _config.stakingSettings.calculateStakingFee(_amount); // Staking fee for this implementation
 
     performPayouts(_config, _currencyAddress, marketplaceFee, mktFeeRecip, mktFee);
 
@@ -223,6 +270,11 @@ library MarketUtilsV2 {
       _tokenId,
       _amount
     );
+
+    // Check for maximum royalty recipients to prevent DoS attacks
+    if (recipients.length > MAX_ROYALTY_RECIPIENTS) {
+      revert TooManyRoyaltyRecipients();
+    }
 
     // Calculate total royalty amount
     uint256 totalRoyaltyAmount = 0;

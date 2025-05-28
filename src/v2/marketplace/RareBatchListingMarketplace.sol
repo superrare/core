@@ -165,6 +165,9 @@ contract RareBatchListingMarketplace is IRareBatchListingMarketplace, OwnableUpg
     // Verify caller owns the merkle root
     require(_creatorSalePriceMerkleRoots[msg.sender].contains(_merkleRoot), "setAllowListConfig::Not root owner");
 
+    // Verify end timestamp is in the future
+    require(_endTimestamp > block.timestamp, "setAllowListConfig::Allow-list end must be in the future");
+
     // Store configuration
     _allowListConfigs[msg.sender][_merkleRoot] = AllowListConfig({root: _allowListRoot, endTimestamp: _endTimestamp});
 
@@ -182,6 +185,9 @@ contract RareBatchListingMarketplace is IRareBatchListingMarketplace, OwnableUpg
     bytes32[] calldata _proof,
     bytes32[] calldata _allowListProof
   ) external payable override nonReentrant {
+    // Prevent zero-length proof bypass
+    require(_proof.length > 0, "buyWithMerkleProof::Proof cannot be empty");
+
     // Verify token is in Merkle root
     bytes32 leaf = keccak256(abi.encodePacked(_originContract, _tokenId));
     require(MerkleProof.verify(_proof, _merkleRoot, leaf), "buyWithMerkleProof::Invalid Merkle proof");
@@ -197,6 +203,9 @@ contract RareBatchListingMarketplace is IRareBatchListingMarketplace, OwnableUpg
     if (allowListConfig.root != bytes32(0)) {
       // Allowlist is configured, verify it hasn't expired
       require(block.timestamp < allowListConfig.endTimestamp, "buyWithMerkleProof::Allowlist period has ended");
+
+      // Prevent zero-length allowlist proof bypass
+      require(_allowListProof.length > 0, "buyWithMerkleProof::Allowlist proof cannot be empty");
 
       // Verify buyer is on allowlist
       bytes32 allowListLeaf = keccak256(abi.encodePacked(msg.sender));
@@ -270,6 +279,11 @@ contract RareBatchListingMarketplace is IRareBatchListingMarketplace, OwnableUpg
     uint256 _tokenId,
     bytes32[] calldata _proof
   ) external pure override returns (bool) {
+    // Prevent zero-length proof bypass
+    if (_proof.length == 0) {
+      return false;
+    }
+
     bytes32 leaf = keccak256(abi.encodePacked(_origin, _tokenId));
     return MerkleProof.verify(_proof, _root, leaf);
   }
