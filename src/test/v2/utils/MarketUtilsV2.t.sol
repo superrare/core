@@ -456,6 +456,13 @@ contract MarketUtilsV2Test is Test {
       abi.encode((amount * 3) / 100)
     );
 
+    // setup getMarketplaceFeePercentage call
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceFeePercentage.selector),
+      abi.encode(3)
+    );
+
     // setup hasERC721TokenSold
     vm.mockCall(
       marketplaceSettings,
@@ -542,6 +549,13 @@ contract MarketUtilsV2Test is Test {
       abi.encode((amount * 3) / 100)
     );
 
+    // setup getMarketplaceFeePercentage call
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceFeePercentage.selector),
+      abi.encode(3)
+    );
+
     // setup hasERC721TokenSold -- true for secondary sale
     vm.mockCall(
       marketplaceSettings,
@@ -616,6 +630,13 @@ contract MarketUtilsV2Test is Test {
       marketplaceSettings,
       abi.encodeWithSelector(IMarketplaceSettings.calculateMarketplaceFee.selector, amount),
       abi.encode((amount * 3) / 100)
+    );
+
+    // setup getMarketplaceFeePercentage call
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceFeePercentage.selector),
+      abi.encode(3)
     );
 
     // setup hasERC721TokenSold
@@ -710,6 +731,13 @@ contract MarketUtilsV2Test is Test {
       abi.encode((amount * 3) / 100)
     );
 
+    // setup getMarketplaceFeePercentage call
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceFeePercentage.selector),
+      abi.encode(3)
+    );
+
     // setup hasERC721TokenSold -- true for secondary sale
     vm.mockCall(
       marketplaceSettings,
@@ -794,6 +822,13 @@ contract MarketUtilsV2Test is Test {
       marketplaceSettings,
       abi.encodeWithSelector(IMarketplaceSettings.calculateMarketplaceFee.selector, amount),
       abi.encode((amount * 3) / 100)
+    );
+
+    // setup getMarketplaceFeePercentage call
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceFeePercentage.selector),
+      abi.encode(3)
     );
 
     // setup hasERC721TokenSold
@@ -905,6 +940,13 @@ contract MarketUtilsV2Test is Test {
       abi.encode((amount * 3) / 100)
     );
 
+    // setup getMarketplaceFeePercentage call
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceFeePercentage.selector),
+      abi.encode(3)
+    );
+
     // setup hasERC721TokenSold -- true for secondary sale
     vm.mockCall(
       marketplaceSettings,
@@ -985,6 +1027,13 @@ contract MarketUtilsV2Test is Test {
       marketplaceSettings,
       abi.encodeWithSelector(IMarketplaceSettings.calculateMarketplaceFee.selector, amount),
       abi.encode((amount * 3) / 100)
+    );
+
+    // setup getMarketplaceFeePercentage call
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceFeePercentage.selector),
+      abi.encode(3)
     );
 
     // setup hasERC721TokenSold -- true for secondary sale
