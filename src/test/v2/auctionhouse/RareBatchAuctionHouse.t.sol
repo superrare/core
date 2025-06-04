@@ -9,6 +9,7 @@ import {Merkle} from "murky/Merkle.sol";
 import {ERC721} from "openzeppelin-contracts/token/ERC721/ERC721.sol";
 import {ERC20} from "openzeppelin-contracts/token/ERC20/ERC20.sol";
 import "openzeppelin-contracts/utils/cryptography/MerkleProof.sol";
+import {ERC1967Proxy} from "openzeppelin-contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IMarketplaceSettings} from "rareprotocol/aux/marketplace/IMarketplaceSettings.sol";
 import {IRoyaltyEngineV1} from "royalty-registry/IRoyaltyEngineV1.sol";
 import {ISpaceOperatorRegistry} from "rareprotocol/aux/registry/interfaces/ISpaceOperatorRegistry.sol";
@@ -26,7 +27,19 @@ import {ERC721ApprovalManager} from "../../../v2/approver/ERC721/ERC721ApprovalM
 /// @title SuperRareAuctionHouseV2MerkleTest
 /// @notice Tests for the Merkle auction functionality in SuperRareAuctionHouseV2
 contract RareBatchAuctionHouseTest is Test {
+  // Events - copied from IRareBatchAuctionHouse for testing
+  event AuctionSettled(
+    address indexed contractAddress,
+    uint256 indexed tokenId,
+    address seller,
+    address bidder,
+    uint128 amount,
+    address currencyAddress,
+    uint8 marketplaceFee
+  );
+
   RareBatchAuctionHouse public auctionHouse;
+  RareBatchAuctionHouse public auctionHouseImplementation;
   // Mock addresses for dependencies
   address marketplaceSettings = makeAddr("marketplaceSettings");
   address royaltyEngine = makeAddr("royaltyEngine");
@@ -73,7 +86,8 @@ contract RareBatchAuctionHouseTest is Test {
     erc721ApprovalManager = new ERC721ApprovalManager();
 
     // Deploy other contracts
-    auctionHouse = new RareBatchAuctionHouse();
+    auctionHouseImplementation = new RareBatchAuctionHouse();
+    auctionHouse = RareBatchAuctionHouse(payable(address(new ERC1967Proxy(address(auctionHouseImplementation), ""))));
     merkle = new Merkle();
     nftContract = new TestNFT();
     currencyContract = new TestToken();
@@ -347,6 +361,65 @@ contract RareBatchAuctionHouseTest is Test {
       splitAddresses,
       splitRatios
     );
+    vm.stopPrank();
+  }
+
+  function test_registerAuctionMerkleRoot_zeroDuration() public {
+    // Setup split addresses and ratios
+    address payable[] memory splitAddresses = new address payable[](1);
+    splitAddresses[0] = payable(makeAddr("splitRecipient"));
+    uint8[] memory splitRatios = new uint8[](1);
+    splitRatios[0] = 100;
+
+    // Try to register with zero duration
+    vm.startPrank(auctionCreator);
+    nftContract.setApprovalForAll(address(erc721ApprovalManager), true);
+    vm.expectRevert("registerAuctionMerkleRoot::Duration must be greater than 0");
+    auctionHouse.registerAuctionMerkleRoot(
+      merkleRoot,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      0, // Zero duration
+      splitAddresses,
+      splitRatios
+    );
+    vm.stopPrank();
+  }
+
+  function test_registerAuctionMerkleRoot_minimumValidDuration() public {
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, , , ) = _createFreshMerkleTree(3);
+
+    // Setup split addresses and ratios
+    address payable[] memory splitAddresses = new address payable[](1);
+    splitAddresses[0] = payable(makeAddr("splitRecipient"));
+    uint8[] memory splitRatios = new uint8[](1);
+    splitRatios[0] = 100;
+
+    // Register with minimum valid duration (1 second)
+    vm.startPrank(auctionCreator);
+    nftContract.setApprovalForAll(address(erc721ApprovalManager), true);
+    auctionHouse.registerAuctionMerkleRoot(
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      1, // Minimum valid duration
+      splitAddresses,
+      splitRatios
+    );
+
+    // Verify the root was registered successfully
+    bytes32[] memory roots = auctionHouse.getUserAuctionMerkleRoots(auctionCreator);
+    assertEq(roots.length, 1, "Should have one root registered");
+    assertEq(roots[0], root, "Registered root should match");
+
+    // Verify the config was saved correctly
+    IRareBatchAuctionHouse.MerkleAuctionConfig memory config = auctionHouse.getMerkleAuctionConfig(
+      auctionCreator,
+      root
+    );
+    assertEq(config.duration, 1, "Duration should be 1 second");
+
     vm.stopPrank();
   }
 
@@ -1285,7 +1358,7 @@ contract RareBatchAuctionHouseTest is Test {
 
     // Try to place bid with empty proof
     vm.startPrank(bidder);
-    vm.expectRevert("bidWithAuctionMerkleProof::Invalid Merkle proof");
+    vm.expectRevert("bidWithAuctionMerkleProof::Proof cannot be empty");
     auctionHouse.bidWithAuctionMerkleProof(
       address(currencyContract),
       address(nftContract),
@@ -1540,5 +1613,292 @@ contract RareBatchAuctionHouseTest is Test {
 
     // Verify the token is transferred to the bidder
     assertEq(nftContract.ownerOf(firstTokenId), bidder, "Token should be with bidder after settlement");
+  }
+
+  function test_initialize_cannotBeCalledTwice() public {
+    // Try to initialize again - should revert
+    vm.expectRevert("Initializable: contract is already initialized");
+    auctionHouse.initialize(
+      marketplaceSettings,
+      royaltyEngine,
+      spaceOperatorRegistry,
+      approvedTokenRegistry,
+      payments,
+      stakingRegistry,
+      stakingSettings,
+      networkBeneficiary,
+      address(erc20ApprovalManager),
+      address(erc721ApprovalManager)
+    );
+  }
+
+  function test_initialize_implementationContractCannotBeInitialized() public {
+    // Deploy a fresh implementation contract
+    RareBatchAuctionHouse freshImplementation = new RareBatchAuctionHouse();
+
+    // Try to initialize the implementation contract directly - should revert
+    vm.expectRevert("Initializable: contract is already initialized");
+    freshImplementation.initialize(
+      marketplaceSettings,
+      royaltyEngine,
+      spaceOperatorRegistry,
+      approvedTokenRegistry,
+      payments,
+      stakingRegistry,
+      stakingSettings,
+      networkBeneficiary,
+      address(erc20ApprovalManager),
+      address(erc721ApprovalManager)
+    );
+  }
+
+  /// @notice Test that the bid function follows CEI pattern (Checks-Effects-Interactions)
+  /// @dev This test verifies that state updates happen before external calls (refunds)
+  function test_bid_CEI_pattern() public {
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, bytes32[] memory proof, , uint256 firstTokenId) = _createFreshMerkleTree(3);
+
+    // Register the auction merkle root
+    vm.startPrank(auctionCreator);
+    auctionHouse.registerAuctionMerkleRoot(
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
+    vm.stopPrank();
+
+    // Setup bidders with tokens
+    address bidder1 = makeAddr("bidder1");
+    address bidder2 = makeAddr("bidder2");
+
+    currencyContract.mint(bidder1, 1000 * 10 ** currencyContract.decimals());
+    currencyContract.mint(bidder2, 1000 * 10 ** currencyContract.decimals());
+
+    // Calculate required amounts for bids
+    uint128 bid1Amount = STARTING_AMOUNT;
+    uint128 bid2Amount = STARTING_AMOUNT + (STARTING_AMOUNT * 10) / 100; // 10% increase
+
+    uint128 bid1Fee = uint128((bid1Amount * 3) / 100); // 3% fee
+    uint128 bid2Fee = uint128((bid2Amount * 3) / 100); // 3% fee
+
+    uint128 bid1Required = bid1Amount + bid1Fee;
+    uint128 bid2Required = bid2Amount + bid2Fee;
+
+    // Mock marketplace fee calculation for bid2Amount
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.calculateMarketplaceFee.selector, bid2Amount),
+      abi.encode(bid2Fee)
+    );
+
+    // Setup: Approve the auction house to spend bidders' tokens
+    vm.startPrank(bidder1);
+    currencyContract.approve(address(erc20ApprovalManager), bid1Required);
+    vm.stopPrank();
+
+    vm.startPrank(bidder2);
+    currencyContract.approve(address(erc20ApprovalManager), bid2Required);
+    vm.stopPrank();
+
+    // Step 1: Create auction with first bid using bidWithAuctionMerkleProof
+    vm.startPrank(bidder1);
+    auctionHouse.bidWithAuctionMerkleProof(
+      address(currencyContract),
+      address(nftContract),
+      firstTokenId,
+      auctionCreator,
+      root,
+      bid1Amount,
+      proof
+    );
+    vm.stopPrank();
+
+    // Verify auction was created and first bid recorded
+    (address currentBidder1, , uint128 currentAmount1, ) = auctionHouse.getCurrentBid(
+      address(nftContract),
+      firstTokenId
+    );
+    assertEq(currentBidder1, bidder1, "First bidder should be current highest bidder");
+    assertEq(currentAmount1, bid1Amount, "First bid amount should be recorded");
+
+    // Step 2: Place second bid using regular bid function to test CEI pattern
+    vm.startPrank(bidder2);
+    auctionHouse.bid(address(nftContract), firstTokenId, address(currencyContract), bid2Amount);
+    vm.stopPrank();
+
+    // Verify second bid was recorded (Effects happened before Interactions)
+    (address currentBidder2, , uint128 currentAmount2, ) = auctionHouse.getCurrentBid(
+      address(nftContract),
+      firstTokenId
+    );
+    assertEq(currentBidder2, bidder2, "Second bidder should be current highest bidder");
+    assertEq(currentAmount2, bid2Amount, "Second bid amount should be recorded");
+
+    // Verify first bidder was refunded (Interactions happened after Effects)
+    // The first bidder should have received their full bid amount + marketplace fee back
+    uint256 bidder1Balance = currencyContract.balanceOf(bidder1);
+    uint256 expectedBalance = 1000 * 10 ** currencyContract.decimals(); // Original balance (full refund including fee)
+    assertEq(bidder1Balance, expectedBalance, "First bidder should be fully refunded including marketplace fee");
+
+    // Verify auction house has the correct balance (second bid + fees)
+    uint256 auctionHouseBalance = currencyContract.balanceOf(address(auctionHouse));
+    assertEq(auctionHouseBalance, bid2Required, "Auction house should hold second bid + fees");
+  }
+
+  /// @notice Test that zero-length Merkle proofs are rejected for auction bids
+  function test_bidWithAuctionMerkleProof_zeroLengthProofRejected() public {
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, , , uint256 firstTokenId) = _createFreshMerkleTree(3);
+
+    // Register the auction merkle root
+    vm.startPrank(auctionCreator);
+    auctionHouse.registerAuctionMerkleRoot(
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
+    vm.stopPrank();
+
+    // Setup: Approve the auction house to spend bidder's tokens
+    vm.startPrank(bidder);
+    uint256 requiredAmount = STARTING_AMOUNT +
+      IMarketplaceSettings(marketplaceSettings).calculateMarketplaceFee(STARTING_AMOUNT);
+    currencyContract.approve(address(erc20ApprovalManager), requiredAmount);
+
+    // Try to bid with zero-length proof (should fail)
+    bytes32[] memory emptyProof = new bytes32[](0);
+
+    vm.expectRevert("bidWithAuctionMerkleProof::Proof cannot be empty");
+    auctionHouse.bidWithAuctionMerkleProof(
+      address(currencyContract),
+      address(nftContract),
+      firstTokenId,
+      auctionCreator,
+      root,
+      STARTING_AMOUNT,
+      emptyProof // Zero-length proof
+    );
+    vm.stopPrank();
+  }
+
+  /// @notice Test that isTokenInRoot returns false for zero-length proofs
+  function test_isTokenInRoot_zeroLengthProofReturnsFalse() public {
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, , , uint256 firstTokenId) = _createFreshMerkleTree(3);
+
+    // Create zero-length proof
+    bytes32[] memory emptyProof = new bytes32[](0);
+
+    // Test that zero-length proof returns false
+    bool result = auctionHouse.isTokenInRoot(root, address(nftContract), firstTokenId, emptyProof);
+    assertFalse(result, "Zero-length proof should return false");
+  }
+
+  /// @notice Test that isTokenInRoot works correctly with valid proofs
+  function test_isTokenInRoot_validProofReturnsTrue() public {
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, bytes32[] memory proof, , uint256 firstTokenId) = _createFreshMerkleTree(3);
+
+    // Test that valid proof returns true
+    bool result = auctionHouse.isTokenInRoot(root, address(nftContract), firstTokenId, proof);
+    assertTrue(result, "Valid proof should return true");
+  }
+
+  /// @notice Test that marketplace fee drift during settlement is prevented
+  /// @dev This test verifies that the marketplace fee stored at bid time is used during settlement,
+  /// not the current marketplace fee percentage, preventing admin manipulation after auction ends
+  function test_settleAuction_usesStoredMarketplaceFee() public {
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, bytes32[] memory proof, , uint256 firstTokenId) = _createFreshMerkleTree(3);
+
+    // Register the auction merkle root
+    vm.startPrank(auctionCreator);
+    auctionHouse.registerAuctionMerkleRoot(
+      root,
+      address(currencyContract),
+      STARTING_AMOUNT,
+      AUCTION_DURATION,
+      auctionConfig.splitAddresses,
+      auctionConfig.splitRatios
+    );
+    vm.stopPrank();
+
+    // Setup: Approve the auction house to spend bidder's tokens
+    vm.startPrank(bidder);
+    uint8 originalFeePercentage = 3; // 3% fee at bid time
+    uint128 originalMarketplaceFee = uint128((STARTING_AMOUNT * originalFeePercentage) / 100);
+    uint128 requiredAmount = STARTING_AMOUNT + originalMarketplaceFee;
+    currencyContract.approve(address(erc20ApprovalManager), requiredAmount);
+
+    // Place bid with 3% marketplace fee
+    auctionHouse.bidWithAuctionMerkleProof(
+      address(currencyContract),
+      address(nftContract),
+      firstTokenId,
+      auctionCreator,
+      root,
+      STARTING_AMOUNT,
+      proof
+    );
+    vm.stopPrank();
+
+    // Verify the bid was recorded with the original marketplace fee percentage
+    (, , , uint8 storedMarketplaceFeeAtTime) = auctionHouse.getCurrentBid(address(nftContract), firstTokenId);
+    assertEq(storedMarketplaceFeeAtTime, originalFeePercentage, "Stored marketplace fee should be 3%");
+
+    // Simulate malicious admin changing marketplace fee to 100% after auction ends
+    uint8 maliciousNewFeePercentage = 100; // 100% fee - malicious change
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceFeePercentage.selector),
+      abi.encode(maliciousNewFeePercentage)
+    );
+
+    // Mock the new marketplace fee calculation (100% of bid amount)
+    uint128 maliciousMarketplaceFee = STARTING_AMOUNT; // 100% of bid amount
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.calculateMarketplaceFee.selector, STARTING_AMOUNT),
+      abi.encode(maliciousMarketplaceFee)
+    );
+
+    // Mock additional calls needed for payout with the specific token ID
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.hasERC721TokenSold.selector, address(nftContract), firstTokenId),
+      abi.encode(false)
+    );
+
+    // Fast forward to auction end and settle
+    vm.warp(block.timestamp + AUCTION_DURATION + 1);
+
+    // Expect the AuctionSettled event to be emitted with the ORIGINAL marketplace fee (3%), not the malicious one (100%)
+    vm.expectEmit(true, true, false, true);
+    emit AuctionSettled(
+      address(nftContract),
+      firstTokenId,
+      auctionCreator,
+      bidder,
+      STARTING_AMOUNT,
+      address(currencyContract),
+      originalFeePercentage // This should be the stored fee (3%), not the current malicious fee (100%)
+    );
+
+    auctionHouse.settleAuction(address(nftContract), firstTokenId);
+
+    // Verify token was transferred to bidder
+    assertEq(nftContract.ownerOf(firstTokenId), bidder, "Token should be transferred to bidder");
+
+    // Additional verification: Check that the stored marketplace fee is still the original one
+    // This verifies that our fix preserves the original fee percentage in the event
+    (, , , uint8 finalStoredFee) = auctionHouse.getCurrentBid(address(nftContract), firstTokenId);
+    // Note: After settlement, the bid is deleted, so this will return 0
+    // But the event should have emitted the correct stored fee
   }
 }

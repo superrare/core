@@ -165,6 +165,9 @@ contract RareBatchListingMarketplace is IRareBatchListingMarketplace, OwnableUpg
     // Verify caller owns the merkle root
     require(_creatorSalePriceMerkleRoots[msg.sender].contains(_merkleRoot), "setAllowListConfig::Not root owner");
 
+    // Verify end timestamp is in the future
+    require(_endTimestamp > block.timestamp, "setAllowListConfig::Allow-list end must be in the future");
+
     // Store configuration
     _allowListConfigs[msg.sender][_merkleRoot] = AllowListConfig({root: _allowListRoot, endTimestamp: _endTimestamp});
 
@@ -175,11 +178,16 @@ contract RareBatchListingMarketplace is IRareBatchListingMarketplace, OwnableUpg
   function buyWithMerkleProof(
     address _originContract,
     uint256 _tokenId,
+    address _currency,
+    uint256 _amount,
     address _creator,
     bytes32 _merkleRoot,
     bytes32[] calldata _proof,
     bytes32[] calldata _allowListProof
   ) external payable override nonReentrant {
+    // Prevent zero-length proof bypass
+    require(_proof.length > 0, "buyWithMerkleProof::Proof cannot be empty");
+
     // Verify token is in Merkle root
     bytes32 leaf = keccak256(abi.encodePacked(_originContract, _tokenId));
     require(MerkleProof.verify(_proof, _merkleRoot, leaf), "buyWithMerkleProof::Invalid Merkle proof");
@@ -196,6 +204,9 @@ contract RareBatchListingMarketplace is IRareBatchListingMarketplace, OwnableUpg
       // Allowlist is configured, verify it hasn't expired
       require(block.timestamp < allowListConfig.endTimestamp, "buyWithMerkleProof::Allowlist period has ended");
 
+      // Prevent zero-length allowlist proof bypass
+      require(_allowListProof.length > 0, "buyWithMerkleProof::Allowlist proof cannot be empty");
+
       // Verify buyer is on allowlist
       bytes32 allowListLeaf = keccak256(abi.encodePacked(msg.sender));
       require(
@@ -206,6 +217,8 @@ contract RareBatchListingMarketplace is IRareBatchListingMarketplace, OwnableUpg
 
     // Get config for this Merkle root
     MerkleSalePriceConfig memory config = creatorRootToConfig[_creator][_merkleRoot];
+    require(config.currency == _currency, "buyWithMerkleProof::Currency mismatch");
+    require(config.amount == _amount, "buyWithMerkleProof::Amount mismatch");
 
     // Get token nonce key and verify it hasn't been used
     bytes32 tokenNonceKey = keccak256(abi.encodePacked(_creator, _merkleRoot, _originContract, _tokenId));
@@ -252,8 +265,9 @@ contract RareBatchListingMarketplace is IRareBatchListingMarketplace, OwnableUpg
       _tokenId,
       msg.sender,
       _creator,
-      _merkleRoot,
+      config.currency,
       config.amount,
+      _merkleRoot,
       currentNonce
     );
   }
@@ -265,6 +279,11 @@ contract RareBatchListingMarketplace is IRareBatchListingMarketplace, OwnableUpg
     uint256 _tokenId,
     bytes32[] calldata _proof
   ) external pure override returns (bool) {
+    // Prevent zero-length proof bypass
+    if (_proof.length == 0) {
+      return false;
+    }
+
     bytes32 leaf = keccak256(abi.encodePacked(_origin, _tokenId));
     return MerkleProof.verify(_proof, _root, leaf);
   }

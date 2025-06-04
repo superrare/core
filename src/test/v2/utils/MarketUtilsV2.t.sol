@@ -456,6 +456,13 @@ contract MarketUtilsV2Test is Test {
       abi.encode((amount * 3) / 100)
     );
 
+    // setup getMarketplaceFeePercentage call
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceFeePercentage.selector),
+      abi.encode(3)
+    );
+
     // setup hasERC721TokenSold
     vm.mockCall(
       marketplaceSettings,
@@ -542,6 +549,13 @@ contract MarketUtilsV2Test is Test {
       abi.encode((amount * 3) / 100)
     );
 
+    // setup getMarketplaceFeePercentage call
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceFeePercentage.selector),
+      abi.encode(3)
+    );
+
     // setup hasERC721TokenSold -- true for secondary sale
     vm.mockCall(
       marketplaceSettings,
@@ -616,6 +630,13 @@ contract MarketUtilsV2Test is Test {
       marketplaceSettings,
       abi.encodeWithSelector(IMarketplaceSettings.calculateMarketplaceFee.selector, amount),
       abi.encode((amount * 3) / 100)
+    );
+
+    // setup getMarketplaceFeePercentage call
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceFeePercentage.selector),
+      abi.encode(3)
     );
 
     // setup hasERC721TokenSold
@@ -710,6 +731,13 @@ contract MarketUtilsV2Test is Test {
       abi.encode((amount * 3) / 100)
     );
 
+    // setup getMarketplaceFeePercentage call
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceFeePercentage.selector),
+      abi.encode(3)
+    );
+
     // setup hasERC721TokenSold -- true for secondary sale
     vm.mockCall(
       marketplaceSettings,
@@ -796,6 +824,13 @@ contract MarketUtilsV2Test is Test {
       abi.encode((amount * 3) / 100)
     );
 
+    // setup getMarketplaceFeePercentage call
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceFeePercentage.selector),
+      abi.encode(3)
+    );
+
     // setup hasERC721TokenSold
     vm.mockCall(
       marketplaceSettings,
@@ -848,6 +883,202 @@ contract MarketUtilsV2Test is Test {
 
     assertEq(charlieBalanceAfter, charlieExpectedBalance, "incorrect first split receiver balance after payout");
     assertEq(bobBalanceAfter, bobExpectedBalance, "incorrect second split receiver balance after payout");
+  }
+
+  function test_payout_tooManyRoyaltyRecipients() public {
+    address originContract = address(0xaaaa);
+    uint256 tokenId = 1;
+    address currencyAddress = address(0);
+    uint256 amount = 1 ether;
+    address payable[] memory splitAddrs = new address payable[](1);
+    uint8[] memory splitRatios = new uint8[](1);
+    splitRatios[0] = 100;
+    splitAddrs[0] = payable(charlie);
+
+    // Setup TOO MANY royalty receivers (6, when max is 5)
+    address payable[] memory royaltyReceiverAddrs = new address payable[](6);
+    uint256[] memory royaltyAmounts = new uint256[](6);
+
+    // Fill with different addresses
+    royaltyReceiverAddrs[0] = payable(alice);
+    royaltyReceiverAddrs[1] = payable(bob);
+    royaltyReceiverAddrs[2] = payable(charlie);
+    royaltyReceiverAddrs[3] = payable(address(0x1111));
+    royaltyReceiverAddrs[4] = payable(address(0x2222));
+    royaltyReceiverAddrs[5] = payable(address(0x3333));
+
+    // Each gets 1% royalty
+    for (uint256 i = 0; i < 6; i++) {
+      royaltyAmounts[i] = (amount * 1) / 100;
+    }
+
+    // setup getRewardAccumulatorAddressForUser call
+    vm.mockCall(
+      stakingRegistry,
+      abi.encodeWithSelector(IRareStakingRegistry.getRewardAccumulatorAddressForUser.selector, charlie),
+      abi.encode(address(0))
+    );
+
+    // setup calculateMarketplacePayoutFee call
+    vm.mockCall(
+      stakingSettings,
+      abi.encodeWithSelector(IStakingSettings.calculateMarketplacePayoutFee.selector, amount),
+      abi.encode((amount * 3) / 100)
+    );
+
+    // setup calculateStakingFee call
+    vm.mockCall(
+      stakingSettings,
+      abi.encodeWithSelector(IStakingSettings.calculateStakingFee.selector, amount),
+      abi.encode(0)
+    );
+
+    // setup calculateMarketplaceFee call
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.calculateMarketplaceFee.selector, amount),
+      abi.encode((amount * 3) / 100)
+    );
+
+    // setup getMarketplaceFeePercentage call
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceFeePercentage.selector),
+      abi.encode(3)
+    );
+
+    // setup hasERC721TokenSold -- true for secondary sale
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.hasERC721TokenSold.selector, originContract, 1),
+      abi.encode(true)
+    );
+
+    // setup getRoyalty with TOO MANY receivers (6)
+    vm.mockCall(
+      royaltyEngine,
+      abi.encodeWithSelector(IRoyaltyEngineV1.getRoyalty.selector, originContract, tokenId, amount),
+      abi.encode(royaltyReceiverAddrs, royaltyAmounts)
+    );
+
+    // Should revert with TooManyRoyaltyRecipients error
+    vm.prank(deployer);
+    vm.expectRevert(MarketUtilsV2.TooManyRoyaltyRecipients.selector);
+    tc.payout{value: amount + ((amount * 3) / 100)}(
+      originContract,
+      tokenId,
+      currencyAddress,
+      amount,
+      charlie,
+      splitAddrs,
+      splitRatios
+    );
+  }
+
+  function test_payout_exactlyMaxRoyaltyRecipients() public {
+    address originContract = address(0xaaaa);
+    uint256 tokenId = 1;
+    address currencyAddress = address(0);
+    uint256 amount = 1 ether;
+    address payable[] memory splitAddrs = new address payable[](1);
+    uint8[] memory splitRatios = new uint8[](1);
+    splitRatios[0] = 100;
+    splitAddrs[0] = payable(charlie);
+
+    // Setup EXACTLY the maximum royalty receivers (5)
+    address payable[] memory royaltyReceiverAddrs = new address payable[](5);
+    uint256[] memory royaltyAmounts = new uint256[](5);
+
+    // Fill with different addresses
+    royaltyReceiverAddrs[0] = payable(alice);
+    royaltyReceiverAddrs[1] = payable(bob);
+    royaltyReceiverAddrs[2] = payable(address(0x1111));
+    royaltyReceiverAddrs[3] = payable(address(0x2222));
+    royaltyReceiverAddrs[4] = payable(address(0x3333));
+
+    // Each gets 2% royalty (10% total)
+    for (uint256 i = 0; i < 5; i++) {
+      royaltyAmounts[i] = (amount * 2) / 100;
+    }
+
+    // setup getRewardAccumulatorAddressForUser call
+    vm.mockCall(
+      stakingRegistry,
+      abi.encodeWithSelector(IRareStakingRegistry.getRewardAccumulatorAddressForUser.selector, charlie),
+      abi.encode(address(0))
+    );
+
+    // setup calculateMarketplacePayoutFee call
+    vm.mockCall(
+      stakingSettings,
+      abi.encodeWithSelector(IStakingSettings.calculateMarketplacePayoutFee.selector, amount),
+      abi.encode((amount * 3) / 100)
+    );
+
+    // setup calculateStakingFee call
+    vm.mockCall(
+      stakingSettings,
+      abi.encodeWithSelector(IStakingSettings.calculateStakingFee.selector, amount),
+      abi.encode(0)
+    );
+
+    // setup calculateMarketplaceFee call
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.calculateMarketplaceFee.selector, amount),
+      abi.encode((amount * 3) / 100)
+    );
+
+    // setup getMarketplaceFeePercentage call
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceFeePercentage.selector),
+      abi.encode(3)
+    );
+
+    // setup hasERC721TokenSold -- true for secondary sale
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.hasERC721TokenSold.selector, originContract, 1),
+      abi.encode(true)
+    );
+
+    // setup getRoyalty with exactly max receivers (5)
+    vm.mockCall(
+      royaltyEngine,
+      abi.encodeWithSelector(IRoyaltyEngineV1.getRoyalty.selector, originContract, tokenId, amount),
+      abi.encode(royaltyReceiverAddrs, royaltyAmounts)
+    );
+
+    uint256 charlieBalanceBefore = charlie.balance;
+    uint256 aliceBalanceBefore = alice.balance;
+    uint256 bobBalanceBefore = bob.balance;
+
+    // Should NOT revert with exactly 5 recipients
+    vm.prank(deployer);
+    tc.payout{value: amount + ((amount * 3) / 100)}(
+      originContract,
+      tokenId,
+      currencyAddress,
+      amount,
+      charlie,
+      splitAddrs,
+      splitRatios
+    );
+
+    uint256 charlieBalanceAfter = charlie.balance;
+    uint256 aliceBalanceAfter = alice.balance;
+    uint256 bobBalanceAfter = bob.balance;
+
+    // Seller should receive 90% (100% - 10% total royalties)
+    uint256 expectedBalance = charlieBalanceBefore + ((amount * 90) / 100);
+    // First two royalty receivers should each receive 2%
+    uint256 aliceExpectedBalance = aliceBalanceBefore + ((amount * 2) / 100);
+    uint256 bobExpectedBalance = bobBalanceBefore + ((amount * 2) / 100);
+
+    assertEq(charlieBalanceAfter, expectedBalance, "incorrect seller balance after payout");
+    assertEq(aliceBalanceAfter, aliceExpectedBalance, "incorrect first royalty receiver balance after payout");
+    assertEq(bobBalanceAfter, bobExpectedBalance, "incorrect second royalty receiver balance after payout");
   }
 
   function test_transferERC721_Success() public {

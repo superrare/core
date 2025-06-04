@@ -42,8 +42,9 @@ interface IRareBatchListingMarketplace {
     uint256 indexed tokenId,
     address indexed buyer,
     address seller,
-    bytes32 merkleRoot,
+    address currency,
     uint256 amount,
+    bytes32 merkleRoot,
     uint256 nonce
   );
 
@@ -87,6 +88,8 @@ interface IRareBatchListingMarketplace {
   /// @notice Buy a token using a Merkle proof
   /// @param _originContract The contract address of the token
   /// @param _tokenId The token ID
+  /// @param _currency The currency address for the sale price (address(0) for ETH)
+  /// @param _amount The sale price amount
   /// @param _creator The creator who registered the Merkle root
   /// @param _merkleRoot The Merkle root containing this token
   /// @param _proof The Merkle proof for this token
@@ -94,6 +97,8 @@ interface IRareBatchListingMarketplace {
   function buyWithMerkleProof(
     address _originContract,
     uint256 _tokenId,
+    address _currency,
+    uint256 _amount,
     address _creator,
     bytes32 _merkleRoot,
     bytes32[] calldata _proof,
