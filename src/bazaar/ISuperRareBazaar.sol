@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {SuperRareBazaarStorage} from "./SuperRareBazaarStorage.sol";
+
 /// @author koloz
 /// @title ISuperRareBazaar
 /// @notice Interface for the SuperRareBazaar Contract
@@ -27,22 +29,13 @@ interface ISuperRareBazaar {
   /// @param _tokenId TokenId of asset being bought.
   /// @param _currencyAddress Currency address of asset being used to buy.
   /// @param _amount Amount the piece if being bought for.
-  function buy(
-    address _originContract,
-    uint256 _tokenId,
-    address _currencyAddress,
-    uint256 _amount
-  ) external payable;
+  function buy(address _originContract, uint256 _tokenId, address _currencyAddress, uint256 _amount) external payable;
 
   /// @notice Cancels an existing offer the sender has placed on a piece.
   /// @param _originContract Contract address of token.
   /// @param _tokenId TokenId that has an offer.
   /// @param _currencyAddress Currency address of the offer.
-  function cancelOffer(
-    address _originContract,
-    uint256 _tokenId,
-    address _currencyAddress
-  ) external;
+  function cancelOffer(address _originContract, uint256 _tokenId, address _currencyAddress) external;
 
   // Seller
 
@@ -68,11 +61,7 @@ interface ISuperRareBazaar {
   /// @param _originContract The origin contract of the asset.
   /// @param _tokenId The tokenId of the asset within the _originContract.
   /// @param _target The address of the person
-  function removeSalePrice(
-    address _originContract,
-    uint256 _tokenId,
-    address _target
-  ) external;
+  function removeSalePrice(address _originContract, uint256 _tokenId, address _target) external;
 
   /// @notice Accept an offer placed on _originContract : _tokenId.
   /// @param _originContract Contract of the asset the offer was made on.
@@ -105,12 +94,7 @@ interface ISuperRareBazaar {
   /// @param _tokenId Token Id of the asset.
   /// @param _currencyAddress Address of currency being used to bid.
   /// @param _amount Amount of the currency being used for the bid.
-  function bid(
-    address _originContract,
-    uint256 _tokenId,
-    address _currencyAddress,
-    uint256 _amount
-  ) external payable;
+  function bid(address _originContract, uint256 _tokenId, address _currencyAddress, uint256 _amount) external payable;
 
   // Seller
 
@@ -164,7 +148,10 @@ interface ISuperRareBazaar {
   /** @return Auction Struct: creatorAddress, creationTime, startingTime, lengthOfAuction,
                 currencyAddress, minimumBid, auctionType, splitRecipients array, and splitRatios array.
     */
-  function getAuctionDetails(address _originContract, uint256 _tokenId)
+  function getAuctionDetails(
+    address _originContract,
+    uint256 _tokenId
+  )
     external
     view
     returns (
@@ -183,14 +170,61 @@ interface ISuperRareBazaar {
     address _originContract,
     uint256 _tokenId,
     address _target
-  )
-    external
-    view
-    returns (
-      address,
-      address,
-      uint256,
-      address payable[] memory,
-      uint8[] memory
-    );
+  ) external view returns (address, address, uint256, address payable[] memory, uint8[] memory);
+
+  // // Merkle Auction Functions
+
+  // /// @notice Registers a new Merkle root for auction configuration
+  // /// @param merkleRoot The root hash of the Merkle tree containing token IDs
+  // /// @param config The auction configuration for this root
+  // function registerAuctionMerkleRoot(
+  //   bytes32 merkleRoot,
+  //   SuperRareBazaarStorage.MerkleAuctionConfig calldata config
+  // ) external;
+
+  // /// @notice Cancels a previously registered Merkle root
+  // /// @param root The Merkle root to cancel
+  // function cancelAuctionMerkleRoot(bytes32 root) external;
+
+  // /// @notice Places a bid using a Merkle proof to verify token inclusion
+  // /// @param originContract The contract address of the token
+  // /// @param tokenId The ID of the token being bid on
+  // /// @param creator The creator of the auction
+  // /// @param merkleRoot The root hash of the Merkle tree
+  // /// @param currency The currency address for the bid
+  // /// @param bidAmount The amount of the bid
+  // /// @param proof The Merkle proof verifying token inclusion
+  // function bidWithAuctionMerkleProof(
+  //   address originContract,
+  //   uint256 tokenId,
+  //   address creator,
+  //   bytes32 merkleRoot,
+  //   address currency,
+  //   uint256 bidAmount,
+  //   bytes32[] calldata proof
+  // ) external payable;
+
+  // /// @notice Gets all Merkle roots registered by a user
+  // /// @param user The address of the user
+  // /// @return An array of Merkle roots
+  // function getUserAuctionMerkleRoots(address user) external view returns (bytes32[] memory);
+
+  // /// @notice Gets the current nonce for a user's Merkle root
+  // /// @param user The address of the user
+  // /// @param root The Merkle root
+  // /// @return The current nonce value
+  // function getCreatorAuctionMerkleRootNonce(address user, bytes32 root) external view returns (uint256);
+
+  // /// @notice Verifies if a token is included in a Merkle root
+  // /// @param root The Merkle root to check against
+  // /// @param origin The contract address of the token
+  // /// @param tokenId The ID of the token
+  // /// @param proof The Merkle proof for verification
+  // /// @return True if the token is included in the root, false otherwise
+  // function isTokenInRoot(
+  //   bytes32 root,
+  //   address origin,
+  //   uint256 tokenId,
+  //   bytes32[] calldata proof
+  // ) external pure returns (bool);
 }

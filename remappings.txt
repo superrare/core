@@ -17,6 +17,6 @@ rareprotocol/aux/=src/
 ensdomains/ens-contracts/=lib/ensdomains/ens-contracts/contracts/
 @ensdomains/buffer/=lib/buffer/
 arachnid/solidity-stringutils/=lib/solidity-stringutils/
+@uniswap/v3-core/contracts=lib/v3-core/contracts/
 @uniswap/v3-core/=lib/v3-core/contracts/
-@uniswap/v3-core/contracts/=lib/v3-core/contracts/
 @uniswap/v3-periphery/=lib/v3-periphery/contracts/

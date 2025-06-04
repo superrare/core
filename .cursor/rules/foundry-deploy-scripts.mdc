@@ -1,0 +1,184 @@
+---
+description: Standardized template and structure for Foundry deployment scripts, ensuring consistent deployment patterns and environment management.
+globs: 
+alwaysApply: false
+---
+# Foundry Deploy Scripts Structure
+
+Every Foundry deploy script setup should follow this standardized structure to ensure consistency and maintainability across the codebase.
+
+## Directory Structure
+
+For a contract deployment named `ContractName`, create a directory with the following structure:
+```
+script/
+└── your-category/
+    └── contract-name-deploy/
+        ├── ContractNameDeploy.s.sol
+        ├── deploy.sh
+        └── env.sample
+```
+
+## 1. Foundry Deploy Script (ContractNameDeploy.s.sol)
+
+The Solidity deploy script should:
+
+1. Follow the naming convention: `ContractNameDeploy.s.sol`
+2. Inherit from `forge-std/Script.sol`
+3. Include clear documentation with `@title` and `@notice`
+4. Have a `run()` function with the following structure:
+5. Always import the whole file: `import "forge-std/Script.sol";`
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.18;
+
+import "forge-std/Script.sol";
+
+/// @title ContractNameDeploy
+/// @notice Deployment script for ContractName and its dependencies
+contract ContractNameDeploy is Script {
+    function run() external {
+        // 1. Load private key and start broadcast
+        uint256 privateKey = vm.envUint("PRIVATE_KEY");
+        vm.startBroadcast(privateKey);
+        address deployer = vm.addr(privateKey);
+
+        // 2. Load environment variables
+        // Use vm.envAddress, vm.envUint, etc.
+        
+        // 3. Deploy dependencies
+        
+        // 4. Deploy implementation (if using proxy pattern)
+        
+        // 5. Deploy and initialize proxy (if using proxy pattern)
+        
+        // 6. Perform post-deployment configuration
+        
+        // 7. Log deployed addresses
+        console.log("ContractName deployed at:", address(contract));
+        
+        vm.stopBroadcast();
+    }
+}
+```
+
+## 2. Deploy Shell Script (deploy.sh)
+
+The shell script should:
+
+1. Be named `deploy.sh`
+2. Include the following features:
+   - Environment file loading
+   - Command-line argument parsing
+   - Support for both simulation and broadcast modes
+   - Configurable RPC URL
+   - Library linking support (if needed)
+   - Contract verification support
+
+```bash
+#!/bin/bash
+
+# Default broadcast to false
+BROADCAST=false
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --broadcast)
+            BROADCAST=true
+            shift
+            ;;
+        *)
+            echo "Unknown parameter: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# Load .env file
+if [ -f .env ]; then
+    echo "Loading environment from .env file"
+    set -o allexport
+    source .env
+    set +o allexport
+fi
+
+# Set default RPC URL if not set
+if [ -z "$RPC_URL" ]; then
+    echo "RPC_URL not set. Using default localhost:8545"
+    export RPC_URL="http://localhost:8545"
+fi
+
+# Prepare forge command
+FORGE_CMD="forge script script/path/to/ContractNameDeploy.s.sol:ContractNameDeploy --rpc-url ${RPC_URL} -vv"
+
+# Add broadcast flag if specified
+if [ "$BROADCAST" = true ]; then
+    echo "Broadcasting transactions..."
+    FORGE_CMD="${FORGE_CMD} --broadcast --verify --etherscan-api-key ${ETHERSCAN_API_KEY} --chain-id ${CHAIN_ID}"
+else
+    echo "Running in simulation mode (no broadcasting)..."
+    eval "${FORGE_CMD}"
+fi
+```
+
+## 3. Environment Sample (.env.sample)
+
+The env.sample file should:
+
+1. Document all required environment variables
+2. Include clear descriptions and examples
+3. Group variables by category
+4. Never contain actual secrets or production values
+
+```env
+# ContractName Deployment Environment Variables
+# Copy this file to .env and update the values for your target environment
+
+# Network Configuration
+# -------------------
+RPC_URL=https://eth-mainnet.g.alchemy.com/v2/YOUR-API-KEY
+
+# Deployment Account
+# ----------------
+# Private key for the deploying account (with 0x prefix)
+PRIVATE_KEY=your_private_key_here
+
+# Contract Dependencies
+# -------------------
+# Document each required address with description
+DEPENDENCY_CONTRACT_ADDRESS=0x...
+
+# Verification
+# -----------
+ETHERSCAN_API_KEY=your_etherscan_api_key
+CHAIN_ID=1  # 1 for mainnet, 11155111 for Sepolia
+```
+
+## Best Practices
+
+1. **Environment Variables**
+   - Always use environment variables for network-specific values
+   - Never hardcode addresses or private keys
+   - Include clear descriptions in env.sample
+
+2. **Error Handling**
+   - Add proper error messages and checks
+   - Validate environment variables before deployment
+   - Include revert messages in contract initialization
+
+3. **Documentation**
+   - Document all constructor parameters
+   - Include deployment prerequisites
+   - Add post-deployment verification steps
+
+4. **Security**
+   - Use access control for initialization
+   - Implement proper upgrade patterns if using proxies
+   - Double-check all privileged roles and permissions
+
+5. **Testing**
+   - Test the deployment script on a local network first
+   - Verify all integrations work as expected
+   - Document any specific testing requirements

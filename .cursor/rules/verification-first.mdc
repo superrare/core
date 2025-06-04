@@ -1,0 +1,18 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Verification First Approach
+
+When working on any task:
+
+1. **No Assumptions**: Do not make assumptions if information or context is missing.
+
+2. **Ask First**: Always ask clarifying questions before proceeding with a task when information is incomplete.
+
+3. **Verify Sources**: Re-read and refer to relevant files, schemas, types, or data carefully rather than relying on memory or guesswork.
+
+4. **Quality Over Speed**: Prioritize correctness and context awareness over speed. Always double-check that you have complete and accurate information.
+
+5. **Show Your Work**: When implementing solutions, explain the reasoning and verification steps taken to ensure correctness.

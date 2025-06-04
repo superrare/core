@@ -1,0 +1,97 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Test Debugging Strategy
+
+This document outlines our systematic approach to debugging and fixing test failures in our test suites.
+
+## Core Principles
+
+1. **Isolate and Focus**: Debug one failing test at a time
+2. **Mock Verification**: Always verify mock configurations first
+3. **Iterative Progress**: Return to full test suite after each fix
+4. **Systematic Resolution**: Don't move on until current test passes
+
+## Step-by-Step Debugging Process
+
+1. **Initial Test Run**
+   ```shell
+   # Run the full test suite with the provided command
+   <INITIAL_TEST_COMMAND>
+   ```
+
+2. **Identify and Isolate**
+   - When failures occur, identify the specific failing test name
+   - Run only the failing test in isolation:
+   ```shell
+   # Run specific test
+   forge test --match-test testSpecificFailingTest -vvv
+   ```
+
+3. **Mock Verification**
+   - For revert errors, immediately check mock configurations
+   - Verify all function calls have appropriate mocks
+   - Check mock arguments match the test scenario
+   - Example mock verification:
+   ```solidity
+   // Check if mock exists for the reverting function
+   vm.mockCall(
+       address(contract),
+       abi.encodeWithSelector(contract.function.selector, expectedArgs),
+       abi.encode(returnValue)
+   );
+   ```
+
+4. **Debug and Fix**
+   - Focus exclusively on the isolated test
+   - Add detailed logging if needed using console.log
+   - Verify state before and after key operations
+   - Don't move to other tests until current test passes
+
+5. **Verification**
+   - After fix, run the isolated test again to confirm
+   - If it passes, return to the full test suite:
+   ```shell
+   # Rerun original command
+   <INITIAL_TEST_COMMAND>
+   ```
+
+6. **Iterate**
+   - If more failures exist, repeat process from step 2
+   - Continue until all tests pass
+
+## Common Pitfalls
+
+1. **Missing Mocks**
+   - Always check for missing mocks first when seeing unexplained reverts
+   - Verify mock arguments match exactly
+   - Check mock return values are appropriate
+
+2. **State Management**
+   - Ensure test state is properly reset between runs
+   - Verify all contract states are as expected
+   - Check balances and ownership where relevant
+
+3. **Error Messages**
+   - Pay attention to specific revert messages
+   - Use -vvv flag for detailed stack traces
+   - Look for patterns in failing tests
+
+## Best Practices
+
+1. **Documentation**
+   - Document any non-obvious fixes
+   - Update test comments to explain complex scenarios
+   - Note any mock configurations that were tricky to identify
+
+2. **Efficiency**
+   - Use test tags to group related tests
+   - Leverage test filtering for faster iterations
+   - Keep detailed notes of what's been tried
+
+3. **Communication**
+   - Document any systemic issues found
+   - Share learnings about common failure patterns
+   - Update this guide with new insights

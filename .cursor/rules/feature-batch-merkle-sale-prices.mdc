@@ -1,0 +1,196 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Batch Merkle Sale Prices Implementation Guide
+
+This guide outlines how to implement batch Merkle sale prices in the SuperRare marketplace by combining patterns from the existing marketplace sale prices and Merkle auction functionality.
+
+## Core Concepts
+
+1. **Existing Sale Price System**
+   - Current marketplace uses direct token-to-price mappings
+   - Supports multiple currencies per token
+   - Handles splits for payouts
+   - Manages marketplace fees
+
+2. **Merkle Auction System**
+   - Uses Merkle trees for batch token management
+   - Supports efficient verification of token inclusion
+   - Handles nonce-based tracking for usage
+   - Manages configuration at root level
+
+## Implementation Guidelines
+
+### 1. Storage Structure
+
+```solidity
+// Merkle Sale Price Storage
+mapping(address => EnumerableSet.Bytes32Set) private creatorSalePriceMerkleRoots;
+mapping(address => mapping(bytes32 => MerkleSalePriceConfig)) public creatorRootToConfig;
+mapping(address => mapping(bytes32 => uint256)) private creatorRootNonce;
+mapping(bytes32 => uint256) private tokenSalePriceNonce;
+
+struct MerkleSalePriceConfig {
+    address currency;
+    uint256 amount;
+    address payable[] splitRecipients;
+    uint8[] splitRatios;
+    uint256 nonce;
+}
+```
+
+### 2. Core Functions
+
+a. **Register Merkle Root for Sale Prices**
+```solidity
+function registerSalePriceMerkleRoot(
+    bytes32 merkleRoot,
+    address currency,
+    uint256 amount,
+    address payable[] calldata splitAddresses,
+    uint8[] calldata splitRatios
+) external {
+    // Validate currency is approved
+    // Validate amount within bounds
+    // Validate splits
+    // Store configuration
+    // Emit event
+}
+```
+
+b. **Buy with Merkle Proof**
+```solidity
+function buyWithMerkleProof(
+    address originContract,
+    uint256 tokenId,
+    address creator,
+    bytes32 merkleRoot,
+    bytes32[] calldata proof
+) external payable {
+    // Verify Merkle proof
+    // Check token ownership
+    // Verify not already used
+    // Handle payment
+    // Transfer token
+    // Update nonce
+}
+```
+
+### 3. Key Differences from Auctions
+
+1. **Immediate Purchase vs Bidding**
+   - No auction duration
+   - Direct purchase at fixed price
+   - No bid tracking needed
+
+2. **Price Configuration**
+   - Fixed price instead of minimum bid
+   - No time-based parameters
+   - Simpler configuration structure
+
+3. **Token Transfer Flow**
+   - Direct seller to buyer transfer
+   - No escrow period in contract
+   - Immediate settlement
+
+### 4. Integration Points
+
+1. **Marketplace Settings**
+```solidity
+// Reuse existing fee calculations
+uint256 fee = marketplaceSettings.calculateMarketplaceFee(amount);
+```
+
+2. **Payment Handling**
+```solidity
+// Follow existing payment patterns
+marketConfig.payout(
+    originContract,
+    tokenId,
+    currencyAddress,
+    amount,
+    seller,
+    splitRecipients,
+    splitRatios
+);
+```
+
+3. **Approval Management**
+```solidity
+// Check marketplace approvals
+marketConfig.addressMustHaveMarketplaceApprovedForNFT(seller, originContract);
+```
+
+### 5. Security Considerations
+
+1. **Nonce Management**
+   - Track usage per token
+   - Prevent double-sales
+   - Maintain root-level nonces
+
+2. **Ownership Verification**
+   - Check token ownership before sale
+   - Verify marketplace approvals
+   - Validate currency approvals
+
+3. **Price Validation**
+   - Enforce marketplace min/max values
+   - Validate currency is approved
+   - Check payment amounts match exactly
+
+### 6. Events
+
+```solidity
+event SalePriceMerkleRootRegistered(
+    address indexed creator,
+    bytes32 indexed merkleRoot,
+    address currency,
+    uint256 amount,
+    uint256 nonce
+);
+
+event MerkleSalePriceExecuted(
+    address indexed contractAddress,
+    uint256 indexed tokenId,
+    address indexed buyer,
+    address seller,
+    bytes32 merkleRoot,
+    uint256 amount,
+    uint256 nonce
+);
+```
+
+## Testing Strategy
+
+1. **Unit Tests**
+   - Root registration
+   - Price configuration
+   - Merkle proof verification
+   - Purchase execution
+   - Fee calculations
+
+2. **Integration Tests**
+   - Multiple token sales
+   - Various currencies
+   - Split payments
+   - Fee distributions
+
+3. **Edge Cases**
+   - Invalid proofs
+   - Unauthorized access
+   - Double-spend attempts
+   - Price/currency mismatches
+
+## Migration Considerations
+
+1. **Backwards Compatibility**
+   - Support both direct and Merkle-based sales
+   - Maintain existing interfaces
+   - Allow gradual adoption
+
+2. **State Management**
+   - Clear upgrade path
+   - No conflicts with existing sales
+   - Clean state transitions

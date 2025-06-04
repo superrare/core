@@ -1,0 +1,53 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# SuperRare Core - Smart Contract Development Rules
+
+This document serves as the central index for all active Cursor rules within this repository, organized by category. These rules define processes, structures, and guidelines for smart contract development.
+
+## General
+
+General guidelines and project organization.
+
+| Rule File                          | Description                                                 |
+| :--------------------------------- | :---------------------------------------------------------- |
+| @cursor-rules.mdc                  | How to add or edit Cursor rules in our project              |
+| @verification-first.mdc            | Guidelines for thorough verification and context awareness  |
+
+## Smart Contract Development
+
+Guidelines specific to writing and structuring smart contracts.
+
+| Rule File                          | Description                                                 |
+| :--------------------------------- | :---------------------------------------------------------- |
+
+## Security & Best Practices
+
+Guidelines for secure contract development and common patterns.
+
+| Rule File                          | Description                                                 |
+| :--------------------------------- | :---------------------------------------------------------- |
+
+## Testing & Deployment
+
+Guidelines for testing and deploying smart contracts.
+
+| Rule File                          | Description                                                 |
+| :--------------------------------- | :---------------------------------------------------------- |
+| @foundry-deploy-scripts.mdc        | Standardized template and structure for Foundry deployment scripts, ensuring consistent deployment patterns and environment management |
+
+## Protocol Features
+
+Rules specific to major protocol features and components.
+
+| Rule File                          | Description                                                 |
+| :--------------------------------- | :---------------------------------------------------------- |
+
+## Integration & External Services
+
+Guidelines for integrating with external systems or services.
+
+| Rule File                          | Description                                                 |
+| :--------------------------------- | :---------------------------------------------------------- |
