@@ -49,6 +49,19 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
   // Key is computed as: keccak256(abi.encodePacked(creator, root, tokenContract, tokenId))
   mapping(bytes32 => uint32) private tokenAuctionNonce;
 
+  /*//////////////////////////////////////////////////////////////////////////
+                                Constructor
+  //////////////////////////////////////////////////////////////////////////*/
+
+  /// @custom:oz-upgrades-unsafe-allow constructor
+  constructor() {
+    _disableInitializers();
+  }
+
+  /*//////////////////////////////////////////////////////////////////////////
+                                Initializer
+  //////////////////////////////////////////////////////////////////////////*/
+
   /**
    * @dev Initializer function
    */
@@ -190,14 +203,15 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
       }
     }
 
-    marketConfig.refund(auction.currencyAddress, currentBid.amount, currentBid.marketplaceFeeAtTime, previousBidder);
-
-    // Record bid
+    // Record bid (Effects before Interactions)
     auctionBids[_originContract][_tokenId] = Bid({
       bidder: msg.sender,
       amount: _amount,
       marketplaceFeeAtTime: marketConfig.marketplaceSettings.getMarketplaceFeePercentage()
     });
+
+    // Refund previous bidder (Interaction after Effects)
+    marketConfig.refund(auction.currencyAddress, currentBid.amount, currentBid.marketplaceFeeAtTime, previousBidder);
 
     // Emit event
     emit AuctionBid(
@@ -232,15 +246,16 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
       // Transfer token to winning bidder
       IERC721(_originContract).transferFrom(address(this), currentBid.bidder, _tokenId);
 
-      // Execute payout
-      marketConfig.payout(
+      // Execute payout using the marketplace fee that was in effect when the bid was placed
+      marketConfig.payoutWithMarketplaceFee(
         _originContract,
         _tokenId,
         auction.currencyAddress,
         currentBid.amount,
         auction.auctionCreator,
         auction.splitRecipients,
-        auction.splitRatios
+        auction.splitRatios,
+        currentBid.marketplaceFeeAtTime
       );
       try marketConfig.marketplaceSettings.markERC721Token(_originContract, _tokenId, true) {} catch {}
     } else {
@@ -305,6 +320,9 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
     // Validate split configuration
     MarketUtilsV2.checkSplits(_splitAddresses, _splitRatios);
 
+    // Verify duration is greater than 0
+    require(_duration > 0, "registerAuctionMerkleRoot::Duration must be greater than 0");
+
     // Verify duration is not too long
     require(_duration <= maxAuctionLength, "registerAuctionMerkleRoot::Duration too long");
 
@@ -360,6 +378,9 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
     uint128 _bidAmount,
     bytes32[] calldata _proof
   ) external payable override nonReentrant {
+    // Prevent zero-length proof bypass
+    require(_proof.length > 0, "bidWithAuctionMerkleProof::Proof cannot be empty");
+
     // Verify token is in Merkle root
     bytes32 leaf = keccak256(abi.encodePacked(_originContract, _tokenId));
     require(MerkleProof.verify(_proof, _merkleRoot, leaf), "bidWithAuctionMerkleProof::Invalid Merkle proof");
@@ -450,6 +471,11 @@ contract RareBatchAuctionHouse is IRareBatchAuctionHouse, OwnableUpgradeable, Re
     uint256 _tokenId,
     bytes32[] calldata _proof
   ) external pure override returns (bool) {
+    // Prevent zero-length proof bypass
+    if (_proof.length == 0) {
+      return false;
+    }
+
     bytes32 leaf = keccak256(abi.encodePacked(_origin, _tokenId));
     return MerkleProof.verify(_proof, _root, leaf);
   }

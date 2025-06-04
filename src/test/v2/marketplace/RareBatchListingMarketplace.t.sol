@@ -859,6 +859,32 @@ contract RareBatchListingMarketplaceTest is Test {
     vm.stopPrank();
   }
 
+  function test_setAllowListConfig_endTimestampInPast() public {
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, , , ) = _createFreshMerkleTree(3);
+
+    // Register the sale price merkle root first
+    vm.startPrank(creator);
+    nftContract.setApprovalForAll(address(erc721ApprovalManager), true);
+    marketplace.registerSalePriceMerkleRoot(
+      root,
+      address(currencyContract),
+      SALE_PRICE,
+      salePriceConfig.splitRecipients,
+      salePriceConfig.splitRatios
+    );
+
+    // Try to set allowlist config with end timestamp in the past
+    vm.expectRevert("setAllowListConfig::Allow-list end must be in the future");
+    marketplace.setAllowListConfig(root, bytes32(uint256(1)), block.timestamp - 1);
+
+    // Try to set allowlist config with end timestamp equal to current timestamp
+    vm.expectRevert("setAllowListConfig::Allow-list end must be in the future");
+    marketplace.setAllowListConfig(root, bytes32(uint256(1)), block.timestamp);
+
+    vm.stopPrank();
+  }
+
   function test_buyWithMerkleProof_withAllowList_success() public {
     // Create fresh tokens and Merkle tree
     (bytes32 root, bytes32[] memory proof, , uint256 firstTokenId) = _createFreshMerkleTree(3);
@@ -989,9 +1015,13 @@ contract RareBatchListingMarketplaceTest is Test {
     bytes32 allowListRoot = merkle.getRoot(allowListLeaves);
     bytes32[] memory allowListProof = merkle.getProof(allowListLeaves, 0); // Get proof for buyer's address
 
-    // Set allowlist config with past timestamp
-    marketplace.setAllowListConfig(root, allowListRoot, block.timestamp - 1);
+    // Set allowlist config with future timestamp
+    uint256 endTimestamp = block.timestamp + 1 hours;
+    marketplace.setAllowListConfig(root, allowListRoot, endTimestamp);
     vm.stopPrank();
+
+    // Warp time to after the allowlist expiration
+    vm.warp(endTimestamp + 1);
 
     // Setup: Approve the marketplace to spend buyer's tokens
     vm.startPrank(buyer);
@@ -1103,5 +1133,122 @@ contract RareBatchListingMarketplaceTest is Test {
     vm.expectRevert("cancelSalePriceMerkleRoot::Not root owner");
     marketplace.cancelSalePriceMerkleRoot(nonexistentRoot);
     vm.stopPrank();
+  }
+
+  /// @notice Test that zero-length Merkle proofs are rejected for token verification
+  function test_buyWithMerkleProof_zeroLengthProofRejected() public {
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, , , uint256 firstTokenId) = _createFreshMerkleTree(3);
+
+    // Register the sale price merkle root
+    vm.startPrank(creator);
+    nftContract.setApprovalForAll(address(erc721ApprovalManager), true);
+    marketplace.registerSalePriceMerkleRoot(
+      root,
+      address(currencyContract),
+      SALE_PRICE,
+      salePriceConfig.splitRecipients,
+      salePriceConfig.splitRatios
+    );
+    vm.stopPrank();
+
+    // Setup: Approve the marketplace to spend buyer's tokens
+    vm.startPrank(buyer);
+    uint256 requiredAmount = SALE_PRICE +
+      IMarketplaceSettings(_marketplaceSettings).calculateMarketplaceFee(SALE_PRICE);
+    currencyContract.approve(address(erc20ApprovalManager), requiredAmount);
+
+    // Try to buy with zero-length proof (should fail)
+    bytes32[] memory emptyProof = new bytes32[](0);
+    bytes32[] memory emptyAllowListProof = new bytes32[](0);
+
+    vm.expectRevert("buyWithMerkleProof::Proof cannot be empty");
+    marketplace.buyWithMerkleProof(
+      address(nftContract),
+      firstTokenId,
+      address(currencyContract),
+      SALE_PRICE,
+      creator,
+      root,
+      emptyProof, // Zero-length proof
+      emptyAllowListProof
+    );
+    vm.stopPrank();
+  }
+
+  /// @notice Test that zero-length allowlist proofs are rejected when allowlist is configured
+  function test_buyWithMerkleProof_zeroLengthAllowListProofRejected() public {
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, bytes32[] memory proof, , uint256 firstTokenId) = _createFreshMerkleTree(3);
+
+    // Register the sale price merkle root
+    vm.startPrank(creator);
+    nftContract.setApprovalForAll(address(erc721ApprovalManager), true);
+    marketplace.registerSalePriceMerkleRoot(
+      root,
+      address(currencyContract),
+      SALE_PRICE,
+      salePriceConfig.splitRecipients,
+      salePriceConfig.splitRatios
+    );
+
+    // Create allowlist Merkle tree with buyer and another address
+    address[] memory allowedAddresses = new address[](2);
+    allowedAddresses[0] = buyer;
+    allowedAddresses[1] = makeAddr("otherAllowedUser");
+
+    bytes32[] memory allowListLeaves = new bytes32[](2);
+    allowListLeaves[0] = keccak256(abi.encodePacked(buyer));
+    allowListLeaves[1] = keccak256(abi.encodePacked(allowedAddresses[1]));
+    bytes32 allowListRoot = merkle.getRoot(allowListLeaves);
+
+    // Set allowlist config
+    marketplace.setAllowListConfig(root, allowListRoot, block.timestamp + 1 days);
+    vm.stopPrank();
+
+    // Setup: Approve the marketplace to spend buyer's tokens
+    vm.startPrank(buyer);
+    uint256 requiredAmount = SALE_PRICE +
+      IMarketplaceSettings(_marketplaceSettings).calculateMarketplaceFee(SALE_PRICE);
+    currencyContract.approve(address(erc20ApprovalManager), requiredAmount);
+
+    // Try to buy with zero-length allowlist proof (should fail)
+    bytes32[] memory emptyAllowListProof = new bytes32[](0);
+
+    vm.expectRevert("buyWithMerkleProof::Allowlist proof cannot be empty");
+    marketplace.buyWithMerkleProof(
+      address(nftContract),
+      firstTokenId,
+      address(currencyContract),
+      SALE_PRICE,
+      creator,
+      root,
+      proof,
+      emptyAllowListProof // Zero-length allowlist proof
+    );
+    vm.stopPrank();
+  }
+
+  /// @notice Test that isTokenInRoot returns false for zero-length proofs
+  function test_isTokenInRoot_zeroLengthProofReturnsFalse() public {
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, , , uint256 firstTokenId) = _createFreshMerkleTree(3);
+
+    // Create zero-length proof
+    bytes32[] memory emptyProof = new bytes32[](0);
+
+    // Test that zero-length proof returns false
+    bool result = marketplace.isTokenInRoot(root, address(nftContract), firstTokenId, emptyProof);
+    assertFalse(result, "Zero-length proof should return false");
+  }
+
+  /// @notice Test that isTokenInRoot works correctly with valid proofs
+  function test_isTokenInRoot_validProofReturnsTrue() public {
+    // Create fresh tokens and Merkle tree
+    (bytes32 root, bytes32[] memory proof, , uint256 firstTokenId) = _createFreshMerkleTree(3);
+
+    // Test that valid proof returns true
+    bool result = marketplace.isTokenInRoot(root, address(nftContract), firstTokenId, proof);
+    assertTrue(result, "Valid proof should return true");
   }
 }
