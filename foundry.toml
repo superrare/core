@@ -1,4 +1,6 @@
 [profile.default]
 auto_detect_remappings = false
 viaIR = true
+optimizer = true
+optimizer_runs = 200
 fs_permissions = [{ access = "read", path = "./"}]
