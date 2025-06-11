@@ -13,8 +13,8 @@ import "openzeppelin-contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {strings} from "arachnid/solidity-stringutils/src/strings.sol";
 import "@ensdomains/ens-contracts/registry/ReverseRegistrar.sol";
 import "@ensdomains/ens-contracts/resolvers/profiles/INameResolver.sol";
-import "@uniswap/v3-core/interfaces/IUniswapV3Factory.sol";
-import "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
+import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import "@uniswap/v3-periphery/libraries/OracleLibrary.sol";
 
 import {IRarityPool} from "../token/IRarityPool.sol";
@@ -49,7 +49,7 @@ contract RareStakingRegistry is IRareStakingRegistry, AccessControlEnumerableUpg
   /*//////////////////////////////////////////////////////////////////////////
                               Structs
   //////////////////////////////////////////////////////////////////////////*/
-  
+
   /// @notice A struct holding the Rarity pool staking address and the reward accumulator address.
   /// @dev Mainly for internal use since `Info` is exposed externally.
   struct RarityPoolContractPair {
@@ -180,7 +180,10 @@ contract RareStakingRegistry is IRareStakingRegistry, AccessControlEnumerableUpg
                             Admin Write Functions
   //////////////////////////////////////////////////////////////////////////*/
 
-  function renounceRole(bytes32 role, address account) public virtual override(IAccessControlUpgradeable, AccessControlUpgradeable) {
+  function renounceRole(
+    bytes32 role,
+    address account
+  ) public virtual override(IAccessControlUpgradeable, AccessControlUpgradeable) {
     if (role == DEFAULT_ADMIN_ROLE && getRoleMemberCount(role) == 1) {
       revert RenouncingAdmin();
     }

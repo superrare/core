@@ -13,7 +13,7 @@ import {IERC20} from "openzeppelin-contracts/interfaces/IERC20.sol";
 import "openzeppelin-contracts/utils/math/Math.sol";
 import "@ensdomains/ens-contracts/registry/ReverseRegistrar.sol";
 import "@ensdomains/ens-contracts/resolvers/Resolver.sol";
-import "@uniswap/v3-core/interfaces/pool/IUniswapV3PoolImmutables.sol";
+import "@uniswap/v3-core/contracts/interfaces/pool/IUniswapV3PoolImmutables.sol";
 import {strings} from "arachnid/solidity-stringutils/src/strings.sol";
 import {ERC20} from "openzeppelin-contracts/token/ERC20/ERC20.sol";
 
@@ -76,10 +76,7 @@ contract RareStakeTest is Test {
       weth,
       defaultPayee
     );
-    RewardAccumulatorFactory(address(rewardSwapFactoryProxy)).initialize(
-      address(rewardSwapTemp),
-      tokenOwner
-    );
+    RewardAccumulatorFactory(address(rewardSwapFactoryProxy)).initialize(address(rewardSwapTemp), tokenOwner);
     RarityPoolFactory(address(factoryProxy)).initialize(
       address(registryProxy),
       address(sRareTemp),
@@ -569,7 +566,6 @@ contract RareStakeTest is Test {
       vm.startPrank(tokenOwner);
       rareStake.addRewards(tokenOwner, depositedReward);
       vm.stopPrank();
-
 
       uint256 rewardsTotal = rareStake.getRoundRewards(rareStake.getCurrentRound());
       uint256 totalSRare = rareStake.totalSupplyAt(rareStake.getCurrentRound());

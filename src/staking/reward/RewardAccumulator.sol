@@ -7,8 +7,8 @@ import {IERC20} from "openzeppelin-contracts/interfaces/IERC20.sol";
 import {Address} from "openzeppelin-contracts/utils/Address.sol";
 import {SafeCast} from "openzeppelin-contracts/utils/math/SafeCast.sol";
 import {Initializable} from "openzeppelin-contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@uniswap/v3-core/interfaces/IUniswapV3Factory.sol";
-import "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
+import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import "@uniswap/v3-periphery/libraries/OracleLibrary.sol";
 
 import {IRewardAccumulator} from "./IRewardAccumulator.sol";
@@ -47,19 +47,15 @@ contract RewardAccumulator is IRewardAccumulator, ReentrancyGuardUpgradeable {
                           Public Write Functions
   //////////////////////////////////////////////////////////////////////////*/
   /// @inheritdoc IRewardAccumulator
-  function rewardSwap(
-    address _tokenOut,
-    uint256 _minAmountOut,
-    uint128 _rareIn
-  ) external nonReentrant {
-    if (_minAmountOut == 0) revert ParameterValueTooLow( );
-    if (_rareIn == 0) revert ParameterValueTooLow( );
+  function rewardSwap(address _tokenOut, uint256 _minAmountOut, uint128 _rareIn) external nonReentrant {
+    if (_minAmountOut == 0) revert ParameterValueTooLow();
+    if (_rareIn == 0) revert ParameterValueTooLow();
 
     IERC20 rare = IERC20(IRareStakingRegistry(stakingPool.getStakingRegistry()).getRareAddress());
 
     // Empty any excess $RARE to the staking pool
     if (rare.balanceOf(address(this)) > 0) {
-      SafeERC20.safeTransfer(IERC20(rare),address(stakingPool), rare.balanceOf(address(this)));
+      SafeERC20.safeTransfer(IERC20(rare), address(stakingPool), rare.balanceOf(address(this)));
     }
     // If ETH, check balance
     if (_tokenOut == address(0) && address(this).balance < _minAmountOut) {
@@ -141,7 +137,9 @@ contract RewardAccumulator is IRewardAccumulator, ReentrancyGuardUpgradeable {
     }
 
     // If checking for Other_Token/RARE price, look up pool pair for Other_token/WETH
-    (int56[] memory otherTickCumulatives, ) = IUniswapV3Pool(stakingRegistry.getSwapPool(tokenOut)).observe(secondsAgos);
+    (int56[] memory otherTickCumulatives, ) = IUniswapV3Pool(stakingRegistry.getSwapPool(tokenOut)).observe(
+      secondsAgos
+    );
     int56 otherTickCumulativesDelta = otherTickCumulatives[1] - otherTickCumulatives[0];
     int24 otherTick = int24(otherTickCumulativesDelta / int32(secondsAgo));
 
