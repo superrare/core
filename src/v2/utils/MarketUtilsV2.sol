@@ -262,30 +262,30 @@ library MarketUtilsV2 {
 
         performPayouts(_config, _currencyAddress, platformFee[0], platformRecip, platformFee);
       }
+    } else {
+      // Get royalty recipients and amounts for secondary sale
+      (address payable[] memory recipients, uint256[] memory amounts) = _config.royaltyEngine.getRoyalty(
+        _originContract,
+        _tokenId,
+        _amount
+      );
+
+      // Check for maximum royalty recipients to prevent DoS attacks
+      if (recipients.length > MAX_ROYALTY_RECIPIENTS) {
+        revert TooManyRoyaltyRecipients();
+      }
+
+      // Calculate total royalty amount
+      uint256 totalRoyaltyAmount = 0;
+      for (uint256 i = 0; i < amounts.length; i++) {
+        totalRoyaltyAmount += amounts[i];
+      }
+
+      remainingAmount = remainingAmount - totalRoyaltyAmount;
+
+      // Pay out royalties
+      performPayouts(_config, _currencyAddress, totalRoyaltyAmount, recipients, amounts);
     }
-
-    // Get royalty recipients and amounts
-    (address payable[] memory recipients, uint256[] memory amounts) = _config.royaltyEngine.getRoyalty(
-      _originContract,
-      _tokenId,
-      _amount
-    );
-
-    // Check for maximum royalty recipients to prevent DoS attacks
-    if (recipients.length > MAX_ROYALTY_RECIPIENTS) {
-      revert TooManyRoyaltyRecipients();
-    }
-
-    // Calculate total royalty amount
-    uint256 totalRoyaltyAmount = 0;
-    for (uint256 i = 0; i < amounts.length; i++) {
-      totalRoyaltyAmount += amounts[i];
-    }
-
-    remainingAmount = remainingAmount - totalRoyaltyAmount;
-
-    // Pay out royalties
-    performPayouts(_config, _currencyAddress, totalRoyaltyAmount, recipients, amounts);
 
     // Calculate and pay out splits
     uint256[] memory splitAmounts = new uint256[](_splitRatios.length);

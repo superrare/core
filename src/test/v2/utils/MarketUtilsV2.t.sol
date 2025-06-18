@@ -1096,4 +1096,206 @@ contract MarketUtilsV2Test is Test {
     // Verify the transfer happened
     assertEq(nft.ownerOf(tokenId), bob, "NFT was not transferred to bob");
   }
+
+  function test_payout_primary_noRoyalties() public {
+    address originContract = address(0xaaaa);
+    uint256 tokenId = 1;
+    address currencyAddress = address(0);
+    uint256 amount = 1 ether;
+    address payable[] memory splitAddrs = new address payable[](1);
+    uint8[] memory splitRatios = new uint8[](1);
+    splitRatios[0] = 100;
+    splitAddrs[0] = payable(charlie);
+
+    // setup getRewardAccumulatorAddressForUser call
+    vm.mockCall(
+      stakingRegistry,
+      abi.encodeWithSelector(IRareStakingRegistry.getRewardAccumulatorAddressForUser.selector, charlie),
+      abi.encode(address(0))
+    );
+
+    // setup calculateMarketplacePayoutFee call
+    vm.mockCall(
+      stakingSettings,
+      abi.encodeWithSelector(IStakingSettings.calculateMarketplacePayoutFee.selector, amount),
+      abi.encode((amount * 3) / 100)
+    );
+
+    // setup calculateStakingFee call
+    vm.mockCall(
+      stakingSettings,
+      abi.encodeWithSelector(IStakingSettings.calculateStakingFee.selector, amount),
+      abi.encode(0)
+    );
+
+    // setup calculateMarketplaceFee call
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.calculateMarketplaceFee.selector, amount),
+      abi.encode((amount * 3) / 100)
+    );
+
+    // setup getMarketplaceFeePercentage call
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceFeePercentage.selector),
+      abi.encode(3)
+    );
+
+    // setup hasERC721TokenSold -- false for primary sale
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.hasERC721TokenSold.selector, originContract, 1),
+      abi.encode(false)
+    );
+
+    // setup isApprovedSpaceOperator
+    vm.mockCall(
+      spaceOperatorRegistry,
+      abi.encodeWithSelector(ISpaceOperatorRegistry.isApprovedSpaceOperator.selector, charlie),
+      abi.encode(false)
+    );
+
+    // setup getERC721ContractPrimarySaleFeePercentage
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.getERC721ContractPrimarySaleFeePercentage.selector, originContract),
+      abi.encode(15)
+    );
+
+    // Mock royalty engine to return non-empty arrays to verify they are ignored
+    address payable[] memory royaltyReceiverAddrs = new address payable[](1);
+    uint256[] memory royaltyAmounts = new uint256[](1);
+    royaltyReceiverAddrs[0] = payable(alice);
+    royaltyAmounts[0] = (amount * 10) / 100;
+
+    vm.mockCall(
+      royaltyEngine,
+      abi.encodeWithSelector(IRoyaltyEngineV1.getRoyalty.selector, originContract, tokenId, amount),
+      abi.encode(royaltyReceiverAddrs, royaltyAmounts)
+    );
+
+    uint256 charlieBalanceBefore = charlie.balance;
+    uint256 aliceBalanceBefore = alice.balance;
+
+    vm.prank(deployer);
+    tc.payout{value: amount + ((amount * 3) / 100)}(
+      originContract,
+      tokenId,
+      currencyAddress,
+      amount,
+      charlie,
+      splitAddrs,
+      splitRatios
+    );
+
+    uint256 charlieBalanceAfter = charlie.balance;
+    uint256 aliceBalanceAfter = alice.balance;
+
+    // Seller should receive 85% (100% - 15% primary fee)
+    uint256 expectedBalance = charlieBalanceBefore + ((amount * 85) / 100);
+    // Royalty receiver should receive nothing
+    uint256 aliceExpectedBalance = aliceBalanceBefore;
+
+    assertEq(charlieBalanceAfter, expectedBalance, "incorrect seller balance after primary sale");
+    assertEq(aliceBalanceAfter, aliceExpectedBalance, "royalty receiver should not receive anything in primary sale");
+  }
+
+  function test_payout_secondary_noPrimaryFees() public {
+    address originContract = address(0xaaaa);
+    uint256 tokenId = 1;
+    address currencyAddress = address(0);
+    uint256 amount = 1 ether;
+    address payable[] memory splitAddrs = new address payable[](1);
+    uint8[] memory splitRatios = new uint8[](1);
+    splitRatios[0] = 100;
+    splitAddrs[0] = payable(charlie);
+
+    // setup getRewardAccumulatorAddressForUser call
+    vm.mockCall(
+      stakingRegistry,
+      abi.encodeWithSelector(IRareStakingRegistry.getRewardAccumulatorAddressForUser.selector, charlie),
+      abi.encode(address(0))
+    );
+
+    // setup calculateMarketplacePayoutFee call
+    vm.mockCall(
+      stakingSettings,
+      abi.encodeWithSelector(IStakingSettings.calculateMarketplacePayoutFee.selector, amount),
+      abi.encode((amount * 3) / 100)
+    );
+
+    // setup calculateStakingFee call
+    vm.mockCall(
+      stakingSettings,
+      abi.encodeWithSelector(IStakingSettings.calculateStakingFee.selector, amount),
+      abi.encode(0)
+    );
+
+    // setup calculateMarketplaceFee call
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.calculateMarketplaceFee.selector, amount),
+      abi.encode((amount * 3) / 100)
+    );
+
+    // setup getMarketplaceFeePercentage call
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceFeePercentage.selector),
+      abi.encode(3)
+    );
+
+    // setup hasERC721TokenSold -- true for secondary sale
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.hasERC721TokenSold.selector, originContract, 1),
+      abi.encode(true)
+    );
+
+    // setup isApprovedSpaceOperator
+    vm.mockCall(
+      spaceOperatorRegistry,
+      abi.encodeWithSelector(ISpaceOperatorRegistry.isApprovedSpaceOperator.selector, charlie),
+      abi.encode(false)
+    );
+
+    // setup getERC721ContractPrimarySaleFeePercentage - should be ignored
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.getERC721ContractPrimarySaleFeePercentage.selector, originContract),
+      abi.encode(15)
+    );
+
+    // Mock royalty engine to return empty arrays to verify primary fees aren't paid
+    vm.mockCall(
+      royaltyEngine,
+      abi.encodeWithSelector(IRoyaltyEngineV1.getRoyalty.selector, originContract, tokenId, amount),
+      abi.encode(new address payable[](0), new uint256[](0))
+    );
+
+    uint256 charlieBalanceBefore = charlie.balance;
+
+    vm.prank(deployer);
+    tc.payout{value: amount + ((amount * 3) / 100)}(
+      originContract,
+      tokenId,
+      currencyAddress,
+      amount,
+      charlie,
+      splitAddrs,
+      splitRatios
+    );
+
+    uint256 charlieBalanceAfter = charlie.balance;
+
+    // Seller should receive 100% (no primary fees in secondary sale)
+    uint256 expectedBalance = charlieBalanceBefore + amount;
+
+    assertEq(
+      charlieBalanceAfter,
+      expectedBalance,
+      "incorrect seller balance after secondary sale - primary fees should not be taken"
+    );
+  }
 }
