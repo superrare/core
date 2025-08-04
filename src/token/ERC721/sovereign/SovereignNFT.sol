@@ -36,6 +36,8 @@ contract SovereignNFT is
 
   uint256 public maxTokens;
 
+  address private _defaultTokenCreator;
+
   // Mapping from token ID to the creator's address
   mapping(uint256 => address) private tokenCreators;
 
@@ -60,6 +62,7 @@ contract SovereignNFT is
   event TokenURIUpdated(uint256 indexed tokenId, string newURI);
   event BatchBaseURIUpdated(uint256 indexed batchIndex, string newBaseURI);
   event TokenURIsLocked();
+  event CreatorSet(address indexed creator);
 
   event ConsecutiveTransfer(
     uint256 indexed fromTokenId,
@@ -86,6 +89,7 @@ contract SovereignNFT is
     __ERC2981__init();
 
     _setDefaultRoyaltyReceiver(_creator);
+    _defaultTokenCreator = _creator;
 
     super.transferOwnership(_creator);
   }
@@ -138,7 +142,7 @@ contract SovereignNFT is
   }
 
   function tokenCreator(uint256) public view override returns (address payable) {
-    return payable(owner());
+    return payable(_defaultTokenCreator);
   }
 
   function disableContract() public onlyOwner {
@@ -150,8 +154,17 @@ contract SovereignNFT is
     _setDefaultRoyaltyReceiver(_receiver);
   }
 
+  function setDefaultRoyaltyPercentage(uint256 _percentage) external onlyOwner {
+    _setDefaultRoyaltyPercentage(_percentage);
+  }
+
   function setRoyaltyReceiverForToken(address _receiver, uint256 _tokenId) external onlyOwner {
     royaltyReceivers[_tokenId] = _receiver;
+  }
+
+  function setCreator(address _creator) external onlyOwner {
+    _defaultTokenCreator = _creator;
+    emit CreatorSet(_creator);
   }
 
   function _setTokenCreator(uint256 _tokenId, address _creator) internal {
