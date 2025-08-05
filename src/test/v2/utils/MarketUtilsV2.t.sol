@@ -902,10 +902,10 @@ contract MarketUtilsV2Test is Test {
     // Fill with different addresses
     royaltyReceiverAddrs[0] = payable(alice);
     royaltyReceiverAddrs[1] = payable(bob);
-    royaltyReceiverAddrs[2] = payable(charlie);
-    royaltyReceiverAddrs[3] = payable(address(0x1111));
-    royaltyReceiverAddrs[4] = payable(address(0x2222));
-    royaltyReceiverAddrs[5] = payable(address(0x3333));
+    royaltyReceiverAddrs[2] = payable(address(0x1111));
+    royaltyReceiverAddrs[3] = payable(address(0x2222));
+    royaltyReceiverAddrs[4] = payable(address(0x3333));
+    royaltyReceiverAddrs[5] = payable(address(0x4444)); // This should be ignored
 
     // Each gets 1% royalty
     for (uint256 i = 0; i < 6; i++) {
@@ -961,9 +961,17 @@ contract MarketUtilsV2Test is Test {
       abi.encode(royaltyReceiverAddrs, royaltyAmounts)
     );
 
-    // Should revert with TooManyRoyaltyRecipients error
+    // Record balances before payout
+    uint256 charlieBalanceBefore = charlie.balance;
+    uint256 aliceBalanceBefore = alice.balance;
+    uint256 bobBalanceBefore = bob.balance;
+    uint256 addr1111BalanceBefore = address(0x1111).balance;
+    uint256 addr2222BalanceBefore = address(0x2222).balance;
+    uint256 addr3333BalanceBefore = address(0x3333).balance;
+    uint256 addr4444BalanceBefore = address(0x4444).balance; // Should not receive anything
+
+    // Should NOT revert - should truncate to first 5 recipients
     vm.prank(deployer);
-    vm.expectRevert(MarketUtilsV2.TooManyRoyaltyRecipients.selector);
     tc.payout{value: amount + ((amount * 3) / 100)}(
       originContract,
       tokenId,
@@ -973,6 +981,154 @@ contract MarketUtilsV2Test is Test {
       splitAddrs,
       splitRatios
     );
+
+    // Record balances after payout
+    uint256 charlieBalanceAfter = charlie.balance;
+    uint256 aliceBalanceAfter = alice.balance;
+    uint256 bobBalanceAfter = bob.balance;
+    uint256 addr1111BalanceAfter = address(0x1111).balance;
+    uint256 addr2222BalanceAfter = address(0x2222).balance;
+    uint256 addr3333BalanceAfter = address(0x3333).balance;
+    uint256 addr4444BalanceAfter = address(0x4444).balance; // Should remain unchanged
+
+    // Verify that only the first 5 recipients received royalties (1% each = 5% total)
+    // Seller should receive 95% (100% - 5% total royalties from first 5 recipients)
+    uint256 expectedSellerBalance = charlieBalanceBefore + ((amount * 95) / 100);
+    uint256 expectedRoyaltyPerRecipient = (amount * 1) / 100;
+
+    assertEq(charlieBalanceAfter, expectedSellerBalance, "Seller should receive 95% after truncated royalties");
+    assertEq(aliceBalanceAfter, aliceBalanceBefore + expectedRoyaltyPerRecipient, "First recipient should receive 1%");
+    assertEq(bobBalanceAfter, bobBalanceBefore + expectedRoyaltyPerRecipient, "Second recipient should receive 1%");
+    assertEq(
+      addr1111BalanceAfter,
+      addr1111BalanceBefore + expectedRoyaltyPerRecipient,
+      "Third recipient should receive 1%"
+    );
+    assertEq(
+      addr2222BalanceAfter,
+      addr2222BalanceBefore + expectedRoyaltyPerRecipient,
+      "Fourth recipient should receive 1%"
+    );
+    assertEq(
+      addr3333BalanceAfter,
+      addr3333BalanceBefore + expectedRoyaltyPerRecipient,
+      "Fifth recipient should receive 1%"
+    );
+    assertEq(addr4444BalanceAfter, addr4444BalanceBefore, "Sixth recipient should receive nothing (truncated)");
+  }
+
+  function test_payout_truncationVerifyOrder() public {
+    address originContract = address(0xaaaa);
+    uint256 tokenId = 1;
+    address currencyAddress = address(0);
+    uint256 amount = 1 ether;
+    address payable[] memory splitAddrs = new address payable[](1);
+    uint8[] memory splitRatios = new uint8[](1);
+    splitRatios[0] = 100;
+    splitAddrs[0] = payable(charlie);
+
+    // Setup 7 royalty receivers to test truncation preserves order
+    address payable[] memory royaltyReceiverAddrs = new address payable[](7);
+    uint256[] memory royaltyAmounts = new uint256[](7);
+
+    // Use distinct amounts to verify order is preserved
+    royaltyReceiverAddrs[0] = payable(alice); // Should get 1%
+    royaltyReceiverAddrs[1] = payable(bob); // Should get 2%
+    royaltyReceiverAddrs[2] = payable(address(0x1111)); // Should get 3%
+    royaltyReceiverAddrs[3] = payable(address(0x2222)); // Should get 4%
+    royaltyReceiverAddrs[4] = payable(address(0x3333)); // Should get 5%
+    royaltyReceiverAddrs[5] = payable(address(0x4444)); // Should get nothing (truncated)
+    royaltyReceiverAddrs[6] = payable(address(0x5555)); // Should get nothing (truncated)
+
+    // Different amounts to verify ordering
+    royaltyAmounts[0] = (amount * 1) / 100; // 1%
+    royaltyAmounts[1] = (amount * 2) / 100; // 2%
+    royaltyAmounts[2] = (amount * 3) / 100; // 3%
+    royaltyAmounts[3] = (amount * 4) / 100; // 4%
+    royaltyAmounts[4] = (amount * 5) / 100; // 5%
+    royaltyAmounts[5] = (amount * 6) / 100; // Should be ignored
+    royaltyAmounts[6] = (amount * 7) / 100; // Should be ignored
+
+    // Mock necessary calls
+    vm.mockCall(
+      stakingRegistry,
+      abi.encodeWithSelector(IRareStakingRegistry.getRewardAccumulatorAddressForUser.selector, charlie),
+      abi.encode(address(0))
+    );
+    vm.mockCall(
+      stakingSettings,
+      abi.encodeWithSelector(IStakingSettings.calculateMarketplacePayoutFee.selector, amount),
+      abi.encode((amount * 3) / 100)
+    );
+    vm.mockCall(
+      stakingSettings,
+      abi.encodeWithSelector(IStakingSettings.calculateStakingFee.selector, amount),
+      abi.encode(0)
+    );
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.calculateMarketplaceFee.selector, amount),
+      abi.encode((amount * 3) / 100)
+    );
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceFeePercentage.selector),
+      abi.encode(3)
+    );
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.hasERC721TokenSold.selector, originContract, 1),
+      abi.encode(true)
+    );
+    vm.mockCall(
+      royaltyEngine,
+      abi.encodeWithSelector(IRoyaltyEngineV1.getRoyalty.selector, originContract, tokenId, amount),
+      abi.encode(royaltyReceiverAddrs, royaltyAmounts)
+    );
+
+    uint256 charlieBalanceBefore = charlie.balance;
+    uint256 aliceBalanceBefore = alice.balance;
+    uint256 bobBalanceBefore = bob.balance;
+    uint256 addr1111BalanceBefore = address(0x1111).balance;
+    uint256 addr2222BalanceBefore = address(0x2222).balance;
+    uint256 addr3333BalanceBefore = address(0x3333).balance;
+    uint256 addr4444BalanceBefore = address(0x4444).balance;
+    uint256 addr5555BalanceBefore = address(0x5555).balance;
+
+    vm.prank(deployer);
+    tc.payout{value: amount + ((amount * 3) / 100)}(
+      originContract,
+      tokenId,
+      currencyAddress,
+      amount,
+      charlie,
+      splitAddrs,
+      splitRatios
+    );
+
+    // Verify only first 5 recipients received their respective amounts
+    // Total paid: 1% + 2% + 3% + 4% + 5% = 15%
+    // Seller should get: 100% - 15% = 85%
+    assertEq(charlie.balance, charlieBalanceBefore + ((amount * 85) / 100), "Seller should receive 85%");
+    assertEq(alice.balance, aliceBalanceBefore + ((amount * 1) / 100), "Alice should receive 1%");
+    assertEq(bob.balance, bobBalanceBefore + ((amount * 2) / 100), "Bob should receive 2%");
+    assertEq(
+      address(0x1111).balance,
+      addr1111BalanceBefore + ((amount * 3) / 100),
+      "Third recipient should receive 3%"
+    );
+    assertEq(
+      address(0x2222).balance,
+      addr2222BalanceBefore + ((amount * 4) / 100),
+      "Fourth recipient should receive 4%"
+    );
+    assertEq(
+      address(0x3333).balance,
+      addr3333BalanceBefore + ((amount * 5) / 100),
+      "Fifth recipient should receive 5%"
+    );
+    assertEq(address(0x4444).balance, addr4444BalanceBefore, "Sixth recipient should receive nothing");
+    assertEq(address(0x5555).balance, addr5555BalanceBefore, "Seventh recipient should receive nothing");
   }
 
   function test_payout_exactlyMaxRoyaltyRecipients() public {

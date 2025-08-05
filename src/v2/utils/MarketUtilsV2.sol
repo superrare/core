@@ -13,9 +13,6 @@ library MarketUtilsV2 {
   /// @notice Maximum number of royalty recipients allowed to prevent DoS attacks
   uint256 public constant MAX_ROYALTY_RECIPIENTS = 5;
 
-  /// @notice Error thrown when too many royalty recipients are returned
-  error TooManyRoyaltyRecipients();
-
   /// @notice Checks to see if the currency address is eth or an approved erc20 token.
   /// @param _currencyAddress Address of currency (Zero address if eth).
   function checkIfCurrencyIsApproved(MarketConfigV2.Config storage _config, address _currencyAddress) internal view {
@@ -272,7 +269,17 @@ library MarketUtilsV2 {
 
       // Check for maximum royalty recipients to prevent DoS attacks
       if (recipients.length > MAX_ROYALTY_RECIPIENTS) {
-        revert TooManyRoyaltyRecipients();
+        // Create new arrays with truncated recipients
+        address payable[] memory truncatedRecipients = new address payable[](MAX_ROYALTY_RECIPIENTS);
+        uint256[] memory truncatedAmounts = new uint256[](MAX_ROYALTY_RECIPIENTS);
+
+        for (uint256 i = 0; i < MAX_ROYALTY_RECIPIENTS; i++) {
+          truncatedRecipients[i] = recipients[i];
+          truncatedAmounts[i] = amounts[i];
+        }
+
+        recipients = truncatedRecipients;
+        amounts = truncatedAmounts;
       }
 
       // Calculate total royalty amount
