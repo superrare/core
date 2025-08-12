@@ -827,6 +827,32 @@ contract SovereignBatchMintTest is Test {
     // Verify token was burned
     vm.expectRevert("ERC721: invalid token ID");
     sovereignNFT.ownerOf(2);
+    vm.stopPrank();
+  }
+
+  function test_RevertWhen_QueryOwnerOfNonExistentToken() public {
+    vm.startPrank(CREATOR);
+
+    // Test with completely empty contract - no tokens minted at all
+    vm.expectRevert("ERC721: invalid token ID");
+    sovereignNFT.ownerOf(999);
+
+    // Mint some tokens to establish a baseline
+    sovereignNFT.addNewToken(TOKEN_URI); // Token ID 1
+    sovereignNFT.batchMint(BATCH_BASE_URI, 3); // Token IDs 2, 3, 4
+
+    // Query for token ID that's way beyond any minted tokens
+    vm.expectRevert("ERC721: invalid token ID");
+    sovereignNFT.ownerOf(999);
+
+    // Query for token ID 0 (should never exist)
+    vm.expectRevert("ERC721: invalid token ID");
+    sovereignNFT.ownerOf(0);
+
+    // Query for token ID that's between existing tokens but never minted
+    // (e.g., if we had tokens 1-4, query for token 100)
+    vm.expectRevert("ERC721: invalid token ID");
+    sovereignNFT.ownerOf(100);
 
     vm.stopPrank();
   }
