@@ -463,7 +463,7 @@ contract SovereignBatchMintTest is Test {
     assertTrue(sovereignNFT.supportsInterface(erc2981InterfaceId));
   }
 
-  function test_TotalSupplyNeverShrinks() public {
+  function test_TotalSupplyDecrementsCorrectly() public {
     vm.startPrank(CREATOR);
 
     // Batch mint 5 tokens
@@ -474,15 +474,13 @@ contract SovereignBatchMintTest is Test {
     sovereignNFT.addNewToken(TOKEN_URI);
     assertEq(sovereignNFT.totalSupply(), 6);
 
-    // Burn batch-minted token (silent burn)
+    // Burn batch-minted token (silent burn) - should now decrement
     sovereignNFT.burn(3);
-    // Total supply should not decrease - this confirms the auditor's finding
-    assertEq(sovereignNFT.totalSupply(), 6);
+    assertEq(sovereignNFT.totalSupply(), 5);
 
-    // Burn regular token
+    // Burn regular token - should also decrement
     sovereignNFT.burn(6);
-    // Total supply should not decrease even for regular burns
-    assertEq(sovereignNFT.totalSupply(), 6);
+    assertEq(sovereignNFT.totalSupply(), 4);
 
     vm.stopPrank();
   }
@@ -539,22 +537,21 @@ contract SovereignBatchMintTest is Test {
     uint256 afterSingleMint = 4;
     assertEq(sovereignNFT.totalSupply(), afterSingleMint);
 
-    // Burn batch-minted token 2 (silent burn)
+    // Burn batch-minted token 2 (silent burn) - should now decrease
     sovereignNFT.burn(2);
-    assertEq(sovereignNFT.totalSupply(), afterSingleMint); // Should not decrease
+    assertEq(sovereignNFT.totalSupply(), 3);
 
     // Burn regular token 4
     sovereignNFT.burn(4);
-    assertEq(sovereignNFT.totalSupply(), afterSingleMint); // Should not decrease
+    assertEq(sovereignNFT.totalSupply(), 2);
 
     // Add another token (ID 5)
     sovereignNFT.addNewToken("ipfs://final");
-    uint256 afterFinalMint = 5;
-    assertEq(sovereignNFT.totalSupply(), afterFinalMint);
+    assertEq(sovereignNFT.totalSupply(), 3);
 
     // Burn the final token
     sovereignNFT.burn(5);
-    assertEq(sovereignNFT.totalSupply(), afterFinalMint); // Should still not decrease
+    assertEq(sovereignNFT.totalSupply(), 2);
 
     vm.stopPrank();
   }
@@ -663,17 +660,19 @@ contract SovereignBatchMintTest is Test {
 
     // Burn the only token
     sovereignNFT.burn(1);
-    assertEq(sovereignNFT.totalSupply(), 1); // Should not decrease
+    assertEq(sovereignNFT.totalSupply(), 0); // Should decrease to 0
 
     // Batch mint after burn
     sovereignNFT.batchMint(BATCH_BASE_URI, 3);
-    assertEq(sovereignNFT.totalSupply(), 4);
+    assertEq(sovereignNFT.totalSupply(), 3);
 
     // Burn all batch tokens
     sovereignNFT.burn(2);
+    assertEq(sovereignNFT.totalSupply(), 2);
     sovereignNFT.burn(3);
+    assertEq(sovereignNFT.totalSupply(), 1);
     sovereignNFT.burn(4);
-    assertEq(sovereignNFT.totalSupply(), 4); // Should remain the same
+    assertEq(sovereignNFT.totalSupply(), 0); // Should be back to 0
 
     vm.stopPrank();
   }
@@ -853,6 +852,303 @@ contract SovereignBatchMintTest is Test {
     // (e.g., if we had tokens 1-4, query for token 100)
     vm.expectRevert("ERC721: invalid token ID");
     sovereignNFT.ownerOf(100);
+
+    vm.stopPrank();
+  }
+
+  // ==================== COMPREHENSIVE TOTAL SUPPLY TESTS ====================
+
+  function test_TotalSupplyInitialState() public {
+    // Verify totalSupply starts at 0 for new contract
+    assertEq(sovereignNFT.totalSupply(), 0);
+  }
+
+  function test_TotalSupplySingleMints() public {
+    vm.startPrank(CREATOR);
+
+    // Test addNewToken increments correctly
+    assertEq(sovereignNFT.totalSupply(), 0);
+    sovereignNFT.addNewToken(TOKEN_URI);
+    assertEq(sovereignNFT.totalSupply(), 1);
+
+    sovereignNFT.addNewToken("second");
+    assertEq(sovereignNFT.totalSupply(), 2);
+
+    // Test mintTo increments correctly
+    sovereignNFT.mintTo("third", USER1, ROYALTY_RECEIVER);
+    assertEq(sovereignNFT.totalSupply(), 3);
+
+    vm.stopPrank();
+  }
+
+  function test_TotalSupplyBatchMints() public {
+    vm.startPrank(CREATOR);
+
+    // Test various batch sizes
+    assertEq(sovereignNFT.totalSupply(), 0);
+
+    // Single token batch
+    sovereignNFT.batchMint(BATCH_BASE_URI, 1);
+    assertEq(sovereignNFT.totalSupply(), 1);
+
+    // Medium batch
+    sovereignNFT.batchMint("https://batch2.com/", 5);
+    assertEq(sovereignNFT.totalSupply(), 6);
+
+    // Large batch
+    sovereignNFT.batchMint("https://batch3.com/", 50);
+    assertEq(sovereignNFT.totalSupply(), 56);
+
+    vm.stopPrank();
+  }
+
+  function test_TotalSupplyMixedMints() public {
+    vm.startPrank(CREATOR);
+
+    assertEq(sovereignNFT.totalSupply(), 0);
+
+    // Interleave single and batch mints
+    sovereignNFT.addNewToken("single1");
+    assertEq(sovereignNFT.totalSupply(), 1);
+
+    sovereignNFT.batchMint(BATCH_BASE_URI, 3);
+    assertEq(sovereignNFT.totalSupply(), 4);
+
+    sovereignNFT.mintTo("single2", USER1, ROYALTY_RECEIVER);
+    assertEq(sovereignNFT.totalSupply(), 5);
+
+    sovereignNFT.batchMint("https://batch2.com/", 2);
+    assertEq(sovereignNFT.totalSupply(), 7);
+
+    sovereignNFT.addNewToken("single3");
+    assertEq(sovereignNFT.totalSupply(), 8);
+
+    vm.stopPrank();
+  }
+
+  function test_TotalSupplyBurnRegularTokens() public {
+    vm.startPrank(CREATOR);
+
+    // Create regular tokens
+    sovereignNFT.addNewToken("token1");
+    sovereignNFT.mintTo("token2", USER1, ROYALTY_RECEIVER);
+    sovereignNFT.addNewToken("token3");
+    assertEq(sovereignNFT.totalSupply(), 3);
+
+    // Burn first token
+    sovereignNFT.burn(1);
+    assertEq(sovereignNFT.totalSupply(), 2);
+
+    // Transfer token to USER1 and let them burn it
+    sovereignNFT.transferFrom(CREATOR, USER1, 3);
+    vm.stopPrank();
+
+    vm.startPrank(USER1);
+    sovereignNFT.burn(2); // USER1 burns their token
+    assertEq(sovereignNFT.totalSupply(), 1);
+
+    sovereignNFT.burn(3); // USER1 burns the transferred token
+    assertEq(sovereignNFT.totalSupply(), 0);
+
+    vm.stopPrank();
+  }
+
+  function test_TotalSupplyBurnBatchTokensSilent() public {
+    vm.startPrank(CREATOR);
+
+    // Batch mint tokens
+    sovereignNFT.batchMint(BATCH_BASE_URI, 5);
+    assertEq(sovereignNFT.totalSupply(), 5);
+
+    // Burn batch tokens that were never transferred (silent burns)
+    sovereignNFT.burn(2);
+    assertEq(sovereignNFT.totalSupply(), 4);
+
+    sovereignNFT.burn(4);
+    assertEq(sovereignNFT.totalSupply(), 3);
+
+    sovereignNFT.burn(1);
+    assertEq(sovereignNFT.totalSupply(), 2);
+
+    // Remaining tokens should still be owned by creator
+    assertEq(sovereignNFT.ownerOf(3), CREATOR);
+    assertEq(sovereignNFT.ownerOf(5), CREATOR);
+
+    vm.stopPrank();
+  }
+
+  function test_TotalSupplyBurnBatchTokensAfterTransfer() public {
+    vm.startPrank(CREATOR);
+
+    // Batch mint tokens
+    sovereignNFT.batchMint(BATCH_BASE_URI, 5);
+    assertEq(sovereignNFT.totalSupply(), 5);
+
+    // Transfer some batch tokens first
+    sovereignNFT.transferFrom(CREATOR, USER1, 2);
+    sovereignNFT.transferFrom(CREATOR, USER2, 4);
+
+    // Verify total supply unchanged after transfers
+    assertEq(sovereignNFT.totalSupply(), 5);
+
+    // Burn transferred token as new owner
+    vm.stopPrank();
+    vm.startPrank(USER1);
+    sovereignNFT.burn(2);
+    assertEq(sovereignNFT.totalSupply(), 4);
+    vm.stopPrank();
+
+    vm.startPrank(USER2);
+    sovereignNFT.burn(4);
+    assertEq(sovereignNFT.totalSupply(), 3);
+    vm.stopPrank();
+
+    // Burn remaining untransferred batch tokens
+    vm.startPrank(CREATOR);
+    sovereignNFT.burn(1);
+    assertEq(sovereignNFT.totalSupply(), 2);
+
+    sovereignNFT.burn(3);
+    assertEq(sovereignNFT.totalSupply(), 1);
+
+    sovereignNFT.burn(5);
+    assertEq(sovereignNFT.totalSupply(), 0);
+
+    vm.stopPrank();
+  }
+
+  function test_TotalSupplyMaxTokensEnforcement() public {
+    vm.startPrank(CREATOR);
+
+    // Create contract with small limit
+    SovereignBatchMint limitedNFT = new SovereignBatchMint();
+    limitedNFT.init("Limited", "LTD", CREATOR, 10);
+
+    assertEq(limitedNFT.totalSupply(), 0);
+
+    // Single mints up to limit
+    for (uint256 i = 1; i <= 8; i++) {
+      limitedNFT.addNewToken(string(abi.encodePacked("token", vm.toString(i))));
+      assertEq(limitedNFT.totalSupply(), i);
+    }
+
+    // Should not be able to batch mint more than remaining capacity
+    vm.expectRevert("batchMint::exceeded maxTokens");
+    limitedNFT.batchMint(BATCH_BASE_URI, 3); // Would exceed 10 limit
+
+    // Should be able to batch mint exactly remaining capacity
+    limitedNFT.batchMint(BATCH_BASE_URI, 2);
+    assertEq(limitedNFT.totalSupply(), 10);
+
+    // Should not be able to mint any more
+    vm.expectRevert("_createToken::exceeded maxTokens");
+    limitedNFT.addNewToken("overflow");
+
+    vm.stopPrank();
+  }
+
+  function test_TotalSupplyMultipleBatchesAndBurns() public {
+    vm.startPrank(CREATOR);
+
+    assertEq(sovereignNFT.totalSupply(), 0);
+
+    // Create multiple batches
+    sovereignNFT.batchMint("https://batch1.com/", 3); // tokens 1,2,3
+    assertEq(sovereignNFT.totalSupply(), 3);
+
+    sovereignNFT.batchMint("https://batch2.com/", 2); // tokens 4,5
+    assertEq(sovereignNFT.totalSupply(), 5);
+
+    sovereignNFT.addNewToken("single"); // token 6
+    assertEq(sovereignNFT.totalSupply(), 6);
+
+    sovereignNFT.batchMint("https://batch3.com/", 4); // tokens 7,8,9,10
+    assertEq(sovereignNFT.totalSupply(), 10);
+
+    // Burn from different batches and single mint
+    sovereignNFT.burn(2); // batch 1 token
+    assertEq(sovereignNFT.totalSupply(), 9);
+
+    sovereignNFT.burn(5); // batch 2 token
+    assertEq(sovereignNFT.totalSupply(), 8);
+
+    sovereignNFT.burn(6); // single token
+    assertEq(sovereignNFT.totalSupply(), 7);
+
+    sovereignNFT.burn(8); // batch 3 token
+    assertEq(sovereignNFT.totalSupply(), 6);
+
+    // Transfer and burn
+    sovereignNFT.transferFrom(CREATOR, USER1, 9);
+    vm.stopPrank();
+    vm.startPrank(USER1);
+    sovereignNFT.burn(9);
+    assertEq(sovereignNFT.totalSupply(), 5);
+
+    vm.stopPrank();
+  }
+
+  function test_TotalSupplyAllBurnTypesDecrement() public {
+    vm.startPrank(CREATOR);
+
+    // Create tokens of all types
+    sovereignNFT.addNewToken("regular1"); // token 1
+    sovereignNFT.batchMint(BATCH_BASE_URI, 3); // tokens 2,3,4
+    sovereignNFT.mintTo("regular2", USER1, ROYALTY_RECEIVER); // token 5
+
+    assertEq(sovereignNFT.totalSupply(), 5);
+
+    // Burn regular token (non-batch)
+    sovereignNFT.burn(1);
+    assertEq(sovereignNFT.totalSupply(), 4);
+
+    // Burn batch token (silent burn - never transferred)
+    sovereignNFT.burn(3);
+    assertEq(sovereignNFT.totalSupply(), 3);
+
+    // Transfer batch token and burn it
+    sovereignNFT.transferFrom(CREATOR, USER2, 4);
+    vm.stopPrank();
+    vm.startPrank(USER2);
+    sovereignNFT.burn(4);
+    assertEq(sovereignNFT.totalSupply(), 2);
+    vm.stopPrank();
+
+    // Burn regular token owned by different user
+    vm.startPrank(USER1);
+    sovereignNFT.burn(5);
+    assertEq(sovereignNFT.totalSupply(), 1);
+    vm.stopPrank();
+
+    // Burn final batch token
+    vm.startPrank(CREATOR);
+    sovereignNFT.burn(2);
+    assertEq(sovereignNFT.totalSupply(), 0);
+
+    vm.stopPrank();
+  }
+
+  function test_TotalSupplyZeroAfterBurningAll() public {
+    vm.startPrank(CREATOR);
+
+    // Mint various tokens
+    sovereignNFT.batchMint(BATCH_BASE_URI, 2);
+    sovereignNFT.addNewToken("single");
+    sovereignNFT.batchMint("https://batch2.com/", 1);
+
+    assertEq(sovereignNFT.totalSupply(), 4);
+
+    // Burn all tokens
+    sovereignNFT.burn(1);
+    sovereignNFT.burn(2);
+    sovereignNFT.burn(3);
+    sovereignNFT.burn(4);
+
+    assertEq(sovereignNFT.totalSupply(), 0);
+
+    // Should be able to mint again after burning all
+    sovereignNFT.addNewToken("after-burn");
+    assertEq(sovereignNFT.totalSupply(), 1);
 
     vm.stopPrank();
   }
