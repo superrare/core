@@ -128,11 +128,7 @@ contract SovereignBatchMint is
     _createToken(_uri, _receiver, getDefaultRoyaltyPercentage(), _royaltyReceiver);
   }
 
-  function deleteToken(uint256 _tokenId) public onlyTokenOwner(_tokenId) {
-    burn(_tokenId);
-  }
-
-  function burn(uint256 _tokenId) public virtual override {
+  function burn(uint256 _tokenId) public virtual override onlyTokenOwner(_tokenId) {
     (bool wasBatchMinted, , ) = _batchMintInfo(_tokenId);
 
     tokensBurned[_tokenId] = true;

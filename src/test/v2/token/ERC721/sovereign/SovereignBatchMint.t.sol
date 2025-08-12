@@ -423,6 +423,37 @@ contract SovereignBatchMintTest is Test {
     vm.stopPrank();
   }
 
+  function test_OwnerOfRevertsForBurned_RegularToken() public {
+    vm.startPrank(CREATOR);
+    sovereignNFT.addNewToken(TOKEN_URI);
+    sovereignNFT.burn(1);
+    vm.expectRevert("ERC721: invalid token ID");
+    sovereignNFT.ownerOf(1);
+    vm.stopPrank();
+  }
+
+  function test_OwnerOfRevertsForBurned_BatchToken() public {
+    vm.startPrank(CREATOR);
+    sovereignNFT.batchMint(BATCH_BASE_URI, 3);
+    sovereignNFT.burn(2);
+    vm.expectRevert("ERC721: invalid token ID");
+    sovereignNFT.ownerOf(2);
+    vm.stopPrank();
+  }
+
+  function test_OwnerOfRevertsForNonExistentNonBatchToken() public {
+    vm.startPrank(CREATOR);
+
+    // Mint a batch for IDs 1..5
+    sovereignNFT.batchMint(BATCH_BASE_URI, 5);
+
+    // Token 6 is not part of any batch and has not been minted
+    vm.expectRevert("ERC721: invalid token ID");
+    sovereignNFT.ownerOf(6);
+
+    vm.stopPrank();
+  }
+
   function test_SupportsInterface() public {
     // Test interface support
     bytes4 erc721InterfaceId = 0x80ac58cd; // ERC721
