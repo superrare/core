@@ -677,4 +677,157 @@ contract SovereignBatchMintTest is Test {
 
     vm.stopPrank();
   }
+
+  function test_RevertWhen_NonOwnerAttemptsToBurnRegularToken() public {
+    vm.startPrank(CREATOR);
+
+    // Add a new token owned by CREATOR
+    sovereignNFT.addNewToken(TOKEN_URI);
+    assertEq(sovereignNFT.ownerOf(1), CREATOR);
+
+    vm.stopPrank();
+
+    // Switch to USER1 (non-owner) and attempt to burn
+    vm.startPrank(USER1);
+    vm.expectRevert("Must be owner of token.");
+    sovereignNFT.burn(1);
+
+    vm.stopPrank();
+
+    // Verify token still exists and is owned by CREATOR
+    assertEq(sovereignNFT.ownerOf(1), CREATOR);
+  }
+
+  function test_RevertWhen_NonOwnerAttemptsToBurnBatchToken() public {
+    vm.startPrank(CREATOR);
+
+    // Batch mint 3 tokens owned by CREATOR
+    sovereignNFT.batchMint(BATCH_BASE_URI, 3);
+    assertEq(sovereignNFT.ownerOf(2), CREATOR);
+
+    vm.stopPrank();
+
+    // Switch to USER1 (non-owner) and attempt to burn batch token
+    vm.startPrank(USER1);
+    vm.expectRevert("Must be owner of token.");
+    sovereignNFT.burn(2);
+
+    vm.stopPrank();
+
+    // Verify token still exists and is owned by CREATOR
+    assertEq(sovereignNFT.ownerOf(2), CREATOR);
+  }
+
+  function test_RevertWhen_ApprovedUserAttemptsToBurn() public {
+    vm.startPrank(CREATOR);
+
+    // Add a new token and approve USER1
+    sovereignNFT.addNewToken(TOKEN_URI);
+    sovereignNFT.approve(USER1, 1);
+    assertEq(sovereignNFT.getApproved(1), USER1);
+
+    vm.stopPrank();
+
+    // Switch to USER1 (approved but not owner) and attempt to burn
+    vm.startPrank(USER1);
+    vm.expectRevert("Must be owner of token.");
+    sovereignNFT.burn(1);
+
+    vm.stopPrank();
+
+    // Verify token still exists, is owned by CREATOR, and approval is still intact
+    assertEq(sovereignNFT.ownerOf(1), CREATOR);
+    assertEq(sovereignNFT.getApproved(1), USER1);
+  }
+
+  function test_RevertWhen_OperatorAttemptsToBurn() public {
+    vm.startPrank(CREATOR);
+
+    // Add a new token and set USER1 as operator for all tokens
+    sovereignNFT.addNewToken(TOKEN_URI);
+    sovereignNFT.setApprovalForAll(USER1, true);
+    assertTrue(sovereignNFT.isApprovedForAll(CREATOR, USER1));
+
+    vm.stopPrank();
+
+    // Switch to USER1 (operator but not owner) and attempt to burn
+    vm.startPrank(USER1);
+    vm.expectRevert("Must be owner of token.");
+    sovereignNFT.burn(1);
+
+    vm.stopPrank();
+
+    // Verify token still exists, is owned by CREATOR, and operator approval is still intact
+    assertEq(sovereignNFT.ownerOf(1), CREATOR);
+    assertTrue(sovereignNFT.isApprovedForAll(CREATOR, USER1));
+  }
+
+  function test_OwnerCanBurnAfterTransfer() public {
+    vm.startPrank(CREATOR);
+
+    // Add a new token
+    sovereignNFT.addNewToken(TOKEN_URI);
+    assertEq(sovereignNFT.ownerOf(1), CREATOR);
+
+    // Transfer token to USER1
+    sovereignNFT.transferFrom(CREATOR, USER1, 1);
+    assertEq(sovereignNFT.ownerOf(1), USER1);
+
+    vm.stopPrank();
+
+    // Now USER1 is the owner and should be able to burn
+    vm.startPrank(USER1);
+    sovereignNFT.burn(1);
+
+    // Verify token was burned
+    vm.expectRevert("ERC721: invalid token ID");
+    sovereignNFT.ownerOf(1);
+
+    vm.stopPrank();
+  }
+
+  function test_OriginalOwnerCannotBurnAfterTransfer() public {
+    vm.startPrank(CREATOR);
+
+    // Add a new token
+    sovereignNFT.addNewToken(TOKEN_URI);
+    assertEq(sovereignNFT.ownerOf(1), CREATOR);
+
+    // Transfer token to USER1
+    sovereignNFT.transferFrom(CREATOR, USER1, 1);
+    assertEq(sovereignNFT.ownerOf(1), USER1);
+
+    // CREATOR is no longer the owner and should not be able to burn
+    vm.expectRevert("Must be owner of token.");
+    sovereignNFT.burn(1);
+
+    vm.stopPrank();
+
+    // Verify token still exists and is owned by USER1
+    assertEq(sovereignNFT.ownerOf(1), USER1);
+  }
+
+  function test_BatchTokenOwnerCanBurnAfterTransfer() public {
+    vm.startPrank(CREATOR);
+
+    // Batch mint tokens
+    sovereignNFT.batchMint(BATCH_BASE_URI, 3);
+    assertEq(sovereignNFT.ownerOf(2), CREATOR);
+
+    // Transfer token 2 to USER1
+    sovereignNFT.transferFrom(CREATOR, USER1, 2);
+    assertEq(sovereignNFT.ownerOf(2), USER1);
+
+    vm.stopPrank();
+
+    // Now USER1 is the owner and should be able to burn
+    vm.startPrank(USER1);
+    sovereignNFT.burn(2);
+
+    // Verify token was burned
+    vm.expectRevert("ERC721: invalid token ID");
+    sovereignNFT.ownerOf(2);
+
+    vm.stopPrank();
+  }
 }
