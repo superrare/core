@@ -40,6 +40,16 @@ contract SovereignBatchMintFactoryTest is Test {
     assertEq(factory.owner(), CREATOR);
   }
 
+  function testImplementationInitializedOnFactoryDeploy() public {
+    // The factory constructor initializes the implementation with default values
+    SovereignBatchMint impl = SovereignBatchMint(factory.sovereignNFT());
+
+    assertEq(impl.name(), "Sovereign Batch Mint");
+    assertEq(impl.symbol(), "SOV");
+    assertEq(impl.maxTokens(), type(uint256).max);
+    assertEq(impl.owner(), CREATOR);
+  }
+
   function testSetSovereignBatchMint() public {
     vm.startPrank(CREATOR);
 
