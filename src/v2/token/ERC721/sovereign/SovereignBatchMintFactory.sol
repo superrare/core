@@ -11,9 +11,9 @@ contract SovereignBatchMintFactory is Ownable {
 
   event SovereignBatchMintCreated(address indexed contractAddress, address indexed owner);
 
-  constructor() {
-    SovereignBatchMint sovNFT = new SovereignBatchMint();
-    sovereignNFT = address(sovNFT);
+  constructor(address _sovereignBatchMintImplementation) {
+    require(_sovereignBatchMintImplementation != address(0), "Implementation address cannot be zero");
+    sovereignNFT = _sovereignBatchMintImplementation;
   }
 
   function setSovereignBatchMint(address _sovereignNFT) external onlyOwner {

@@ -11,6 +11,7 @@ contract SovereignBatchMintFactoryTest is Test {
 
   // Contracts
   SovereignBatchMintFactory public factory;
+  SovereignBatchMint public implementation;
 
   // Test values and addresses
   string public constant NAME = "Sovereign NFT";
@@ -20,14 +21,20 @@ contract SovereignBatchMintFactoryTest is Test {
   address public constant NON_OWNER = address(0x2);
 
   function setUp() public {
-    // Deploy factory
-    vm.prank(CREATOR);
-    factory = new SovereignBatchMintFactory();
+    vm.startPrank(CREATOR);
+
+    // Deploy implementation first
+    implementation = new SovereignBatchMint();
+
+    // Deploy factory with implementation address
+    factory = new SovereignBatchMintFactory(address(implementation));
+
+    vm.stopPrank();
   }
 
   function testInitialState() public {
-    // Verify initial contract reference is set
-    assertTrue(factory.sovereignNFT() != address(0));
+    // Verify initial contract reference is set to our implementation
+    assertEq(factory.sovereignNFT(), address(implementation));
 
     // Verify ownership
     assertEq(factory.owner(), CREATOR);
@@ -123,6 +130,16 @@ contract SovereignBatchMintFactoryTest is Test {
     // Try to create a contract with zero max tokens (should revert)
     vm.expectRevert("createSovereignNFTContract::_maxTokens cant be zero");
     factory.createSovereignBatchMint(NAME, SYMBOL, 0);
+
+    vm.stopPrank();
+  }
+
+  function testRevertWhenConstructorGetsZeroAddress() public {
+    vm.startPrank(CREATOR);
+
+    // Try to deploy factory with zero address implementation (should revert)
+    vm.expectRevert("Implementation address cannot be zero");
+    new SovereignBatchMintFactory(address(0));
 
     vm.stopPrank();
   }
