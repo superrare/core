@@ -12,7 +12,7 @@ import "openzeppelin-contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "../../../../token/extensions/ITokenCreator.sol";
 import "../../../../token/extensions/ERC2981Upgradeable.sol";
 
-contract SovereignNFTV2 is
+contract SovereignBatchMint is
   OwnableUpgradeable,
   ERC165Upgradeable,
   ERC721Upgradeable,
@@ -37,8 +37,10 @@ contract SovereignNFTV2 is
 
   uint256 public maxTokens;
 
-  // Mapping from token ID to the creator's address
-  mapping(uint256 => address) private tokenCreators;
+  // Maximum number of batches allowed to prevent DoS via unbounded loops
+  uint256 public constant MAX_BATCHES = 100;
+
+  address private _defaultTokenCreator;
 
   // Mapping from tokenId to if it was burned or not (for batch minting)
   mapping(uint256 => bool) private tokensBurned;
@@ -48,6 +50,8 @@ contract SovereignNFTV2 is
 
   // Counter to keep track of the current token id.
   CountersUpgradeable.Counter private tokenIdCounter;
+
+  CountersUpgradeable.Counter private totalSupplyCounter;
 
   MintBatch[] private mintBatches;
 
@@ -61,6 +65,7 @@ contract SovereignNFTV2 is
   event TokenURIUpdated(uint256 indexed tokenId, string newURI);
   event BatchBaseURIUpdated(uint256 indexed batchIndex, string newBaseURI);
   event TokenURIsLocked();
+  event CreatorSet(address indexed creator);
 
   event ConsecutiveTransfer(
     uint256 indexed fromTokenId,
@@ -87,6 +92,7 @@ contract SovereignNFTV2 is
     __ERC2981__init();
 
     _setDefaultRoyaltyReceiver(_creator);
+    _defaultTokenCreator = _creator;
 
     super.transferOwnership(_creator);
   }
@@ -102,12 +108,15 @@ contract SovereignNFTV2 is
   }
 
   function batchMint(string calldata _baseURI, uint256 _numberOfTokens) public onlyOwner ifNotDisabled {
+    require(mintBatches.length < MAX_BATCHES, "batchMint::exceeded max batches");
+
     uint256 startTokenId = tokenIdCounter.current() + 1;
     uint256 endTokenId = startTokenId + _numberOfTokens - 1;
 
-    tokenIdCounter = CountersUpgradeable.Counter(endTokenId);
+    tokenIdCounter._value = endTokenId;
+    totalSupplyCounter._value = totalSupplyCounter.current() + (endTokenId - startTokenId + 1);
 
-    require(tokenIdCounter.current() <= maxTokens, "batchMint::exceeded maxTokens");
+    require(totalSupplyCounter.current() <= maxTokens, "batchMint::exceeded maxTokens");
 
     mintBatches.push(MintBatch(startTokenId, endTokenId, _baseURI));
 
@@ -115,31 +124,33 @@ contract SovereignNFTV2 is
   }
 
   function addNewToken(string memory _uri) public onlyOwner ifNotDisabled {
-    _createToken(_uri, msg.sender, msg.sender, getDefaultRoyaltyPercentage(), msg.sender);
+    _createToken(_uri, msg.sender, getDefaultRoyaltyPercentage(), msg.sender);
   }
 
   function mintTo(string calldata _uri, address _receiver, address _royaltyReceiver) external onlyOwner ifNotDisabled {
-    _createToken(_uri, msg.sender, _receiver, getDefaultRoyaltyPercentage(), _royaltyReceiver);
+    _createToken(_uri, _receiver, getDefaultRoyaltyPercentage(), _royaltyReceiver);
   }
 
-  function deleteToken(uint256 _tokenId) public onlyTokenOwner(_tokenId) {
-    burn(_tokenId);
-  }
-
-  function burn(uint256 _tokenId) public virtual override {
+  function burn(uint256 _tokenId) public virtual override onlyTokenOwner(_tokenId) {
     (bool wasBatchMinted, , ) = _batchMintInfo(_tokenId);
 
     tokensBurned[_tokenId] = true;
+    // Clear any existing approval to prevent stale approvals if token IDs are reused
+    _tokenApprovals[_tokenId] = address(0);
 
     if (wasBatchMinted && !ERC721Upgradeable._exists(_tokenId)) {
+      // For batch-minted tokens that were never transferred, we need to manually emit
+      // the Transfer event to maintain ERC-721 compliance for indexers
+      totalSupplyCounter.decrement();
+      emit Transfer(owner(), address(0), _tokenId);
       return;
     }
-
+    totalSupplyCounter.decrement();
     ERC721BurnableUpgradeable.burn(_tokenId);
   }
 
   function tokenCreator(uint256) public view override returns (address payable) {
-    return payable(owner());
+    return payable(_defaultTokenCreator);
   }
 
   function disableContract() public onlyOwner {
@@ -151,27 +162,31 @@ contract SovereignNFTV2 is
     _setDefaultRoyaltyReceiver(_receiver);
   }
 
+  function setDefaultRoyaltyPercentage(uint256 _percentage) external onlyOwner {
+    _setDefaultRoyaltyPercentage(_percentage);
+  }
+
   function setRoyaltyReceiverForToken(address _receiver, uint256 _tokenId) external onlyOwner {
     royaltyReceivers[_tokenId] = _receiver;
   }
 
-  function _setTokenCreator(uint256 _tokenId, address _creator) internal {
-    tokenCreators[_tokenId] = _creator;
+  function setCreator(address _creator) external onlyOwner {
+    _defaultTokenCreator = _creator;
+    emit CreatorSet(_creator);
   }
 
   function _createToken(
     string memory _uri,
-    address _creator,
     address _to,
     uint256 _royaltyPercentage,
     address _royaltyReceiver
   ) internal returns (uint256) {
     tokenIdCounter.increment();
+    totalSupplyCounter.increment();
     uint256 tokenId = tokenIdCounter.current();
     require(tokenId <= maxTokens, "_createToken::exceeded maxTokens");
     _safeMint(_to, tokenId);
     _tokenURIs[tokenId] = _uri;
-    _setTokenCreator(tokenId, _creator);
     _setRoyaltyPercentage(tokenId, _royaltyPercentage);
     _setRoyaltyReceiver(tokenId, _royaltyReceiver);
     return tokenId;
@@ -235,7 +250,7 @@ contract SovereignNFTV2 is
    */
   function _approve(address to, uint256 tokenId) internal override {
     _tokenApprovals[tokenId] = to;
-    emit Approval(ERC721Upgradeable.ownerOf(tokenId), to, tokenId); // internal owner
+    emit Approval(ownerOf(tokenId), to, tokenId);
   }
 
   /**
@@ -260,11 +275,14 @@ contract SovereignNFTV2 is
       _mint(_from, _tokenId);
     }
 
+    // Clear custom approval mapping to prevent stale approvals
+    _tokenApprovals[_tokenId] = address(0);
+
     ERC721Upgradeable._transfer(_from, _to, _tokenId);
   }
 
   function totalSupply() public view virtual returns (uint256) {
-    return tokenIdCounter.current();
+    return totalSupplyCounter.current();
   }
 
   function _batchMintInfo(
