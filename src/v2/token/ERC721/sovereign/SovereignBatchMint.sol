@@ -51,6 +51,8 @@ contract SovereignBatchMint is
   // Counter to keep track of the current token id.
   CountersUpgradeable.Counter private tokenIdCounter;
 
+  CountersUpgradeable.Counter private totalSupplyCounter;
+
   MintBatch[] private mintBatches;
 
   // Optional mapping for token URIs
@@ -112,8 +114,9 @@ contract SovereignBatchMint is
     uint256 endTokenId = startTokenId + _numberOfTokens - 1;
 
     tokenIdCounter._value = endTokenId;
+    totalSupplyCounter._value = totalSupplyCounter.current() + (endTokenId - startTokenId + 1);
 
-    require(tokenIdCounter.current() <= maxTokens, "batchMint::exceeded maxTokens");
+    require(totalSupplyCounter.current() <= maxTokens, "batchMint::exceeded maxTokens");
 
     mintBatches.push(MintBatch(startTokenId, endTokenId, _baseURI));
 
@@ -138,10 +141,11 @@ contract SovereignBatchMint is
     if (wasBatchMinted && !ERC721Upgradeable._exists(_tokenId)) {
       // For batch-minted tokens that were never transferred, we need to manually emit
       // the Transfer event to maintain ERC-721 compliance for indexers
+      totalSupplyCounter.decrement();
       emit Transfer(owner(), address(0), _tokenId);
       return;
     }
-
+    totalSupplyCounter.decrement();
     ERC721BurnableUpgradeable.burn(_tokenId);
   }
 
@@ -178,6 +182,7 @@ contract SovereignBatchMint is
     address _royaltyReceiver
   ) internal returns (uint256) {
     tokenIdCounter.increment();
+    totalSupplyCounter.increment();
     uint256 tokenId = tokenIdCounter.current();
     require(tokenId <= maxTokens, "_createToken::exceeded maxTokens");
     _safeMint(_to, tokenId);
@@ -277,7 +282,7 @@ contract SovereignBatchMint is
   }
 
   function totalSupply() public view virtual returns (uint256) {
-    return tokenIdCounter.current();
+    return totalSupplyCounter.current();
   }
 
   function _batchMintInfo(
