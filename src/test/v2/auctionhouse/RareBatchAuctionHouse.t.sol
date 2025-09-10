@@ -378,7 +378,7 @@ contract RareBatchAuctionHouseTest is Test {
     // Try to register with zero duration
     vm.startPrank(auctionCreator);
     nftContract.setApprovalForAll(address(erc721ApprovalManager), true);
-    vm.expectRevert("registerAuctionMerkleRoot::Duration must be greater than 0");
+    vm.expectRevert("Duration must be greater than 0");
     auctionHouse.registerAuctionMerkleRoot(
       merkleRoot,
       address(currencyContract),
@@ -477,7 +477,7 @@ contract RareBatchAuctionHouseTest is Test {
 
     // Try to cancel as non-owner
     vm.startPrank(bidder);
-    vm.expectRevert("cancelAuctionMerkleRoot::Not root owner");
+    vm.expectRevert("Not root owner");
     auctionHouse.cancelAuctionMerkleRoot(root);
     vm.stopPrank();
 
@@ -576,7 +576,7 @@ contract RareBatchAuctionHouseTest is Test {
 
     // Try to place bid with invalid proof
     vm.startPrank(bidder);
-    vm.expectRevert("bidWithAuctionMerkleProof::Invalid Merkle proof");
+    vm.expectRevert("Invalid Merkle proof");
     auctionHouse.bidWithAuctionMerkleProof(
       address(currencyContract),
       address(nftContract),
@@ -636,7 +636,7 @@ contract RareBatchAuctionHouseTest is Test {
 
     // Try to place same bid again
     vm.startPrank(bidder);
-    vm.expectRevert("bidWithAuctionMerkleProof::Token already used for this Merkle root");
+    vm.expectRevert("Token already used for this Merkle root");
     auctionHouse.bidWithAuctionMerkleProof(
       address(currencyContract),
       address(nftContract),
@@ -677,7 +677,7 @@ contract RareBatchAuctionHouseTest is Test {
 
     // Try to place bid with wrong owner
     vm.startPrank(bidder);
-    vm.expectRevert("bidWithAuctionMerkleProof::Not token owner");
+    vm.expectRevert("Not token owner");
     auctionHouse.bidWithAuctionMerkleProof(
       address(currencyContract),
       address(nftContract),
@@ -864,7 +864,7 @@ contract RareBatchAuctionHouseTest is Test {
 
     // Try to sell same token again - should fail
     vm.startPrank(bidder);
-    vm.expectRevert("bidWithAuctionMerkleProof::Token already used for this Merkle root");
+    vm.expectRevert("Token already used for this Merkle root");
     auctionHouse.bidWithAuctionMerkleProof(
       address(currencyContract),
       address(nftContract),
@@ -1274,7 +1274,7 @@ contract RareBatchAuctionHouseTest is Test {
     // Try to place bid with non-existent token ID
     vm.startPrank(bidder);
     // Note: The Merkle proof validation happens first, so that's the expected revert.
-    vm.expectRevert("bidWithAuctionMerkleProof::Invalid Merkle proof");
+    vm.expectRevert("Invalid Merkle proof");
     auctionHouse.bidWithAuctionMerkleProof(
       address(currencyContract),
       address(nftContract),
@@ -1321,7 +1321,7 @@ contract RareBatchAuctionHouseTest is Test {
 
     // Try to place bid with malformed proof
     vm.startPrank(bidder);
-    vm.expectRevert("bidWithAuctionMerkleProof::Invalid Merkle proof");
+    vm.expectRevert("Invalid Merkle proof");
     auctionHouse.bidWithAuctionMerkleProof(
       address(currencyContract),
       address(nftContract),
@@ -1362,7 +1362,7 @@ contract RareBatchAuctionHouseTest is Test {
 
     // Try to place bid with empty proof
     vm.startPrank(bidder);
-    vm.expectRevert("bidWithAuctionMerkleProof::Proof cannot be empty");
+    vm.expectRevert("Proof cannot be empty");
     auctionHouse.bidWithAuctionMerkleProof(
       address(currencyContract),
       address(nftContract),
@@ -1778,7 +1778,7 @@ contract RareBatchAuctionHouseTest is Test {
     // Try to bid with zero-length proof (should fail)
     bytes32[] memory emptyProof = new bytes32[](0);
 
-    vm.expectRevert("bidWithAuctionMerkleProof::Proof cannot be empty");
+    vm.expectRevert("Proof cannot be empty");
     auctionHouse.bidWithAuctionMerkleProof(
       address(currencyContract),
       address(nftContract),
