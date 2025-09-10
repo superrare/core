@@ -3,6 +3,7 @@ pragma solidity ^0.8.18;
 
 import {OwnableUpgradeable} from "openzeppelin-contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import {UUPSUpgradeable} from "openzeppelin-contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "openzeppelin-contracts/token/ERC721/IERC721.sol";
 import {MerkleProof} from "openzeppelin-contracts/utils/cryptography/MerkleProof.sol";
@@ -16,7 +17,12 @@ import {IRareBatchListingMarketplace} from "./IRareBatchListingMarketplace.sol";
  * @title RareBatchListingMarketplace
  * @notice V2 implementation of the RareBatchListingMarketplace, using Merkle-based sale price functionality
  */
-contract RareBatchListingMarketplace is IRareBatchListingMarketplace, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract RareBatchListingMarketplace is
+  IRareBatchListingMarketplace,
+  OwnableUpgradeable,
+  ReentrancyGuardUpgradeable,
+  UUPSUpgradeable
+{
   using EnumerableSet for EnumerableSet.Bytes32Set;
   using MarketUtilsV2 for MarketConfigV2.Config;
   using MarketConfigV2 for MarketConfigV2.Config;
@@ -98,6 +104,77 @@ contract RareBatchListingMarketplace is IRareBatchListingMarketplace, OwnableUpg
 
     __Ownable_init();
     __ReentrancyGuard_init();
+  }
+
+  /*//////////////////////////////////////////////////////////////////////////
+                          Internal UUPS Functions
+  //////////////////////////////////////////////////////////////////////////*/
+
+  /// @inheritdoc UUPSUpgradeable
+  function _authorizeUpgrade(address) internal override onlyOwner {}
+
+  /*//////////////////////////////////////////////////////////////////////////
+                          Admin Write Functions
+  //////////////////////////////////////////////////////////////////////////*/
+
+  /// @notice Update the network beneficiary address
+  /// @param _networkBeneficiary The new network beneficiary address
+  function setNetworkBeneficiary(address _networkBeneficiary) external onlyOwner {
+    _marketConfig.updateNetworkBeneficiary(_networkBeneficiary);
+  }
+
+  /// @notice Update the marketplace settings contract
+  /// @param _marketplaceSettings The new marketplace settings contract address
+  function setMarketplaceSettings(address _marketplaceSettings) external onlyOwner {
+    _marketConfig.updateMarketplaceSettings(_marketplaceSettings);
+  }
+
+  /// @notice Update the space operator registry contract
+  /// @param _spaceOperatorRegistry The new space operator registry contract address
+  function setSpaceOperatorRegistry(address _spaceOperatorRegistry) external onlyOwner {
+    _marketConfig.updateSpaceOperatorRegistry(_spaceOperatorRegistry);
+  }
+
+  /// @notice Update the royalty engine contract
+  /// @param _royaltyEngine The new royalty engine contract address
+  function setRoyaltyEngine(address _royaltyEngine) external onlyOwner {
+    _marketConfig.updateRoyaltyEngine(_royaltyEngine);
+  }
+
+  /// @notice Update the payments contract
+  /// @param _payments The new payments contract address
+  function setPayments(address _payments) external onlyOwner {
+    _marketConfig.updatePayments(_payments);
+  }
+
+  /// @notice Update the approved token registry contract
+  /// @param _approvedTokenRegistry The new approved token registry contract address
+  function setApprovedTokenRegistry(address _approvedTokenRegistry) external onlyOwner {
+    _marketConfig.updateApprovedTokenRegistry(_approvedTokenRegistry);
+  }
+
+  /// @notice Update the staking settings contract
+  /// @param _stakingSettings The new staking settings contract address
+  function setStakingSettings(address _stakingSettings) external onlyOwner {
+    _marketConfig.updateStakingSettings(_stakingSettings);
+  }
+
+  /// @notice Update the staking registry contract
+  /// @param _stakingRegistry The new staking registry contract address
+  function setStakingRegistry(address _stakingRegistry) external onlyOwner {
+    _marketConfig.updateStakingRegistry(_stakingRegistry);
+  }
+
+  /// @notice Update the ERC20 approval manager contract
+  /// @param _erc20ApprovalManager The new ERC20 approval manager contract address
+  function setERC20ApprovalManager(address _erc20ApprovalManager) external onlyOwner {
+    _marketConfig.updateERC20ApprovalManager(_erc20ApprovalManager);
+  }
+
+  /// @notice Update the ERC721 approval manager contract
+  /// @param _erc721ApprovalManager The new ERC721 approval manager contract address
+  function setERC721ApprovalManager(address _erc721ApprovalManager) external onlyOwner {
+    _marketConfig.updateERC721ApprovalManager(_erc721ApprovalManager);
   }
 
   /// @inheritdoc IRareBatchListingMarketplace

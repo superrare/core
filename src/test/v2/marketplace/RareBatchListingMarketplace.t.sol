@@ -22,6 +22,8 @@ import {TestNFT} from "../utils/TestNft.sol";
 import {TestToken} from "../utils/TestToken.sol";
 import {ERC20ApprovalManager} from "../../../v2/approver/ERC20/ERC20ApprovalManager.sol";
 import {ERC721ApprovalManager} from "../../../v2/approver/ERC721/ERC721ApprovalManager.sol";
+import {UUPSUpgradeable} from "openzeppelin-contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {MarketConfigV2} from "../../../v2/utils/MarketConfigV2.sol";
 
 /// @title RareBatchListingMarketplaceTest
 /// @notice Tests for the Merkle sale price functionality in RareBatchListingMarketplace
@@ -49,6 +51,7 @@ contract RareBatchListingMarketplaceTest is Test {
   address public admin;
   address public creator;
   address public buyer;
+  address public nonOwner;
 
   // Test data
   uint256 public tokenId;
@@ -68,6 +71,7 @@ contract RareBatchListingMarketplaceTest is Test {
     admin = makeAddr("admin");
     creator = makeAddr("creator");
     buyer = makeAddr("buyer");
+    nonOwner = makeAddr("nonOwner");
 
     // Deploy approval managers first
     erc20ApprovalManager = new ERC20ApprovalManager();
@@ -1250,5 +1254,367 @@ contract RareBatchListingMarketplaceTest is Test {
     // Test that valid proof returns true
     bool result = marketplace.isTokenInRoot(root, address(nftContract), firstTokenId, proof);
     assertTrue(result, "Valid proof should return true");
+  }
+
+  /*//////////////////////////////////////////////////////////////////////////
+                              UUPS Upgrade Tests
+  //////////////////////////////////////////////////////////////////////////*/
+
+  /// @notice Test that owner can upgrade the contract
+  function test_upgrade_ownerCanUpgrade() public {
+    // Deploy new implementation
+    RareBatchListingMarketplace newImplementation = new RareBatchListingMarketplace();
+
+    // Owner should be able to upgrade
+    marketplace.upgradeTo(address(newImplementation));
+
+    // Verify the upgrade was successful by checking the contract still works
+    bytes32[] memory roots = marketplace.getUserSalePriceMerkleRoots(creator);
+    assertEq(roots.length, 0, "Contract should still function after upgrade");
+  }
+
+  /// @notice Test that non-owner cannot upgrade the contract
+  function test_upgrade_nonOwnerCannotUpgrade() public {
+    // Deploy new implementation
+    RareBatchListingMarketplace newImplementation = new RareBatchListingMarketplace();
+
+    // Non-owner should not be able to upgrade
+    vm.startPrank(buyer);
+    vm.expectRevert("Ownable: caller is not the owner");
+    marketplace.upgradeTo(address(newImplementation));
+    vm.stopPrank();
+  }
+
+  /// @notice Test that owner can upgrade and call initialization in one transaction
+  function test_upgrade_upgradeToAndCall() public {
+    // Deploy new implementation
+    RareBatchListingMarketplace newImplementation = new RareBatchListingMarketplace();
+
+    // Prepare call data for a function call after upgrade
+    bytes memory callData = abi.encodeWithSelector(marketplace.getUserSalePriceMerkleRoots.selector, creator);
+
+    // Owner should be able to upgrade and call
+    marketplace.upgradeToAndCall(address(newImplementation), callData);
+
+    // Verify the contract still works
+    bytes32[] memory roots = marketplace.getUserSalePriceMerkleRoots(creator);
+    assertEq(roots.length, 0, "Contract should still function after upgrade");
+  }
+
+  /// @notice Test that non-owner cannot use upgradeToAndCall
+  function test_upgrade_nonOwnerCannotUpgradeToAndCall() public {
+    // Deploy new implementation
+    RareBatchListingMarketplace newImplementation = new RareBatchListingMarketplace();
+
+    // Prepare call data
+    bytes memory callData = abi.encodeWithSelector(marketplace.getUserSalePriceMerkleRoots.selector, creator);
+
+    // Non-owner should not be able to upgrade
+    vm.startPrank(buyer);
+    vm.expectRevert("Ownable: caller is not the owner");
+    marketplace.upgradeToAndCall(address(newImplementation), callData);
+    vm.stopPrank();
+  }
+
+  /// @notice Test that upgrade preserves existing state
+  function test_upgrade_preservesState() public {
+    // Create and register a Merkle root before upgrade
+    (bytes32 root, , , ) = _createFreshMerkleTree(3);
+
+    vm.startPrank(creator);
+    marketplace.registerSalePriceMerkleRoot(
+      root,
+      address(currencyContract),
+      SALE_PRICE,
+      salePriceConfig.splitRecipients,
+      salePriceConfig.splitRatios
+    );
+    vm.stopPrank();
+
+    // Verify state before upgrade
+    bytes32[] memory rootsBefore = marketplace.getUserSalePriceMerkleRoots(creator);
+    assertEq(rootsBefore.length, 1, "Should have one root before upgrade");
+    assertEq(rootsBefore[0], root, "Root should match before upgrade");
+
+    uint256 nonceBefore = marketplace.getCreatorSalePriceMerkleRootNonce(creator, root);
+    assertEq(nonceBefore, 1, "Nonce should be 1 before upgrade");
+
+    // Deploy new implementation and upgrade
+    RareBatchListingMarketplace newImplementation = new RareBatchListingMarketplace();
+    marketplace.upgradeTo(address(newImplementation));
+
+    // Verify state is preserved after upgrade
+    bytes32[] memory rootsAfter = marketplace.getUserSalePriceMerkleRoots(creator);
+    assertEq(rootsAfter.length, 1, "Should have one root after upgrade");
+    assertEq(rootsAfter[0], root, "Root should match after upgrade");
+
+    uint256 nonceAfter = marketplace.getCreatorSalePriceMerkleRootNonce(creator, root);
+    assertEq(nonceAfter, 1, "Nonce should be preserved after upgrade");
+
+    // Verify config is preserved
+    IRareBatchListingMarketplace.MerkleSalePriceConfig memory config = marketplace.getMerkleSalePriceConfig(
+      creator,
+      root
+    );
+    assertEq(config.currency, address(currencyContract), "Currency should be preserved");
+    assertEq(config.amount, SALE_PRICE, "Amount should be preserved");
+    assertEq(config.nonce, 1, "Config nonce should be preserved");
+  }
+
+  /*//////////////////////////////////////////////////////////////////////////
+                              Admin Configuration Tests
+  //////////////////////////////////////////////////////////////////////////*/
+
+  /// @notice Test that owner can update network beneficiary
+  function test_admin_setNetworkBeneficiary_success() public {
+    address newBeneficiary = makeAddr("newBeneficiary");
+
+    // Owner should be able to update network beneficiary
+    vm.expectEmit(true, false, false, false);
+    emit MarketConfigV2.NetworkBeneficiaryUpdated(newBeneficiary);
+    marketplace.setNetworkBeneficiary(newBeneficiary);
+  }
+
+  /// @notice Test that non-owner cannot update network beneficiary
+  function test_admin_setNetworkBeneficiary_onlyOwner() public {
+    address newBeneficiary = makeAddr("newBeneficiary");
+
+    vm.startPrank(nonOwner);
+    vm.expectRevert("Ownable: caller is not the owner");
+    marketplace.setNetworkBeneficiary(newBeneficiary);
+    vm.stopPrank();
+  }
+
+  /// @notice Test that owner can update marketplace settings
+  function test_admin_setMarketplaceSettings_success() public {
+    address newSettings = makeAddr("newMarketplaceSettings");
+
+    vm.expectEmit(true, false, false, false);
+    emit MarketConfigV2.MarketplaceSettingsUpdated(newSettings);
+    marketplace.setMarketplaceSettings(newSettings);
+  }
+
+  /// @notice Test that non-owner cannot update marketplace settings
+  function test_admin_setMarketplaceSettings_onlyOwner() public {
+    address newSettings = makeAddr("newMarketplaceSettings");
+
+    vm.startPrank(nonOwner);
+    vm.expectRevert("Ownable: caller is not the owner");
+    marketplace.setMarketplaceSettings(newSettings);
+    vm.stopPrank();
+  }
+
+  /// @notice Test that owner can update space operator registry
+  function test_admin_setSpaceOperatorRegistry_success() public {
+    address newRegistry = makeAddr("newSpaceOperatorRegistry");
+
+    vm.expectEmit(true, false, false, false);
+    emit MarketConfigV2.SpaceOperatorRegistryUpdated(newRegistry);
+    marketplace.setSpaceOperatorRegistry(newRegistry);
+  }
+
+  /// @notice Test that non-owner cannot update space operator registry
+  function test_admin_setSpaceOperatorRegistry_onlyOwner() public {
+    address newRegistry = makeAddr("newSpaceOperatorRegistry");
+
+    vm.startPrank(nonOwner);
+    vm.expectRevert("Ownable: caller is not the owner");
+    marketplace.setSpaceOperatorRegistry(newRegistry);
+    vm.stopPrank();
+  }
+
+  /// @notice Test that owner can update royalty engine
+  function test_admin_setRoyaltyEngine_success() public {
+    address newEngine = makeAddr("newRoyaltyEngine");
+
+    vm.expectEmit(true, false, false, false);
+    emit MarketConfigV2.RoyaltyEngineUpdated(newEngine);
+    marketplace.setRoyaltyEngine(newEngine);
+  }
+
+  /// @notice Test that non-owner cannot update royalty engine
+  function test_admin_setRoyaltyEngine_onlyOwner() public {
+    address newEngine = makeAddr("newRoyaltyEngine");
+
+    vm.startPrank(nonOwner);
+    vm.expectRevert("Ownable: caller is not the owner");
+    marketplace.setRoyaltyEngine(newEngine);
+    vm.stopPrank();
+  }
+
+  /// @notice Test that owner can update payments contract
+  function test_admin_setPayments_success() public {
+    address newPayments = makeAddr("newPayments");
+
+    vm.expectEmit(true, false, false, false);
+    emit MarketConfigV2.PaymentsUpdated(newPayments);
+    marketplace.setPayments(newPayments);
+  }
+
+  /// @notice Test that non-owner cannot update payments contract
+  function test_admin_setPayments_onlyOwner() public {
+    address newPayments = makeAddr("newPayments");
+
+    vm.startPrank(nonOwner);
+    vm.expectRevert("Ownable: caller is not the owner");
+    marketplace.setPayments(newPayments);
+    vm.stopPrank();
+  }
+
+  /// @notice Test that owner can update approved token registry
+  function test_admin_setApprovedTokenRegistry_success() public {
+    address newRegistry = makeAddr("newApprovedTokenRegistry");
+
+    vm.expectEmit(true, false, false, false);
+    emit MarketConfigV2.ApprovedTokenRegistryUpdated(newRegistry);
+    marketplace.setApprovedTokenRegistry(newRegistry);
+  }
+
+  /// @notice Test that non-owner cannot update approved token registry
+  function test_admin_setApprovedTokenRegistry_onlyOwner() public {
+    address newRegistry = makeAddr("newApprovedTokenRegistry");
+
+    vm.startPrank(nonOwner);
+    vm.expectRevert("Ownable: caller is not the owner");
+    marketplace.setApprovedTokenRegistry(newRegistry);
+    vm.stopPrank();
+  }
+
+  /// @notice Test that owner can update staking settings
+  function test_admin_setStakingSettings_success() public {
+    address newSettings = makeAddr("newStakingSettings");
+
+    vm.expectEmit(true, false, false, false);
+    emit MarketConfigV2.StakingSettingsUpdated(newSettings);
+    marketplace.setStakingSettings(newSettings);
+  }
+
+  /// @notice Test that non-owner cannot update staking settings
+  function test_admin_setStakingSettings_onlyOwner() public {
+    address newSettings = makeAddr("newStakingSettings");
+
+    vm.startPrank(nonOwner);
+    vm.expectRevert("Ownable: caller is not the owner");
+    marketplace.setStakingSettings(newSettings);
+    vm.stopPrank();
+  }
+
+  /// @notice Test that owner can update staking registry
+  function test_admin_setStakingRegistry_success() public {
+    address newRegistry = makeAddr("newStakingRegistry");
+
+    vm.expectEmit(true, false, false, false);
+    emit MarketConfigV2.StakingRegistryUpdated(newRegistry);
+    marketplace.setStakingRegistry(newRegistry);
+  }
+
+  /// @notice Test that non-owner cannot update staking registry
+  function test_admin_setStakingRegistry_onlyOwner() public {
+    address newRegistry = makeAddr("newStakingRegistry");
+
+    vm.startPrank(nonOwner);
+    vm.expectRevert("Ownable: caller is not the owner");
+    marketplace.setStakingRegistry(newRegistry);
+    vm.stopPrank();
+  }
+
+  /// @notice Test that owner can update ERC20 approval manager
+  function test_admin_setERC20ApprovalManager_success() public {
+    address newManager = makeAddr("newERC20ApprovalManager");
+
+    vm.expectEmit(true, false, false, false);
+    emit MarketConfigV2.ERC20ApprovalManagerUpdated(newManager);
+    marketplace.setERC20ApprovalManager(newManager);
+  }
+
+  /// @notice Test that non-owner cannot update ERC20 approval manager
+  function test_admin_setERC20ApprovalManager_onlyOwner() public {
+    address newManager = makeAddr("newERC20ApprovalManager");
+
+    vm.startPrank(nonOwner);
+    vm.expectRevert("Ownable: caller is not the owner");
+    marketplace.setERC20ApprovalManager(newManager);
+    vm.stopPrank();
+  }
+
+  /// @notice Test that owner can update ERC721 approval manager
+  function test_admin_setERC721ApprovalManager_success() public {
+    address newManager = makeAddr("newERC721ApprovalManager");
+
+    vm.expectEmit(true, false, false, false);
+    emit MarketConfigV2.ERC721ApprovalManagerUpdated(newManager);
+    marketplace.setERC721ApprovalManager(newManager);
+  }
+
+  /// @notice Test that non-owner cannot update ERC721 approval manager
+  function test_admin_setERC721ApprovalManager_onlyOwner() public {
+    address newManager = makeAddr("newERC721ApprovalManager");
+
+    vm.startPrank(nonOwner);
+    vm.expectRevert("Ownable: caller is not the owner");
+    marketplace.setERC721ApprovalManager(newManager);
+    vm.stopPrank();
+  }
+
+  /// @notice Test multiple admin updates in sequence
+  function test_admin_multipleUpdates() public {
+    address newBeneficiary = makeAddr("newBeneficiary");
+    address newSettings = makeAddr("newMarketplaceSettings");
+    address newRegistry = makeAddr("newSpaceOperatorRegistry");
+
+    // Update multiple settings
+    marketplace.setNetworkBeneficiary(newBeneficiary);
+    marketplace.setMarketplaceSettings(newSettings);
+    marketplace.setSpaceOperatorRegistry(newRegistry);
+
+    // All updates should succeed without reverting
+    // The fact that we reach this point means all updates worked
+    assertTrue(true, "Multiple admin updates should succeed");
+  }
+
+  /// @notice Test that admin functions emit correct events
+  function test_admin_eventsEmitted() public {
+    address newBeneficiary = makeAddr("newBeneficiary");
+    address newSettings = makeAddr("newMarketplaceSettings");
+    address newERC20Manager = makeAddr("newERC20Manager");
+    address newERC721Manager = makeAddr("newERC721Manager");
+
+    // Test that each admin function emits the correct event
+    vm.expectEmit(true, false, false, false);
+    emit MarketConfigV2.NetworkBeneficiaryUpdated(newBeneficiary);
+    marketplace.setNetworkBeneficiary(newBeneficiary);
+
+    vm.expectEmit(true, false, false, false);
+    emit MarketConfigV2.MarketplaceSettingsUpdated(newSettings);
+    marketplace.setMarketplaceSettings(newSettings);
+
+    vm.expectEmit(true, false, false, false);
+    emit MarketConfigV2.ERC20ApprovalManagerUpdated(newERC20Manager);
+    marketplace.setERC20ApprovalManager(newERC20Manager);
+
+    vm.expectEmit(true, false, false, false);
+    emit MarketConfigV2.ERC721ApprovalManagerUpdated(newERC721Manager);
+    marketplace.setERC721ApprovalManager(newERC721Manager);
+  }
+
+  /// @notice Test admin functions with zero addresses (should not revert at contract level)
+  function test_admin_zeroAddresses() public {
+    // Note: The contract itself doesn't validate zero addresses in the admin functions
+    // Validation happens in the MarketConfigV2 library functions
+    // These tests verify the functions can be called with zero addresses
+
+    marketplace.setNetworkBeneficiary(address(0));
+    marketplace.setMarketplaceSettings(address(0));
+    marketplace.setSpaceOperatorRegistry(address(0));
+    marketplace.setRoyaltyEngine(address(0));
+    marketplace.setPayments(address(0));
+    marketplace.setApprovedTokenRegistry(address(0));
+    marketplace.setStakingSettings(address(0));
+    marketplace.setStakingRegistry(address(0));
+    marketplace.setERC20ApprovalManager(address(0));
+    marketplace.setERC721ApprovalManager(address(0));
+
+    // All calls should succeed at the contract level
+    assertTrue(true, "Admin functions should accept zero addresses");
   }
 }
