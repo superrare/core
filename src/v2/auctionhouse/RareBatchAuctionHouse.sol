@@ -83,16 +83,16 @@ contract RareBatchAuctionHouse is
     address _erc20ApprovalManager,
     address _erc721ApprovalManager
   ) public initializer {
-    require(_marketplaceSettings != address(0), "initialize::marketplaceSettings cannot be 0 address");
-    require(_royaltyEngine != address(0), "initialize::royaltyEngine cannot be 0 address");
-    require(_spaceOperatorRegistry != address(0), "initialize::spaceOperatorRegistry cannot be 0 address");
-    require(_approvedTokenRegistry != address(0), "initialize::approvedTokenRegistry cannot be 0 address");
-    require(_payments != address(0), "initialize::payments cannot be 0 address");
-    require(_stakingRegistry != address(0), "initialize::stakingRegistry cannot be 0 address");
-    require(_stakingSettings != address(0), "initialize::stakingSettings cannot be 0 address");
-    require(_networkBeneficiary != address(0), "initialize::networkBeneficiary cannot be 0 address");
-    require(_erc20ApprovalManager != address(0), "initialize::erc20ApprovalManager cannot be 0 address");
-    require(_erc721ApprovalManager != address(0), "initialize::erc721ApprovalManager cannot be 0 address");
+    require(_marketplaceSettings != address(0), "marketplaceSettings cannot be 0 address");
+    require(_royaltyEngine != address(0), "royaltyEngine cannot be 0 address");
+    require(_spaceOperatorRegistry != address(0), "spaceOperatorRegistry cannot be 0 address");
+    require(_approvedTokenRegistry != address(0), "approvedTokenRegistry cannot be 0 address");
+    require(_payments != address(0), "payments cannot be 0 address");
+    require(_stakingRegistry != address(0), "stakingRegistry cannot be 0 address");
+    require(_stakingSettings != address(0), "stakingSettings cannot be 0 address");
+    require(_networkBeneficiary != address(0), "networkBeneficiary cannot be 0 address");
+    require(_erc20ApprovalManager != address(0), "erc20ApprovalManager cannot be 0 address");
+    require(_erc721ApprovalManager != address(0), "erc721ApprovalManager cannot be 0 address");
 
     // Initialize market config
     marketConfig = MarketConfigV2.generateMarketConfig(
@@ -237,20 +237,20 @@ contract RareBatchAuctionHouse is
     Auction memory auction = tokenAuctions[_originContract][_tokenId];
 
     // Verify auction exists
-    require(auction.startingTime > 0, "bid::Must have a current auction");
+    require(auction.startingTime > 0, "Must have a current auction");
 
     // Verify bidder is not the auction creator
-    require(auction.auctionCreator != msg.sender, "bid::Cannot bid on your own auction");
+    require(auction.auctionCreator != msg.sender, "Cannot bid on your own auction");
 
-    require(block.timestamp < auction.startingTime + auction.lengthOfAuction, "bid::Auction has ended");
+    require(block.timestamp < auction.startingTime + auction.lengthOfAuction, "Auction has ended");
 
     // Verify bid currency matches auction currency
-    require(_currencyAddress == auction.currencyAddress, "bid::Currency does not match auction currency");
+    require(_currencyAddress == auction.currencyAddress, "Currency does not match auction currency");
 
     // Verify bid amount is valid
-    require(_amount >= auction.minimumBid, "bid::Bid amount too low");
-    require(_amount > 0, "bid::Bid amount must be greater than 0");
-    require(_amount <= marketConfig.marketplaceSettings.getMarketplaceMaxValue(), "bid::Bid exceeds max value");
+    require(_amount >= auction.minimumBid, "Bid amount too low");
+    require(_amount > 0, "Bid amount must be greater than 0");
+    require(_amount <= marketConfig.marketplaceSettings.getMarketplaceMaxValue(), "Bid exceeds max value");
 
     // Get current bid
     Bid memory currentBid = auctionBids[_originContract][_tokenId];
@@ -259,7 +259,7 @@ contract RareBatchAuctionHouse is
     // If not first bid, verify minimum increase percentage
     if (previousBidder != address(0)) {
       uint256 minBidIncrease = (currentBid.amount * minimumBidIncreasePercentage) / 100;
-      require(_amount >= currentBid.amount + minBidIncrease, "bid::Must increase bid by minimum percentage");
+      require(_amount >= currentBid.amount + minBidIncrease, "Must increase bid by minimum percentage");
     }
 
     // Transfer tokens for bid
@@ -310,10 +310,10 @@ contract RareBatchAuctionHouse is
     Bid memory currentBid = auctionBids[_originContract][_tokenId];
 
     // Verify auction exists
-    require(auction.startingTime > 0, "settleAuction::No auction exists");
+    require(auction.startingTime > 0, "No auction exists");
 
     // Verify auction has ended
-    require(block.timestamp >= auction.startingTime + auction.lengthOfAuction, "settleAuction::Auction has not ended");
+    require(block.timestamp >= auction.startingTime + auction.lengthOfAuction, "Auction has not ended");
 
     // Delete auction and bid from storage
     delete tokenAuctions[_originContract][_tokenId];
@@ -398,15 +398,15 @@ contract RareBatchAuctionHouse is
     MarketUtilsV2.checkSplits(_splitAddresses, _splitRatios);
 
     // Verify duration is greater than 0
-    require(_duration > 0, "registerAuctionMerkleRoot::Duration must be greater than 0");
+    require(_duration > 0, "Duration must be greater than 0");
 
     // Verify duration is not too long
-    require(_duration <= maxAuctionLength, "registerAuctionMerkleRoot::Duration too long");
+    require(_duration <= maxAuctionLength, "Duration too long");
 
     // Verify starting amount is valid
     require(
       _startingAmount <= marketConfig.marketplaceSettings.getMarketplaceMaxValue(),
-      "registerAuctionMerkleRoot::Starting amount exceeds maximum value"
+      "Starting amount exceeds maximum value"
     );
 
     // Add root to user's set of roots
@@ -432,7 +432,7 @@ contract RareBatchAuctionHouse is
   /// @inheritdoc IRareBatchAuctionHouse
   function cancelAuctionMerkleRoot(bytes32 _root) external override {
     // Check if caller owns the root
-    require(creatorAuctionMerkleRoots[msg.sender].contains(_root), "cancelAuctionMerkleRoot::Not root owner");
+    require(creatorAuctionMerkleRoots[msg.sender].contains(_root), "Not root owner");
 
     // Remove root from user's set
     creatorAuctionMerkleRoots[msg.sender].remove(_root);
@@ -456,45 +456,36 @@ contract RareBatchAuctionHouse is
     bytes32[] calldata _proof
   ) external payable override nonReentrant {
     // Prevent zero-length proof bypass
-    require(_proof.length > 0, "bidWithAuctionMerkleProof::Proof cannot be empty");
+    require(_proof.length > 0, "Proof cannot be empty");
 
     // Verify token is in Merkle root
     bytes32 leaf = keccak256(abi.encodePacked(_originContract, _tokenId));
-    require(MerkleProof.verify(_proof, _merkleRoot, leaf), "bidWithAuctionMerkleProof::Invalid Merkle proof");
+    require(MerkleProof.verify(_proof, _merkleRoot, leaf), "Invalid Merkle proof");
 
     IMarketplaceSettings settings = marketConfig.marketplaceSettings;
     // Verify Merkle root is registered and active
-    require(
-      creatorAuctionMerkleRoots[_creator].contains(_merkleRoot),
-      "bidWithAuctionMerkleProof::Merkle root not registered"
-    );
+    require(creatorAuctionMerkleRoots[_creator].contains(_merkleRoot), "Merkle root not registered");
 
     // Get config for this Merkle root
     MerkleAuctionConfig memory config = creatorRootToConfig[_creator][_merkleRoot];
-    require(config.currency == _currencyAddress, "bidWithAuctionMerkleProof::Currency does not match");
+    require(config.currency == _currencyAddress, "Currency does not match");
 
     // Get token nonce key and verify it hasn't been used
     bytes32 tokenNonceKey = keccak256(abi.encodePacked(_creator, _merkleRoot, _originContract, _tokenId));
     uint32 currentNonce = creatorRootNonce[_creator][_merkleRoot];
-    require(
-      tokenAuctionNonce[tokenNonceKey] < currentNonce,
-      "bidWithAuctionMerkleProof::Token already used for this Merkle root"
-    );
+    require(tokenAuctionNonce[tokenNonceKey] < currentNonce, "Token already used for this Merkle root");
 
     // Verify no auction exists for this token
-    require(
-      tokenAuctions[_originContract][_tokenId].startingTime == 0,
-      "bidWithAuctionMerkleProof::Auction already exists"
-    );
+    require(tokenAuctions[_originContract][_tokenId].startingTime == 0, "Auction already exists");
 
     // Verify bid amount is valid
-    require(_bidAmount > 0, "bidWithAuctionMerkleProof::Cannot be 0");
-    require(_bidAmount <= settings.getMarketplaceMaxValue(), "bidWithAuctionMerkleProof::Must be less than max value");
-    require(_bidAmount >= config.startingAmount, "bidWithAuctionMerkleProof::Cannot be lower than minimum bid");
+    require(_bidAmount > 0, "Cannot be 0");
+    require(_bidAmount <= settings.getMarketplaceMaxValue(), "Must be less than max value");
+    require(_bidAmount >= config.startingAmount, "Cannot be lower than minimum bid");
 
     // Verify creator owns the token
     IERC721 erc721 = IERC721(_originContract);
-    require(erc721.ownerOf(_tokenId) == _creator, "bidWithAuctionMerkleProof::Not token owner");
+    require(erc721.ownerOf(_tokenId) == _creator, "Not token owner");
 
     // Check marketplace approval
     marketConfig.addressMustHaveMarketplaceApprovedForNFT(_creator, _originContract, _tokenId);
