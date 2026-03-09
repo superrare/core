@@ -56,7 +56,7 @@ interface ISuperRareMarketplace {
     uint256 _listPrice,
     address _target,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external;
 
   /// @notice Removes the current sale price of an asset for _target for the given currency.
@@ -82,6 +82,6 @@ interface ISuperRareMarketplace {
     address _currencyAddress,
     uint256 _amount,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external;
 }

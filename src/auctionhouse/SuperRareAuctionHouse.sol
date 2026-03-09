@@ -41,7 +41,7 @@ contract SuperRareAuctionHouse is
     uint256 _lengthOfAuction,
     uint256 _startTime,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external override {
     _checkIfCurrencyIsApproved(_currencyAddress);
     _senderMustBeTokenOwner(_originContract, _tokenId);
@@ -123,7 +123,7 @@ contract SuperRareAuctionHouse is
     uint256 _amount,
     uint256 _lengthOfAuction,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external override {
     require(false, 'convertOfferToAuction::Deprecated');
     _senderMustBeTokenOwner(_originContract, _tokenId);
@@ -261,7 +261,7 @@ contract SuperRareAuctionHouse is
     Bid memory currBid = auctionBids[_originContract][_tokenId];
 
     require(
-      _amount >= currBid.amount + ((currBid.amount * minimumBidIncreasePercentage) / 100),
+      _amount >= currBid.amount + ((currBid.amount * minimumBidIncreasePercentage) / 10000),
       "bid::Must be higher than prev bid + min increase."
     );
 
@@ -380,7 +380,7 @@ contract SuperRareAuctionHouse is
     external
     view
     override
-    returns (address, uint256, uint256, uint256, address, uint256, bytes32, address payable[] memory, uint8[] memory)
+    returns (address, uint256, uint256, uint256, address, uint256, bytes32, address payable[] memory, uint16[] memory)
   {
     Auction memory auction = tokenAuctions[_originContract][_tokenId];
 

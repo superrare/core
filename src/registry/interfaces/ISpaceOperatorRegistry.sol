@@ -8,9 +8,9 @@ interface ISpaceOperatorRegistry {
     function getPlatformCommission(address _operator)
         external
         view
-        returns (uint8);
+        returns (uint16);
 
-    function setPlatformCommission(address _operator, uint8 _commission)
+    function setPlatformCommission(address _operator, uint16 _commission)
         external;
 
     function isApprovedSpaceOperator(address _operator)

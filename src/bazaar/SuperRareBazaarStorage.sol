@@ -35,7 +35,7 @@ contract SuperRareBazaarStorage {
     address payable buyer;
     uint256 amount;
     uint256 timestamp;
-    uint8 marketplaceFee;
+    uint16 marketplaceFee;
     bool convertible;
   }
 
@@ -49,7 +49,7 @@ contract SuperRareBazaarStorage {
     address currencyAddress;
     uint256 amount;
     address payable[] splitRecipients;
-    uint8[] splitRatios;
+    uint16[] splitRatios;
   }
 
   // Structure of an Auction:
@@ -70,14 +70,14 @@ contract SuperRareBazaarStorage {
     uint256 minimumBid;
     bytes32 auctionType;
     address payable[] splitRecipients;
-    uint8[] splitRatios;
+    uint16[] splitRatios;
   }
 
   struct Bid {
     address payable bidder;
     address currencyAddress;
     uint256 amount;
-    uint8 marketplaceFee;
+    uint16 marketplaceFee;
   }
 
   /////////////////////////////////////////////////////////////////////////
@@ -99,7 +99,7 @@ contract SuperRareBazaarStorage {
     uint256 _amount,
     uint256 _tokenId,
     address payable[] _splitRecipients,
-    uint8[] _splitRatios
+    uint16[] _splitRatios
   );
 
   event OfferPlaced(
@@ -119,7 +119,7 @@ contract SuperRareBazaarStorage {
     uint256 _amount,
     uint256 _tokenId,
     address payable[] _splitAddresses,
-    uint8[] _splitRatios
+    uint16[] _splitRatios
   );
 
   event CancelOffer(
@@ -196,8 +196,8 @@ contract SuperRareBazaarStorage {
   // Address of the network beneficiary
   address public networkBeneficiary;
 
-  // A minimum increase in bid amount when out bidding someone.
-  uint8 public minimumBidIncreasePercentage; // 10 = 10%
+  // A minimum increase in bid amount when out bidding someone (basis points, 1000 = 10%).
+  uint16 public minimumBidIncreasePercentage;
 
   // Maximum length that an auction can be.
   uint256 public maxAuctionLength;

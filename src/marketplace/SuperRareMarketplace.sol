@@ -43,7 +43,7 @@ contract SuperRareMarketplace is
     Offer memory currOffer = tokenCurrentOffers[_originContract][_tokenId][_currencyAddress];
 
     require(
-      _amount >= currOffer.amount + ((currOffer.amount * minimumBidIncreasePercentage) / 100),
+      _amount >= currOffer.amount + ((currOffer.amount * minimumBidIncreasePercentage) / 10000),
       "offer::Must be greater than prev offer + min increase"
     );
 
@@ -170,7 +170,7 @@ contract SuperRareMarketplace is
     uint256 _listPrice,
     address _target,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external override {
     _checkIfCurrencyIsApproved(_currencyAddress);
     _senderMustBeTokenOwner(_originContract, _tokenId);
@@ -208,7 +208,7 @@ contract SuperRareMarketplace is
 
     delete tokenSalePrices[_originContract][_tokenId][_target];
 
-    emit SetSalePrice(_originContract, address(0), address(0), 0, _tokenId, new address payable[](0), new uint8[](0));
+    emit SetSalePrice(_originContract, address(0), address(0), 0, _tokenId, new address payable[](0), new uint16[](0));
   }
 
   /// @notice Accept an offer placed on _originContract : _tokenId.
@@ -225,7 +225,7 @@ contract SuperRareMarketplace is
     address _currencyAddress,
     uint256 _amount,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external override nonReentrant {
     _senderMustBeTokenOwner(_originContract, _tokenId);
     _ownerMustHaveMarketplaceApprovedForNFT(_originContract, _tokenId);

@@ -23,7 +23,7 @@ interface ISuperRareAuctionHouse {
     uint256 _lengthOfAuction,
     uint256 _startTime,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external;
 
   /// @notice Converts an offer into a coldie auction.
@@ -41,7 +41,7 @@ interface ISuperRareAuctionHouse {
     uint256 _amount,
     uint256 _lengthOfAuction,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external;
 
   /// @notice Cancels a configured Auction that has not started.
@@ -84,6 +84,6 @@ interface ISuperRareAuctionHouse {
       uint256,
       bytes32,
       address payable[] memory,
-      uint8[] memory
+      uint16[] memory
     );
 }

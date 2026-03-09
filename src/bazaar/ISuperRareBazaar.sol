@@ -54,7 +54,7 @@ interface ISuperRareBazaar {
     uint256 _listPrice,
     address _target,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external;
 
   /// @notice Removes the current sale price of an asset for the given currency.
@@ -76,7 +76,7 @@ interface ISuperRareBazaar {
     address _currencyAddress,
     uint256 _amount,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external;
 
   // Auction House
@@ -116,7 +116,7 @@ interface ISuperRareBazaar {
     uint256 _lengthOfAuction,
     uint256 _startTime,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external;
 
   /// @notice Cancels a configured Auction that has not started.
@@ -139,7 +139,7 @@ interface ISuperRareBazaar {
     uint256 _amount,
     uint256 _lengthOfAuction,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external;
 
   /// @notice Grabs the current auction details for a token.
@@ -163,14 +163,14 @@ interface ISuperRareBazaar {
       uint256,
       bytes32,
       address payable[] calldata,
-      uint8[] calldata
+      uint16[] calldata
     );
 
   function getSalePrice(
     address _originContract,
     uint256 _tokenId,
     address _target
-  ) external view returns (address, address, uint256, address payable[] memory, uint8[] memory);
+  ) external view returns (address, address, uint256, address payable[] memory, uint16[] memory);
 
   // // Merkle Auction Functions
 

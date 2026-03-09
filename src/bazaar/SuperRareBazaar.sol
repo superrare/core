@@ -54,7 +54,7 @@ contract SuperRareBazaar is ISuperRareBazaar, OwnableUpgradeable, ReentrancyGuar
     stakingRegistry = _stakingRegistry;
     networkBeneficiary = _networkBeneficiary;
 
-    minimumBidIncreasePercentage = 10;
+    minimumBidIncreasePercentage = 1000; // 10% in basis points
     maxAuctionLength = 7 days;
     auctionLengthExtension = 15 minutes;
     offerCancelationDelay = 5 minutes;
@@ -116,7 +116,7 @@ contract SuperRareBazaar is ISuperRareBazaar, OwnableUpgradeable, ReentrancyGuar
     networkBeneficiary = _networkBeneficiary;
   }
 
-  function setMinimumBidIncreasePercentage(uint8 _minimumBidIncreasePercentage) external onlyOwner {
+  function setMinimumBidIncreasePercentage(uint16 _minimumBidIncreasePercentage) external onlyOwner {
     minimumBidIncreasePercentage = _minimumBidIncreasePercentage;
   }
 
@@ -217,7 +217,7 @@ contract SuperRareBazaar is ISuperRareBazaar, OwnableUpgradeable, ReentrancyGuar
     uint256 _listPrice,
     address _target,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external override {
     (bool success, bytes memory data) = superRareMarketplace.delegatecall(
       abi.encodeWithSelector(
@@ -255,7 +255,7 @@ contract SuperRareBazaar is ISuperRareBazaar, OwnableUpgradeable, ReentrancyGuar
 
     delete tokenSalePrices[_originContract][_tokenId][_target];
 
-    emit SetSalePrice(_originContract, address(0), address(0), 0, _tokenId, new address payable[](0), new uint8[](0));
+    emit SetSalePrice(_originContract, address(0), address(0), 0, _tokenId, new address payable[](0), new uint16[](0));
   }
 
   /// @notice Accept an offer placed on _originContract : _tokenId.
@@ -272,7 +272,7 @@ contract SuperRareBazaar is ISuperRareBazaar, OwnableUpgradeable, ReentrancyGuar
     address _currencyAddress,
     uint256 _amount,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external override {
     (bool success, bytes memory data) = superRareMarketplace.delegatecall(
       abi.encodeWithSelector(
@@ -314,7 +314,7 @@ contract SuperRareBazaar is ISuperRareBazaar, OwnableUpgradeable, ReentrancyGuar
     uint256 _lengthOfAuction,
     uint256 _startTime,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external override {
     (bool success, bytes memory data) = superRareAuctionHouse.delegatecall(
       abi.encodeWithSelector(
@@ -352,7 +352,7 @@ contract SuperRareBazaar is ISuperRareBazaar, OwnableUpgradeable, ReentrancyGuar
     uint256 _amount,
     uint256 _lengthOfAuction,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external override {
     (bool success, bytes memory data) = superRareAuctionHouse.delegatecall(
       abi.encodeWithSelector(
@@ -432,7 +432,7 @@ contract SuperRareBazaar is ISuperRareBazaar, OwnableUpgradeable, ReentrancyGuar
       uint256,
       bytes32,
       address payable[] memory,
-      uint8[] memory
+      uint16[] memory
     )
   {
     Auction memory auction = tokenAuctions[_originContract][_tokenId];
@@ -463,7 +463,7 @@ contract SuperRareBazaar is ISuperRareBazaar, OwnableUpgradeable, ReentrancyGuar
       address,
       uint256,
       address payable[] memory,
-      uint8[] memory
+      uint16[] memory
     )
   {
     SalePrice memory sp = tokenSalePrices[_originContract][_tokenId][_target];

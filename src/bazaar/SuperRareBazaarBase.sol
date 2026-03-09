@@ -48,10 +48,10 @@ abstract contract SuperRareBazaarBase is SuperRareBazaarStorage {
   /// @notice Verifies that the splits supplied are valid.
   /// @dev A valid split has the same number of splits and ratios.
   /// @dev There can only be a max of 5 parties split with.
-  /// @dev Total of the ratios should be 100 which is relative.
+  /// @dev Total of the ratios should be 10000 (basis points) which is relative.
   /// @param _splits The addresses the amount is being split with.
-  /// @param _ratios The ratios each address in _splits is getting.
-  function _checkSplits(address payable[] calldata _splits, uint8[] calldata _ratios) internal pure {
+  /// @param _ratios The ratios each address in _splits is getting (basis points).
+  function _checkSplits(address payable[] calldata _splits, uint16[] calldata _ratios) internal pure {
     require(_splits.length > 0, "checkSplits::Must have at least 1 split");
     require(_splits.length <= 5, "checkSplits::Split exceeded max size");
     require(_splits.length == _ratios.length, "checkSplits::Splits and ratios must be equal");
@@ -61,7 +61,7 @@ abstract contract SuperRareBazaarBase is SuperRareBazaarStorage {
       totalRatio += _ratios[i];
     }
 
-    require(totalRatio == 100, "checkSplits::Total must be equal to 100");
+    require(totalRatio == 10000, "checkSplits::Total must be equal to 10000");
   }
 
   /// @notice Checks to see if the sender has approved the marketplace to move tokens.
@@ -120,7 +120,7 @@ abstract contract SuperRareBazaarBase is SuperRareBazaarStorage {
       return;
     }
 
-    uint256 requiredAmount = _amount + ((_amount * _marketplaceFee) / 100);
+    uint256 requiredAmount = _amount + ((_amount * _marketplaceFee) / 10000);
 
     if (_currencyAddress == address(0)) {
       (bool success, bytes memory data) = address(payments).call{value: requiredAmount}(
@@ -146,7 +146,7 @@ abstract contract SuperRareBazaarBase is SuperRareBazaarStorage {
   /// @param _amount Total amount to be paid out.
   /// @param _seller Address of the person selling the asset.
   /// @param _splitAddrs Addresses that funds need to be split against.
-  /// @param _splitRatios Ratios for split pertaining to each address.
+  /// @param _splitRatios Ratios for split pertaining to each address (basis points).
   function _payout(
     address _originContract,
     uint256 _tokenId,
@@ -154,7 +154,7 @@ abstract contract SuperRareBazaarBase is SuperRareBazaarStorage {
     uint256 _amount,
     address _seller,
     address payable[] memory _splitAddrs,
-    uint8[] memory _splitRatios
+    uint16[] memory _splitRatios
   ) internal {
     require(_splitAddrs.length == _splitRatios.length, "Number of split addresses and ratios must be equal.");
 
@@ -194,17 +194,17 @@ abstract contract SuperRareBazaarBase is SuperRareBazaarStorage {
       if (spaceOperatorRegistry.isApprovedSpaceOperator(_seller)) {
         uint256 platformCommission = spaceOperatorRegistry.getPlatformCommission(_seller);
 
-        remainingAmount = remainingAmount - ((_amount * platformCommission) / 100);
+        remainingAmount = remainingAmount - ((_amount * platformCommission) / 10000);
 
-        platformFee[0] = (_amount * platformCommission) / 100;
+        platformFee[0] = (_amount * platformCommission) / 10000;
 
         _performPayouts(_currencyAddress, platformFee[0], platformRecip, platformFee);
       } else {
         uint256 platformCommission = marketplaceSettings.getERC721ContractPrimarySaleFeePercentage(_originContract);
 
-        remainingAmount = remainingAmount - ((_amount * platformCommission) / 100);
+        remainingAmount = remainingAmount - ((_amount * platformCommission) / 10000);
 
-        platformFee[0] = (_amount * platformCommission) / 100;
+        platformFee[0] = (_amount * platformCommission) / 10000;
 
         _performPayouts(_currencyAddress, platformFee[0], platformRecip, platformFee);
       }
@@ -230,8 +230,8 @@ abstract contract SuperRareBazaarBase is SuperRareBazaarStorage {
     uint256 totalSplit = 0;
 
     for (uint256 i = 0; i < _splitAddrs.length; i++) {
-      remainingAmts[i] = (remainingAmount * _splitRatios[i]) / 100;
-      totalSplit += (remainingAmount * _splitRatios[i]) / 100;
+      remainingAmts[i] = (remainingAmount * _splitRatios[i]) / 10000;
+      totalSplit += (remainingAmount * _splitRatios[i]) / 10000;
     }
     _performPayouts(_currencyAddress, totalSplit, _splitAddrs, remainingAmts);
   }

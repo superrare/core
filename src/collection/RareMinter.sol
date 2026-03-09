@@ -115,7 +115,7 @@ contract RareMinter is Initializable, IRareMinter, OwnableUpgradeable, Reentranc
     uint256 _startTime,
     uint256 _maxMints,
     address payable[] calldata _splitRecipients,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external {
     require(
       OwnableUpgradeable(_contractAddress).owner() == msg.sender,

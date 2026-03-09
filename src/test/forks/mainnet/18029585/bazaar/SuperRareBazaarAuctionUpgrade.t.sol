@@ -82,8 +82,8 @@ contract SuperRareBazaarAuctionUpgrade is Test {
     address payable[] memory splitAddresses = new address payable[](1);
     splitAddresses[0] = payable(auctionCreator);
 
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     // Create an auction
     vm.prank(auctionCreator);
     bazaar.configureAuction(
@@ -121,8 +121,8 @@ contract SuperRareBazaarAuctionUpgrade is Test {
     address payable[] memory splitAddresses = new address payable[](1);
     splitAddresses[0] = payable(auctionCreator);
 
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     // Create an auction
     vm.prank(auctionCreator);
     bazaar.configureAuction(

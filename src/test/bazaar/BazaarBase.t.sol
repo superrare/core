@@ -50,7 +50,7 @@ contract TestContract is SuperRareBazaarBase {
     uint256 _amount,
     address _seller,
     address payable[] memory _splitAddrs,
-    uint8[] memory _splitRatios
+    uint16[] memory _splitRatios
   ) public payable {
     _payout(_originContract, _tokenId, _currencyAddress, _amount, _seller, _splitAddrs, _splitRatios);
   }
@@ -133,8 +133,8 @@ contract RareBazaarBaseTest is Test {
     address currencyAddress = address(0);
     uint256 amount = 1 ether;
     address payable[] memory splitAddrs = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     splitAddrs[0] = payable(charlie);
 
     // setup getRewardAccumulatorAddressForUser call -- 3%
@@ -178,11 +178,11 @@ contract RareBazaarBaseTest is Test {
       abi.encode(false)
     );
 
-    // setup has getERC721ContractPrimarySaleFeePercentage -- 15%
+    // setup has getERC721ContractPrimarySaleFeePercentage -- 15% (1500 bp)
     vm.mockCall(
       marketplaceSettings,
       abi.encodeWithSelector(IMarketplaceSettings.getERC721ContractPrimarySaleFeePercentage.selector, originContract),
-      abi.encode(15)
+      abi.encode(uint16(1500))
     );
     uint256 balanceBefore = charlie.balance;
     vm.prank(deployer);
@@ -210,8 +210,8 @@ contract RareBazaarBaseTest is Test {
     address currencyAddress = address(0);
     uint256 amount = 1 ether;
     address payable[] memory splitAddrs = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     splitAddrs[0] = payable(charlie);
 
     // setup getRewardAccumulatorAddressForUser call -- 3%
@@ -255,11 +255,11 @@ contract RareBazaarBaseTest is Test {
       abi.encode(true)
     );
 
-    // setup getPlatformCommission -- 5%
+    // setup getPlatformCommission -- 5% (500 bp)
     vm.mockCall(
       spaceOperatorRegistry,
       abi.encodeWithSelector(ISpaceOperatorRegistry.getPlatformCommission.selector, charlie),
-      abi.encode(5)
+      abi.encode(uint16(500))
     );
     uint256 balanceBefore = charlie.balance;
     vm.prank(deployer);
@@ -287,8 +287,8 @@ contract RareBazaarBaseTest is Test {
     address currencyAddress = address(0);
     uint256 amount = 1 ether;
     address payable[] memory splitAddrs = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     splitAddrs[0] = payable(charlie);
     address payable[] memory royaltyReceiverAddrs = new address payable[](1);
     uint256[] memory royaltyAmounts = new uint256[](1);
@@ -371,8 +371,8 @@ contract RareBazaarBaseTest is Test {
     address currencyAddress = address(0);
     uint256 amount = 1 ether;
     address payable[] memory splitAddrs = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     splitAddrs[0] = payable(charlie);
 
     // setup getRewardAccumulatorAddressForUser call -- 3%
@@ -416,11 +416,11 @@ contract RareBazaarBaseTest is Test {
       abi.encode(false)
     );
 
-    // setup has getERC721ContractPrimarySaleFeePercentage -- 15%
+    // setup has getERC721ContractPrimarySaleFeePercentage -- 15% (1500 bp)
     vm.mockCall(
       marketplaceSettings,
       abi.encodeWithSelector(IMarketplaceSettings.getERC721ContractPrimarySaleFeePercentage.selector, originContract),
-      abi.encode(15)
+      abi.encode(uint16(1500))
     );
     uint256 balanceBefore = rewardPool.balance;
     vm.prank(deployer);
@@ -448,8 +448,8 @@ contract RareBazaarBaseTest is Test {
     address currencyAddress = address(0);
     uint256 amount = 1 ether;
     address payable[] memory splitAddrs = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     splitAddrs[0] = payable(charlie);
 
     // setup getRewardAccumulatorAddressForUser call -- 3%
@@ -493,11 +493,11 @@ contract RareBazaarBaseTest is Test {
       abi.encode(false)
     );
 
-    // setup has getERC721ContractPrimarySaleFeePercentage -- 15%
+    // setup has getERC721ContractPrimarySaleFeePercentage -- 15% (1500 bp)
     vm.mockCall(
       marketplaceSettings,
       abi.encodeWithSelector(IMarketplaceSettings.getERC721ContractPrimarySaleFeePercentage.selector, originContract),
-      abi.encode(15)
+      abi.encode(uint16(1500))
     );
     vm.prank(deployer);
     tc.payout{value: amount + ((amount * 3) / 100)}(
@@ -523,8 +523,8 @@ contract RareBazaarBaseTest is Test {
     address currencyAddress = address(rare);
     uint256 amount = 1 ether;
     address payable[] memory splitAddrs = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     splitAddrs[0] = payable(charlie);
 
     // setup getRewardAccumulatorAddressForUser call -- 3%
@@ -568,11 +568,11 @@ contract RareBazaarBaseTest is Test {
       abi.encode(false)
     );
 
-    // setup has getERC721ContractPrimarySaleFeePercentage -- 15%
+    // setup has getERC721ContractPrimarySaleFeePercentage -- 15% (1500 bp)
     vm.mockCall(
       marketplaceSettings,
       abi.encodeWithSelector(IMarketplaceSettings.getERC721ContractPrimarySaleFeePercentage.selector, originContract),
-      abi.encode(15)
+      abi.encode(uint16(1500))
     );
     vm.prank(deployer);
     rare.transfer(address(tc), amount + ((amount * 3) / 100));

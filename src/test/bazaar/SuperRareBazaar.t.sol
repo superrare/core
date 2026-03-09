@@ -98,7 +98,6 @@ contract SuperRareBazaarTest is Test {
   }
 
   function test_convert_offer_currency_exploit() external {
-
     /*///////////////////////////////////////////////////
                         Mock Calls
     ///////////////////////////////////////////////////*/
@@ -120,7 +119,7 @@ contract SuperRareBazaarTest is Test {
     vm.mockCall(
       marketplaceSettings,
       abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceFeePercentage.selector),
-      abi.encode(3)
+      abi.encode(uint16(300))
     );
     vm.mockCall(
       marketplaceSettings,
@@ -150,7 +149,7 @@ contract SuperRareBazaarTest is Test {
     vm.mockCall(
       marketplaceSettings,
       abi.encodeWithSelector(IMarketplaceSettings.getERC721ContractPrimarySaleFeePercentage.selector, address(sfn)),
-      abi.encode(15)
+      abi.encode(uint16(1500))
     );
     vm.mockCall(
       marketplaceSettings,
@@ -162,10 +161,6 @@ contract SuperRareBazaarTest is Test {
                         Test
     ///////////////////////////////////////////////////*/
     configureAuction();
-
-    skip(12); //~about 1 block
-    vm.expectRevert();
-    superRareBazaar.settleAuction(address(sfn), 1);
   }
 
 
@@ -178,47 +173,18 @@ contract SuperRareBazaarTest is Test {
     console2.log("Amount Recieved by Attacker:", msg.value);
   }
   
-  // Configure the auction
+  // Verify convertOfferToAuction is deprecated and reverts
   function configureAuction() internal {
-    // Setup the Offer and convert it to an auction 
-    createOfferAndConvertToAuction();
-
-    address payable[] memory _splitAddresses = new address payable[](1);
-    _splitAddresses[0] = payable(address(this));
-
-    uint8[] memory _splitRatios = new uint8[](1);
-    _splitRatios[0] = 100;
-
-    //@exploit: Assumes all NFTs follows the ERC-721 spec
-    vm.prank(exploiter);
-    IERC721(sfn).transferFrom(exploiter, exploiter1, 1);
-
-    //@exploit: Overwrites previously set auction with a new Currency (ETH). Keeps the same bid
-    vm.prank(exploiter1);
-    vm.expectRevert();
-    superRareBazaar.configureAuction(
-      SCHEDULED_AUCTION,
-      address(sfn),
-      1,
-      TARGET_AMOUNT,
-      address(0),
-      _lengthOfAuction,
-      block.timestamp + 1,
-      _splitAddresses,
-      _splitRatios
-    );
-  }
-
-  function createOfferAndConvertToAuction() internal {
     createOffer();
 
     address payable[] memory _splitAddresses = new address payable[](1);
     _splitAddresses[0] = payable(address(this));
 
-    uint8[] memory _splitRatios = new uint8[](1);
-    _splitRatios[0] = 100;
+    uint16[] memory _splitRatios = new uint16[](1);
+    _splitRatios[0] = 10000;
 
     vm.prank(exploiter);
+    vm.expectRevert("convertOfferToAuction::Deprecated");
     superRareBazaar.convertOfferToAuction(
       address(sfn),
       1,
