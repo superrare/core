@@ -132,6 +132,10 @@ contract SuperRareBazaar is ISuperRareBazaar, OwnableUpgradeable, ReentrancyGuar
     offerCancelationDelay = _offerCancelationDelay;
   }
 
+  function setAppRegistry(address _appRegistry) external onlyOwner {
+    appRegistry = _appRegistry;
+  }
+
   /////////////////////////////////////////////////////////////////////////
   // Marketplace Functions
   /////////////////////////////////////////////////////////////////////////
@@ -146,15 +150,25 @@ contract SuperRareBazaar is ISuperRareBazaar, OwnableUpgradeable, ReentrancyGuar
   /// @param _currencyAddress Address of the token being offered.
   /// @param _amount Amount being offered.
   /// @param _convertible If the offer can be converted into an auction
+  /// @param _app App facilitating the offer; address(0) = no app fee on acceptance
   function offer(
     address _originContract,
     uint256 _tokenId,
     address _currencyAddress,
     uint256 _amount,
-    bool _convertible
+    bool _convertible,
+    address _app
   ) external payable override {
     (bool success, bytes memory data) = superRareMarketplace.delegatecall(
-      abi.encodeWithSelector(this.offer.selector, _originContract, _tokenId, _currencyAddress, _amount, _convertible)
+      abi.encodeWithSelector(
+        this.offer.selector,
+        _originContract,
+        _tokenId,
+        _currencyAddress,
+        _amount,
+        _convertible,
+        _app
+      )
     );
 
     require(success, string(data));
@@ -210,6 +224,7 @@ contract SuperRareBazaar is ISuperRareBazaar, OwnableUpgradeable, ReentrancyGuar
   /// @param _target Address of the person this sale price is target to.
   /// @param _splitAddresses Addresses to split the sellers commission with.
   /// @param _splitRatios The ratio for the split corresponding to each of the addresses being split with.
+  /// @param _app App facilitating the listing; address(0) = no app fee on buy
   function setSalePrice(
     address _originContract,
     uint256 _tokenId,
@@ -217,7 +232,8 @@ contract SuperRareBazaar is ISuperRareBazaar, OwnableUpgradeable, ReentrancyGuar
     uint256 _listPrice,
     address _target,
     address payable[] calldata _splitAddresses,
-    uint16[] calldata _splitRatios
+    uint16[] calldata _splitRatios,
+    address _app
   ) external override {
     (bool success, bytes memory data) = superRareMarketplace.delegatecall(
       abi.encodeWithSelector(
@@ -228,7 +244,8 @@ contract SuperRareBazaar is ISuperRareBazaar, OwnableUpgradeable, ReentrancyGuar
         _listPrice,
         _target,
         _splitAddresses,
-        _splitRatios
+        _splitRatios,
+        _app
       )
     );
 
@@ -305,6 +322,7 @@ contract SuperRareBazaar is ISuperRareBazaar, OwnableUpgradeable, ReentrancyGuar
   /// @param _lengthOfAuction The amount of time in seconds that the auction is configured for.
   /// @param _splitAddresses Addresses to split the sellers commission with.
   /// @param _splitRatios The ratio for the split corresponding to each of the addresses being split with.
+  /// @param _app App facilitating the auction; address(0) = no app fee on settlement
   function configureAuction(
     bytes32 _auctionType,
     address _originContract,
@@ -314,7 +332,8 @@ contract SuperRareBazaar is ISuperRareBazaar, OwnableUpgradeable, ReentrancyGuar
     uint256 _lengthOfAuction,
     uint256 _startTime,
     address payable[] calldata _splitAddresses,
-    uint16[] calldata _splitRatios
+    uint16[] calldata _splitRatios,
+    address _app
   ) external override {
     (bool success, bytes memory data) = superRareAuctionHouse.delegatecall(
       abi.encodeWithSelector(
@@ -327,7 +346,8 @@ contract SuperRareBazaar is ISuperRareBazaar, OwnableUpgradeable, ReentrancyGuar
         _lengthOfAuction,
         _startTime,
         _splitAddresses,
-        _splitRatios
+        _splitRatios,
+        _app
       )
     );
 

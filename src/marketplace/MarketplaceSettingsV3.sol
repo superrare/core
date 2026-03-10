@@ -88,13 +88,14 @@ contract MarketplaceSettingsV3 is
         minValue = _minValue;
     }
 
+    /// @dev Deprecated: RareAppRegistry handles fees. Returns 0 for interface compatibility.
     function getMarketplaceFeePercentage()
         external
         view
         override
         returns (uint16)
     {
-        return marketplaceFeePercentage;
+        return 0;
     }
 
     function setMarketplaceFeePercentage(uint16 _percentage) external onlyOwner {
@@ -105,13 +106,14 @@ contract MarketplaceSettingsV3 is
         marketplaceFeePercentage = _percentage;
     }
 
-    function calculateMarketplaceFee(uint256 _amount)
+    /// @dev Deprecated: RareAppRegistry handles fees. Returns 0 for interface compatibility.
+    function calculateMarketplaceFee(uint256)
         external
-        view
+        pure
         override
         returns (uint256)
     {
-        return (_amount * marketplaceFeePercentage) / 10000;
+        return 0;
     }
 
     function getERC721ContractPrimarySaleFeePercentage(address)
@@ -213,22 +215,23 @@ contract MarketplaceSettingsV3 is
         stakingFeePercentage = _percentage;
     }
 
-    function calculateStakingFee(uint256 _amount)
+    /// @dev Deprecated: RareAppRegistry handles fees. Returns 0 for interface compatibility.
+    function calculateStakingFee(uint256)
         external
-        view
+        pure
         override
         returns (uint256)
     {
-        return (_amount * stakingFeePercentage) / 10000;
+        return 0;
     }
 
-    function calculateMarketplacePayoutFee(uint256 _amount)
+    /// @dev Deprecated: RareAppRegistry handles fees. Returns 0 for interface compatibility.
+    function calculateMarketplacePayoutFee(uint256)
         external
-        view
+        pure
         override
         returns (uint256)
     {
-        return
-            (_amount * (marketplaceFeePercentage - stakingFeePercentage)) / 10000;
+        return 0;
     }
 }

@@ -3,4 +3,7 @@ auto_detect_remappings = false
 viaIR = true
 optimizer = true
 optimizer_runs = 100
-fs_permissions = [{ access = "read", path = "./"}]
+fs_permissions = [
+    { access = "read", path = "./" },
+    { access = "read-write", path = "./deployments" }
+]

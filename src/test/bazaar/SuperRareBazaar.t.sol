@@ -20,8 +20,7 @@ import {IERC721} from "openzeppelin-contracts/token/ERC721/IERC721.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {SuperFakeNFT} from "../../test/utils/SuperFakeNFT.sol";
 import {TestRare} from "../../test/utils/TestRare.sol";
-
-
+import {RareAppRegistry} from "../../registry/RareAppRegistry.sol";
 
 contract SuperRareBazaarTest is Test {
   TestRare private superRareToken;
@@ -201,8 +200,122 @@ contract SuperRareBazaarTest is Test {
 
     //@exploit: Create an Offer using a custom NFT and the superRareToken as Currency
     vm.prank(bidder);
-    superRareBazaar.offer(address(sfn), 1, address(superRareToken), TARGET_AMOUNT, true);
+    superRareBazaar.offer(address(sfn), 1, address(superRareToken), TARGET_AMOUNT, true, address(0));
   }
 
+  function test_buy_with_app_zero_no_fees() public {
+    RareAppRegistry appRegistry = new RareAppRegistry(address(this));
+    superRareBazaar.setAppRegistry(address(appRegistry));
 
+    vm.mockCall(
+      royaltyEngine,
+      abi.encodeWithSelector(IRoyaltyEngineV1.getRoyalty.selector, address(sfn), 1, TARGET_AMOUNT),
+      abi.encode(new address payable[](0), new uint256[](0))
+    );
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.hasERC721TokenSold.selector, address(sfn), 1),
+      abi.encode(false)
+    );
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.markERC721Token.selector, address(sfn), 1, true),
+      abi.encode()
+    );
+    vm.mockCall(
+      approvedTokenRegistry,
+      abi.encodeWithSelector(IApprovedTokenRegistry.isApprovedToken.selector, address(superRareToken)),
+      abi.encode(true)
+    );
+
+    address payable[] memory splitAddresses = new address payable[](1);
+    splitAddresses[0] = payable(exploiter);
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
+
+    vm.prank(exploiter);
+    superRareBazaar.setSalePrice(
+      address(sfn),
+      1,
+      address(superRareToken),
+      TARGET_AMOUNT,
+      address(0),
+      splitAddresses,
+      splitRatios,
+      address(0) // _app = 0, no fees
+    );
+
+    uint256 sellerBalanceBefore = superRareToken.balanceOf(exploiter);
+    vm.prank(bidder);
+    superRareBazaar.buy(address(sfn), 1, address(superRareToken), TARGET_AMOUNT);
+    uint256 sellerBalanceAfter = superRareToken.balanceOf(exploiter);
+
+    assertEq(sellerBalanceAfter - sellerBalanceBefore, TARGET_AMOUNT, "Seller should get full amount when _app is 0");
+  }
+
+  function test_buy_with_registered_app_fee_split() public {
+    RareAppRegistry appRegistry = new RareAppRegistry(address(this));
+    address appAddr = address(0x999);
+    address appFeeRecipient = address(0x888);
+    vm.prank(appAddr);
+    appRegistry.registerApp(250, appFeeRecipient); // 2.5%
+
+    superRareBazaar.setAppRegistry(address(appRegistry));
+
+    vm.mockCall(
+      royaltyEngine,
+      abi.encodeWithSelector(IRoyaltyEngineV1.getRoyalty.selector, address(sfn), 1, TARGET_AMOUNT),
+      abi.encode(new address payable[](0), new uint256[](0))
+    );
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.hasERC721TokenSold.selector, address(sfn), 1),
+      abi.encode(false)
+    );
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.markERC721Token.selector, address(sfn), 1, true),
+      abi.encode()
+    );
+    vm.mockCall(
+      approvedTokenRegistry,
+      abi.encodeWithSelector(IApprovedTokenRegistry.isApprovedToken.selector, address(superRareToken)),
+      abi.encode(true)
+    );
+
+    address payable[] memory splitAddresses = new address payable[](1);
+    splitAddresses[0] = payable(exploiter);
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
+
+    vm.prank(exploiter);
+    superRareBazaar.setSalePrice(
+      address(sfn),
+      1,
+      address(superRareToken),
+      TARGET_AMOUNT,
+      address(0),
+      splitAddresses,
+      splitRatios,
+      appAddr // registered app
+    );
+
+    uint256 sellerBalanceBefore = superRareToken.balanceOf(exploiter);
+    uint256 appBalanceBefore = superRareToken.balanceOf(appFeeRecipient);
+    uint256 protocolBalanceBefore = superRareToken.balanceOf(networkBeneficiary);
+
+    vm.prank(bidder);
+    superRareBazaar.buy(address(sfn), 1, address(superRareToken), TARGET_AMOUNT);
+
+    (uint256 appShare, uint256 protocolShare, uint256 totalFee) =
+      appRegistry.calculateFeeSplit(appAddr, TARGET_AMOUNT);
+
+    uint256 sellerBalanceAfter = superRareToken.balanceOf(exploiter);
+    uint256 appBalanceAfter = superRareToken.balanceOf(appFeeRecipient);
+    uint256 protocolBalanceAfter = superRareToken.balanceOf(networkBeneficiary);
+
+    assertEq(appBalanceAfter - appBalanceBefore, appShare, "App should receive appShare");
+    assertEq(protocolBalanceAfter - protocolBalanceBefore, protocolShare, "Protocol should receive protocolShare");
+    assertEq(sellerBalanceAfter - sellerBalanceBefore, TARGET_AMOUNT - totalFee, "Seller should get amount minus fee");
+  }
 }

@@ -14,6 +14,7 @@ interface ISuperRareAuctionHouse {
   /// @param _lengthOfAuction The amount of time in seconds that the auction is configured for.
   /// @param _splitAddresses Addresses to split the sellers commission with.
   /// @param _splitRatios The ratio for the split corresponding to each of the addresses being split with.
+  /// @param _app App facilitating the auction; address(0) = no app fee on settlement
   function configureAuction(
     bytes32 _auctionType,
     address _originContract,
@@ -23,7 +24,8 @@ interface ISuperRareAuctionHouse {
     uint256 _lengthOfAuction,
     uint256 _startTime,
     address payable[] calldata _splitAddresses,
-    uint16[] calldata _splitRatios
+    uint16[] calldata _splitRatios,
+    address _app
   ) external;
 
   /// @notice Converts an offer into a coldie auction.

@@ -8,6 +8,7 @@ import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "openzeppelin-contracts/token/ERC721/IERC721.sol";
 import {SuperRareBazaarBase} from "../bazaar/SuperRareBazaarBase.sol";
 import {ISuperRareAuctionHouse} from "./ISuperRareAuctionHouse.sol";
+import {IRareAppRegistry} from "../registry/IRareAppRegistry.sol";
 
 /// @author koloz
 /// @title SuperRareAuctionHouse
@@ -32,6 +33,7 @@ contract SuperRareAuctionHouse is
   /// @param _lengthOfAuction The amount of time in seconds that the auction is configured for.
   /// @param _splitAddresses Addresses to split the sellers commission with.
   /// @param _splitRatios The ratio for the split corresponding to each of the addresses being split with.
+  /// @param _app App facilitating the auction; address(0) = no app fee on settlement
   function configureAuction(
     bytes32 _auctionType,
     address _originContract,
@@ -41,7 +43,8 @@ contract SuperRareAuctionHouse is
     uint256 _lengthOfAuction,
     uint256 _startTime,
     address payable[] calldata _splitAddresses,
-    uint16[] calldata _splitRatios
+    uint16[] calldata _splitRatios,
+    address _app
   ) external override {
     _checkIfCurrencyIsApproved(_currencyAddress);
     _senderMustBeTokenOwner(_originContract, _tokenId);
@@ -86,7 +89,8 @@ contract SuperRareAuctionHouse is
       _startingAmount,
       _auctionType,
       _splitAddresses,
-      _splitRatios
+      _splitRatios,
+      _app
     );
 
     if (_auctionType == SCHEDULED_AUCTION) {
@@ -161,7 +165,8 @@ contract SuperRareAuctionHouse is
       currOffer.amount,
       COLDIE_AUCTION,
       _splitAddresses,
-      _splitRatios
+      _splitRatios,
+      address(0) // deprecated path, no app
     );
 
     delete tokenCurrentOffers[_originContract][_tokenId][_currencyAddress];
@@ -170,7 +175,7 @@ contract SuperRareAuctionHouse is
       currOffer.buyer,
       _currencyAddress,
       _amount,
-      marketplaceSettings.getMarketplaceFeePercentage()
+      0 // marketplaceFee deprecated
     );
 
     IERC721 erc721 = IERC721(_originContract);
@@ -233,7 +238,7 @@ contract SuperRareAuctionHouse is
     address _currencyAddress,
     uint256 _amount
   ) external payable override nonReentrant {
-    uint256 requiredAmount = _amount + marketplaceSettings.calculateMarketplaceFee(_amount);
+    uint256 requiredAmount = _amount;
 
     _senderMustHaveMarketplaceApproved(_currencyAddress, requiredAmount);
 
@@ -282,7 +287,7 @@ contract SuperRareAuctionHouse is
       payable(msg.sender),
       _currencyAddress,
       _amount,
-      marketplaceSettings.getMarketplaceFeePercentage()
+      0 // marketplaceFee deprecated
     );
 
     bool startedAuction = false;
@@ -349,13 +354,26 @@ contract SuperRareAuctionHouse is
         currBid.amount,
         auction.auctionCreator,
         auction.splitRecipients,
-        auction.splitRatios
+        auction.splitRatios,
+        auction.app
       );
 
       marketplaceSettings.markERC721Token(_originContract, _tokenId, true);
       require(erc721.ownerOf(_tokenId) == currBid.bidder , "settleAuction::Failed to transfer to auction winner");
     }
 
+    uint256 appFee;
+    uint256 protocolFee;
+    if (appRegistry != address(0) && auction.app != address(0)) {
+      (, uint256[] memory royalties) =
+        royaltyEngine.getRoyalty(_originContract, _tokenId, currBid.amount);
+      uint256 totalRoyalties;
+      for (uint256 i = 0; i < royalties.length; i++) {
+        totalRoyalties += royalties[i];
+      }
+      uint256 amountAfterRoyalty = currBid.amount - totalRoyalties;
+      (appFee, protocolFee,) = IRareAppRegistry(appRegistry).calculateFeeSplit(auction.app, amountAfterRoyalty);
+    }
 
     emit AuctionSettled(
       _originContract,
@@ -363,7 +381,10 @@ contract SuperRareAuctionHouse is
       auction.auctionCreator,
       _tokenId,
       auction.currencyAddress,
-      currBid.amount
+      currBid.amount,
+      auction.app,
+      appFee,
+      protocolFee
     );
   }
 

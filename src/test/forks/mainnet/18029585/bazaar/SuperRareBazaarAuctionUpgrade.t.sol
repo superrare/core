@@ -95,7 +95,8 @@ contract SuperRareBazaarAuctionUpgrade is Test {
       LENGTH_OF_AUCTION,
       block.timestamp + 1,
       splitAddresses,
-      splitRatios
+      splitRatios,
+      address(0)
     );
 
     // Auction begins
@@ -134,7 +135,8 @@ contract SuperRareBazaarAuctionUpgrade is Test {
       LENGTH_OF_AUCTION,
       block.timestamp + 1,
       splitAddresses,
-      splitRatios
+      splitRatios,
+      address(0)
     );
 
     // Auction begins
