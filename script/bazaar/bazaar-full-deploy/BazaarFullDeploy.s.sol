@@ -134,6 +134,13 @@ contract BazaarFullDeploy is Script {
     // 9. Perform post-deployment configuration
     console.log("\n=== Post-Deployment Configuration ===");
 
+    // Chain TOKEN_MARK_ROLE approvals through the marketplace settings stack.
+    marketplaceSettingsV1.grantMarketplaceAccess(address(marketplaceSettingsV2));
+    console.log("Granted marketplace access to MarketplaceSettingsV2 on MarketplaceSettingsV1");
+
+    marketplaceSettingsV2.grantMarketplaceAccess(address(marketplaceSettingsV3));
+    console.log("Granted marketplace access to MarketplaceSettingsV3 on MarketplaceSettingsV2");
+
     // Grant marketplace access to the bazaar
     marketplaceSettingsV3.grantMarketplaceAccess(address(bazaar));
     console.log("Granted marketplace access to bazaar");
