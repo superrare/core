@@ -24,7 +24,7 @@ This repository contains the Solidity contracts that power Rare Protocol's marke
   - [`Payments` — DoS-resistant ETH payouts](#payments--dos-resistant-eth-payouts)
   - [`MarketConfig` / `MarketUtils` — shared marketplace library](#marketconfig--marketutils--shared-marketplace-library)
 - [Deprecated](#deprecated)
-  - [Staking (wound down — wired but inert)](#staking-wound-down--wired-but-inert)
+  - [Staking (wound down — lookups return zero)](#staking-wound-down--lookups-return-zero)
   - [Token contracts (superseded)](#token-contracts-superseded)
   - [Factories (superseded)](#factories-superseded)
   - [Never deployed](#never-deployed)
@@ -173,7 +173,7 @@ In practice:
 |---|---|---|
 | Visible to external marketplaces / indexers immediately after batch | Yes | No — only after first transfer |
 | Listable on Rare's contracts ([Bazaar](#superrarebazaar--single-token-marketplace), [`RareBatchListingMarketplace`](#rarebatchlistingmarketplace), [`RareBatchAuctionHouse`](#rarebatchauctionhouse), [`BatchOffer`](#batchoffer)) | Yes | Yes |
-| Listable on any other ERC-721 marketplace contract | Yes | Yes at the contract level — but the external marketplace's UI won't display the tokens until they're transferred |
+| Listable on any other ERC-721 marketplace contract | Yes | Yes technically, but in practice no — the external marketplace's UI won't display the tokens until they're transferred |
 | Individual immediate mint via `mintTo` / `addNewToken` | Yes | No (only `prepareMint`) |
 
 **Use `SovereignBatchMint`** when you want the batch to be discoverable and tradeable across the broader ERC-721 ecosystem (OpenSea, Blur, etc.) from day one, or when you want individual immediate-mint capability alongside batch reservation.
@@ -209,10 +209,10 @@ These contracts aren't entry points for users, but every marketplace and minting
 
 Holds the protocol-wide configuration that every marketplace and minting contract reads from:
 
-- **Marketplace fee percentage** + helpers like `calculateMarketplaceFee(amount)`.
-- **Per-contract primary sale fee percentage** (with a default fallback) — applies different rates on first sale vs. resale.
+- **Marketplace fee percentage** + helpers like `calculateMarketplaceFee(amount)` (applied on secondary sales).
+- **Primary sale fee percentage** — applied on a token's first sale instead of the marketplace fee. V3 uses a single protocol-wide rate; the per-contract override that existed in V1 was removed (V3's `getERC721ContractPrimarySaleFeePercentage(address)` ignores the address argument and always returns the default).
 - **Min / max transaction values** that bound any single sale.
-- **Primary-vs-secondary tracking** via `markERC721Token` / `hasERC721TokenSold`.
+- **Primary-vs-secondary tracking** via `markERC721Token` / `hasERC721TokenSold` — determines which fee rate applies on a given sale.
 
 It is `Ownable`, not a proxy. Configuration changes happen by calling owner-only setters; the active settings address is held by the Bazaar, `RareMinter`, and the V2 batch contracts (`RareBatchListingMarketplace`, `RareBatchAuctionHouse`, `BatchOffer`) and can be rotated via setters on each.
 
@@ -255,11 +255,13 @@ Used by `RareMinter`, `BatchOffer`, and the V1 Bazaar internals (V1 variants), a
 
 The contracts in this section remain in the repo for reference and to support existing on-chain deployments. **Do not deploy new instances and do not build new integrations against them.**
 
-A note on what "deprecated" means here: several of these contracts are still wired into the active marketplace and minting contracts as initialization parameters, state variables, or `MarketConfig` fields. That's because removing those wires would change storage layouts and constructor signatures on contracts that are already deployed. The wiring is *inert* — the active contracts no longer call into these on the live flow, the protocol no longer reads from them to make decisions, and the data they hold is either empty or unused. Treat them as "addresses kept around for backwards compatibility, behavior turned off."
+A note on what "deprecated" means here: some of these contracts are still wired into the active marketplace and minting contracts as initialization parameters or state variables, and a few of them are still called on the live payout / minting paths. The deprecation is at the **data layer**: the registries hold no live data — no approved space operators, no stakers with non-zero balances, no royalty engine fallback to the legacy registry — so the calls return empty/zero values and produce no effect. Either the contract is never called, or the lookup is performed and evaluates to a no-op. Either way, the protocol behavior these contracts used to gate has been turned off.
 
-### Staking (wound down — wired but inert)
+### Staking (wound down — lookups return zero)
 
-Staking has been eliminated. `RareStakingRegistry`, `RarityPool`, and `RewardAccumulator` are no longer functionally part of the protocol — staking minimums aren't enforced, no rewards are routed, and the `RarityPool` interface that `RareMinter` holds is never called on the active path. The staking-registry address still appears as an init parameter on `RareMinter`, `RareBatchListingMarketplace`, `RareBatchAuctionHouse`, and as a field on `MarketConfig` / `MarketConfigV2`, but those references are no-ops.
+Staking has been wound down at the data level. The on-chain code paths that read from `RareStakingRegistry`, `RarityPool`, and `RewardAccumulator` are still live: `RareMinter` calls `stakingRegistry.getStakingAddressForUser(...)` and `IRarityPool.getAmountStakedByUser(...)` to enforce its (now-zero) seller staking minimum, and the payout helpers (`MarketUtils.payout`, `MarketUtilsV2.payoutWithMarketplaceFee`, `SuperRareBazaarBase._payout`) call `stakingRegistry.getRewardAccumulatorAddressForUser(...)` to look up where to route rewards. But the staking data itself has been zeroed out — staked amounts are 0, no reward accumulators are configured, and the contract-seller-staking-minimum is 0 — so each lookup returns nothing useful and the staking branch is effectively skipped.
+
+The staking-registry address still appears as an init parameter on `RareMinter`, `RareBatchListingMarketplace`, `RareBatchAuctionHouse`, and as a field on `MarketConfig` / `MarketConfigV2`.
 
 - `src/staking/RareStakingRegistry.sol`
 - `src/staking/RarityPool.sol`
@@ -284,11 +286,9 @@ Use the V2 token contracts in [Token Contracts](#token-contracts) instead.
 
 ### Registries (no longer driving behavior)
 
-These registries are **wired into active contracts but no longer functionally consulted**:
-
-- **`src/registry/RoyaltyRegistry.sol`** — replaced by the royalty engine (the `royaltyEngine` field on `MarketConfig`) for all royalty lookups. `SuperRareBazaar` still imports `IRareRoyaltyRegistry` and stores its address, but the active flow doesn't read from it.
-- **`src/registry/SpaceOperatorRegistry.sol`** — Spaces are no longer a supported product, no new operators are being added, and existing entries have been zeroed out. `SuperRareBazaar` still references it but the lookups never gate anything.
-- **`src/registry/CreatorRegistry.sol`** — unused by the active contracts.
+- **`src/registry/RoyaltyRegistry.sol`** — replaced by the royalty engine (the `royaltyEngine` field on `MarketConfig`) for all royalty lookups. `SuperRareBazaar` still imports `IRareRoyaltyRegistry` and stores its address, but the active flow never calls into it.
+- **`src/registry/SpaceOperatorRegistry.sol`** — Spaces are no longer a supported product. The payout helpers (`MarketUtils.payout`, `MarketUtilsV2.payoutWithMarketplaceFee`, `SuperRareBazaarBase._payout`) still call `isApprovedSpaceOperator(seller)` and `getPlatformCommission(seller)` on every payout, but **all space operator entries have been removed from the registry**, so `isApprovedSpaceOperator` returns false for every seller and the platform-commission branch never fires.
+- **`src/registry/CreatorRegistry.sol`** — unused by the active contracts (not even imported).
 
 ---
 
