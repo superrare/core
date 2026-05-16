@@ -8,6 +8,7 @@ import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "openzeppelin-contracts/token/ERC721/IERC721.sol";
 import {ISuperRareMarketplace} from "./ISuperRareMarketplace.sol";
 import {SuperRareBazaarBase} from "../bazaar/SuperRareBazaarBase.sol";
+import {IRareAppRegistry} from "../registry/IRareAppRegistry.sol";
 
 /// @author koloz
 /// @title SuperRareMarketplace
@@ -30,12 +31,14 @@ contract SuperRareMarketplace is
   /// @param _currencyAddress Address of the token being offered.
   /// @param _amount Amount being offered (excluding marketplace fee).
   /// @param _convertible If the offer can be converted into an auction
+  /// @param _app App facilitating the offer; address(0) = no app fee on acceptance
   function offer(
     address _originContract,
     uint256 _tokenId,
     address _currencyAddress,
     uint256 _amount,
-    bool _convertible
+    bool _convertible,
+    address _app
   ) external payable override nonReentrant {
     _checkIfCurrencyIsApproved(_currencyAddress);
     require(_amount > 0, "offer::Amount cannot be 0");
@@ -43,11 +46,11 @@ contract SuperRareMarketplace is
     Offer memory currOffer = tokenCurrentOffers[_originContract][_tokenId][_currencyAddress];
 
     require(
-      _amount >= currOffer.amount + ((currOffer.amount * minimumBidIncreasePercentage) / 100),
+      _amount >= currOffer.amount + ((currOffer.amount * minimumBidIncreasePercentage) / 10000),
       "offer::Must be greater than prev offer + min increase"
     );
 
-    uint256 requiredAmount = _amount + marketplaceSettings.calculateMarketplaceFee(_amount);
+    uint256 requiredAmount = _amount;
 
     _senderMustHaveMarketplaceApproved(_currencyAddress, requiredAmount);
 
@@ -60,8 +63,9 @@ contract SuperRareMarketplace is
       payable(msg.sender),
       _amount,
       block.timestamp,
-      marketplaceSettings.getMarketplaceFeePercentage(),
-      _convertible
+      0, // marketplaceFee deprecated
+      _convertible,
+      _app
     );
 
     _refund(_currencyAddress, currOffer.amount, currOffer.marketplaceFee, currOffer.buyer);
@@ -76,7 +80,7 @@ contract SuperRareMarketplace is
   /// @param _originContract Contract address for asset being bought.
   /// @param _tokenId TokenId of asset being bought.
   /// @param _currencyAddress Currency address of asset being used to buy.
-  /// @param _amount Amount the piece if being bought for (excluding marketplace fee).
+  /// @param _amount Amount the piece if being bought for.
   function buy(
     address _originContract,
     uint256 _tokenId,
@@ -87,7 +91,7 @@ contract SuperRareMarketplace is
 
     _ownerMustHaveMarketplaceApprovedForNFT(_originContract, _tokenId);
 
-    uint256 requiredAmount = _amount + marketplaceSettings.calculateMarketplaceFee(_amount);
+    uint256 requiredAmount = _amount;
 
     mapping(address => SalePrice) storage salePrices = tokenSalePrices[_originContract][_tokenId];
 
@@ -119,11 +123,24 @@ contract SuperRareMarketplace is
 
     erc721.transferFrom(tokenOwner, msg.sender, _tokenId);
 
-    _payout(_originContract, _tokenId, _currencyAddress, _amount, sp.seller, sp.splitRecipients, sp.splitRatios);
+    _payout(_originContract, _tokenId, _currencyAddress, _amount, sp.seller, sp.splitRecipients, sp.splitRatios, sp.app);
+
+    uint256 appFee;
+    uint256 protocolFee;
+    if (appRegistry != address(0) && sp.app != address(0)) {
+      (, uint256[] memory royalties) =
+        royaltyEngine.getRoyalty(_originContract, _tokenId, _amount);
+      uint256 totalRoyalties;
+      for (uint256 i = 0; i < royalties.length; i++) {
+        totalRoyalties += royalties[i];
+      }
+      uint256 amountAfterRoyalty = _amount - totalRoyalties;
+      (appFee, protocolFee,) = IRareAppRegistry(appRegistry).calculateFeeSplit(sp.app, amountAfterRoyalty);
+    }
 
     marketplaceSettings.markERC721Token(_originContract, _tokenId, true);
 
-    emit Sold(_originContract, msg.sender, sp.seller, _currencyAddress, _amount, _tokenId);
+    emit Sold(_originContract, msg.sender, sp.seller, _currencyAddress, _amount, _tokenId, sp.app, appFee, protocolFee);
   }
 
   /// @notice Cancels an existing offer the sender has placed on a piece.
@@ -163,6 +180,7 @@ contract SuperRareMarketplace is
   /// @param _target Address of the person this sale price is target to.
   /// @param _splitAddresses Addresses to split the sellers commission with.
   /// @param _splitRatios The ratio for the split corresponding to each of the addresses being split with.
+  /// @param _app App facilitating the listing; address(0) = no app fee on buy
   function setSalePrice(
     address _originContract,
     uint256 _tokenId,
@@ -170,7 +188,8 @@ contract SuperRareMarketplace is
     uint256 _listPrice,
     address _target,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios,
+    address _app
   ) external override {
     _checkIfCurrencyIsApproved(_currencyAddress);
     _senderMustBeTokenOwner(_originContract, _tokenId);
@@ -182,7 +201,8 @@ contract SuperRareMarketplace is
       _currencyAddress,
       _listPrice,
       _splitAddresses,
-      _splitRatios
+      _splitRatios,
+      _app
     );
 
     emit SetSalePrice(_originContract, _currencyAddress, _target, _listPrice, _tokenId, _splitAddresses, _splitRatios);
@@ -208,7 +228,7 @@ contract SuperRareMarketplace is
 
     delete tokenSalePrices[_originContract][_tokenId][_target];
 
-    emit SetSalePrice(_originContract, address(0), address(0), 0, _tokenId, new address payable[](0), new uint8[](0));
+    emit SetSalePrice(_originContract, address(0), address(0), 0, _tokenId, new address payable[](0), new uint16[](0));
   }
 
   /// @notice Accept an offer placed on _originContract : _tokenId.
@@ -225,7 +245,7 @@ contract SuperRareMarketplace is
     address _currencyAddress,
     uint256 _amount,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external override nonReentrant {
     _senderMustBeTokenOwner(_originContract, _tokenId);
     _ownerMustHaveMarketplaceApprovedForNFT(_originContract, _tokenId);
@@ -244,7 +264,20 @@ contract SuperRareMarketplace is
     IERC721 erc721 = IERC721(_originContract);
     erc721.transferFrom(msg.sender, currOffer.buyer, _tokenId);
 
-    _payout(_originContract, _tokenId, _currencyAddress, _amount, msg.sender, _splitAddresses, _splitRatios);
+    _payout(_originContract, _tokenId, _currencyAddress, _amount, msg.sender, _splitAddresses, _splitRatios, currOffer.app);
+
+    uint256 appFee;
+    uint256 protocolFee;
+    if (appRegistry != address(0) && currOffer.app != address(0)) {
+      (, uint256[] memory royalties) =
+        royaltyEngine.getRoyalty(_originContract, _tokenId, _amount);
+      uint256 totalRoyalties;
+      for (uint256 i = 0; i < royalties.length; i++) {
+        totalRoyalties += royalties[i];
+      }
+      uint256 amountAfterRoyalty = _amount - totalRoyalties;
+      (appFee, protocolFee,) = IRareAppRegistry(appRegistry).calculateFeeSplit(currOffer.app, amountAfterRoyalty);
+    }
 
     marketplaceSettings.markERC721Token(_originContract, _tokenId, true);
 
@@ -256,7 +289,10 @@ contract SuperRareMarketplace is
       _amount,
       _tokenId,
       _splitAddresses,
-      _splitRatios
+      _splitRatios,
+      currOffer.app,
+      appFee,
+      protocolFee
     );
   }
 }

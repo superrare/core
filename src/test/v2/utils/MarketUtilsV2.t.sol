@@ -78,7 +78,7 @@ contract TestContract {
     config.addressMustHaveMarketplaceApprovedForNFT(_addr, _originContract, _tokenId);
   }
 
-  function checkSplits(address payable[] calldata _splitAddrs, uint8[] calldata _splitRatios) public pure {
+  function checkSplits(address payable[] calldata _splitAddrs, uint16[] calldata _splitRatios) public pure {
     MarketUtilsV2.checkSplits(_splitAddrs, _splitRatios);
   }
 
@@ -101,7 +101,7 @@ contract TestContract {
     uint256 _amount,
     address _seller,
     address payable[] memory _splitAddrs,
-    uint8[] memory _splitRatios
+    uint16[] memory _splitRatios
   ) public payable {
     config.payout(_originContract, _tokenId, _currencyAddress, _amount, _seller, _splitAddrs, _splitRatios);
   }
@@ -287,19 +287,19 @@ contract MarketUtilsV2Test is Test {
 
   function test_checkSplits_Success() public {
     address payable[] memory splitAddrs = new address payable[](2);
-    uint8[] memory splitRatios = new uint8[](2);
+    uint16[] memory splitRatios = new uint16[](2);
 
     splitAddrs[0] = payable(alice);
     splitAddrs[1] = payable(bob);
-    splitRatios[0] = 60;
-    splitRatios[1] = 40;
+    splitRatios[0] = 6000;
+    splitRatios[1] = 4000;
 
     tc.checkSplits(splitAddrs, splitRatios);
   }
 
   function test_checkSplits_EmptyArrays() public {
     address payable[] memory splitAddrs = new address payable[](0);
-    uint8[] memory splitRatios = new uint8[](0);
+    uint16[] memory splitRatios = new uint16[](0);
 
     vm.expectRevert("checkSplits::Must have at least 1 split");
     tc.checkSplits(splitAddrs, splitRatios);
@@ -307,7 +307,7 @@ contract MarketUtilsV2Test is Test {
 
   function test_checkSplits_TooManySplits() public {
     address payable[] memory splitAddrs = new address payable[](6);
-    uint8[] memory splitRatios = new uint8[](6);
+    uint16[] memory splitRatios = new uint16[](6);
 
     vm.expectRevert("checkSplits::Split exceeded max size");
     tc.checkSplits(splitAddrs, splitRatios);
@@ -315,7 +315,7 @@ contract MarketUtilsV2Test is Test {
 
   function test_checkSplits_UnequalArrays() public {
     address payable[] memory splitAddrs = new address payable[](2);
-    uint8[] memory splitRatios = new uint8[](3);
+    uint16[] memory splitRatios = new uint16[](3);
 
     vm.expectRevert("checkSplits::Splits and ratios must be equal");
     tc.checkSplits(splitAddrs, splitRatios);
@@ -323,14 +323,14 @@ contract MarketUtilsV2Test is Test {
 
   function test_checkSplits_InvalidTotal() public {
     address payable[] memory splitAddrs = new address payable[](2);
-    uint8[] memory splitRatios = new uint8[](2);
+    uint16[] memory splitRatios = new uint16[](2);
 
     splitAddrs[0] = payable(alice);
     splitAddrs[1] = payable(bob);
-    splitRatios[0] = 60;
-    splitRatios[1] = 30;
+    splitRatios[0] = 6000;
+    splitRatios[1] = 3000;
 
-    vm.expectRevert("checkSplits::Total must be equal to 100");
+    vm.expectRevert("checkSplits::Total must be equal to 10000");
     tc.checkSplits(splitAddrs, splitRatios);
   }
 
@@ -424,8 +424,8 @@ contract MarketUtilsV2Test is Test {
     address currencyAddress = address(0);
     uint256 amount = 1 ether;
     address payable[] memory splitAddrs = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     splitAddrs[0] = payable(charlie);
 
     // setup getRewardAccumulatorAddressForUser call
@@ -477,11 +477,11 @@ contract MarketUtilsV2Test is Test {
       abi.encode(false)
     );
 
-    // setup getERC721ContractPrimarySaleFeePercentage
+    // setup getERC721ContractPrimarySaleFeePercentage -- 15% (1500 bp)
     vm.mockCall(
       marketplaceSettings,
       abi.encodeWithSelector(IMarketplaceSettings.getERC721ContractPrimarySaleFeePercentage.selector, originContract),
-      abi.encode(15)
+      abi.encode(uint16(1500))
     );
 
     // Mock royalty engine to return empty arrays for primary sale
@@ -513,8 +513,8 @@ contract MarketUtilsV2Test is Test {
     address currencyAddress = address(0);
     uint256 amount = 1 ether;
     address payable[] memory splitAddrs = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     splitAddrs[0] = payable(charlie);
     address payable[] memory royaltyReceiverAddrs = new address payable[](1);
     uint256[] memory royaltyAmounts = new uint256[](1);
@@ -600,8 +600,8 @@ contract MarketUtilsV2Test is Test {
     address currencyAddress = address(0);
     uint256 amount = 1 ether;
     address payable[] memory splitAddrs = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     splitAddrs[0] = payable(charlie);
 
     // setup getRewardAccumulatorAddressForUser call
@@ -653,11 +653,11 @@ contract MarketUtilsV2Test is Test {
       abi.encode(true)
     );
 
-    // setup getPlatformCommission -- 5%
+    // setup getPlatformCommission -- 5% (500 bp)
     vm.mockCall(
       spaceOperatorRegistry,
       abi.encodeWithSelector(ISpaceOperatorRegistry.getPlatformCommission.selector, charlie),
-      abi.encode(5)
+      abi.encode(uint16(500))
     );
 
     // Mock royalty engine to return empty arrays for primary sale with space operator
@@ -691,8 +691,8 @@ contract MarketUtilsV2Test is Test {
     address currencyAddress = address(0);
     uint256 amount = 1 ether;
     address payable[] memory splitAddrs = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     splitAddrs[0] = payable(charlie);
 
     // Setup multiple royalty receivers
@@ -790,11 +790,11 @@ contract MarketUtilsV2Test is Test {
 
     // Setup multiple splits
     address payable[] memory splitAddrs = new address payable[](2);
-    uint8[] memory splitRatios = new uint8[](2);
+    uint16[] memory splitRatios = new uint16[](2);
     splitAddrs[0] = payable(charlie);
     splitAddrs[1] = payable(bob);
-    splitRatios[0] = 60; // 60%
-    splitRatios[1] = 40; // 40%
+    splitRatios[0] = 6000; // 60%
+    splitRatios[1] = 4000; // 40%
 
     // setup getRewardAccumulatorAddressForUser call
     vm.mockCall(
@@ -845,11 +845,11 @@ contract MarketUtilsV2Test is Test {
       abi.encode(false)
     );
 
-    // setup getERC721ContractPrimarySaleFeePercentage
+    // setup getERC721ContractPrimarySaleFeePercentage -- 15% (1500 bp)
     vm.mockCall(
       marketplaceSettings,
       abi.encodeWithSelector(IMarketplaceSettings.getERC721ContractPrimarySaleFeePercentage.selector, originContract),
-      abi.encode(15)
+      abi.encode(uint16(1500))
     );
 
     // Mock royalty engine to return empty arrays for primary sale with splits
@@ -891,8 +891,8 @@ contract MarketUtilsV2Test is Test {
     address currencyAddress = address(0);
     uint256 amount = 1 ether;
     address payable[] memory splitAddrs = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     splitAddrs[0] = payable(charlie);
 
     // Setup TOO MANY royalty receivers (6, when max is 5)
@@ -1023,8 +1023,8 @@ contract MarketUtilsV2Test is Test {
     address currencyAddress = address(0);
     uint256 amount = 1 ether;
     address payable[] memory splitAddrs = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     splitAddrs[0] = payable(charlie);
 
     // Setup 7 royalty receivers to test truncation preserves order
@@ -1137,8 +1137,8 @@ contract MarketUtilsV2Test is Test {
     address currencyAddress = address(0);
     uint256 amount = 1 ether;
     address payable[] memory splitAddrs = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     splitAddrs[0] = payable(charlie);
 
     // Setup EXACTLY the maximum royalty receivers (5)
@@ -1259,8 +1259,8 @@ contract MarketUtilsV2Test is Test {
     address currencyAddress = address(0);
     uint256 amount = 1 ether;
     address payable[] memory splitAddrs = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     splitAddrs[0] = payable(charlie);
 
     // setup getRewardAccumulatorAddressForUser call
@@ -1312,11 +1312,11 @@ contract MarketUtilsV2Test is Test {
       abi.encode(false)
     );
 
-    // setup getERC721ContractPrimarySaleFeePercentage
+    // setup getERC721ContractPrimarySaleFeePercentage -- 15% (1500 bp)
     vm.mockCall(
       marketplaceSettings,
       abi.encodeWithSelector(IMarketplaceSettings.getERC721ContractPrimarySaleFeePercentage.selector, originContract),
-      abi.encode(15)
+      abi.encode(uint16(1500))
     );
 
     // Mock royalty engine to return non-empty arrays to verify they are ignored
@@ -1363,8 +1363,8 @@ contract MarketUtilsV2Test is Test {
     address currencyAddress = address(0);
     uint256 amount = 1 ether;
     address payable[] memory splitAddrs = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     splitAddrs[0] = payable(charlie);
 
     // setup getRewardAccumulatorAddressForUser call
@@ -1416,11 +1416,11 @@ contract MarketUtilsV2Test is Test {
       abi.encode(false)
     );
 
-    // setup getERC721ContractPrimarySaleFeePercentage - should be ignored
+    // setup getERC721ContractPrimarySaleFeePercentage - should be ignored (15% = 1500 bp)
     vm.mockCall(
       marketplaceSettings,
       abi.encodeWithSelector(IMarketplaceSettings.getERC721ContractPrimarySaleFeePercentage.selector, originContract),
-      abi.encode(15)
+      abi.encode(uint16(1500))
     );
 
     // Mock royalty engine to return empty arrays to verify primary fees aren't paid

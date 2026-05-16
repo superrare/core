@@ -20,3 +20,5 @@ arachnid/solidity-stringutils/=lib/solidity-stringutils/
 @uniswap/v3-core/contracts=lib/v3-core/contracts/
 @uniswap/v3-core/=lib/v3-core/contracts/
 @uniswap/v3-periphery/=lib/v3-periphery/contracts/
+@manifoldxyz/libraries-solidity/=lib/libraries-solidity/
+openzeppelin/=lib/openzeppelin-contracts/contracts/

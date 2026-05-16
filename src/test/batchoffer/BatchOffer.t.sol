@@ -96,9 +96,9 @@ contract TestBatchOffer is Test {
     testToken.transferOwnership(notryan);
 
     address payable[] memory _splitRecipients = new address payable[](1);
-    uint8[] memory _splitRatios = new uint8[](1);
+    uint16[] memory _splitRatios = new uint16[](1);
     _splitRecipients[0] = payable(notryan);
-    _splitRatios[0] = 100;
+    _splitRatios[0] = 10000;
 
     Merkle m = new Merkle();
     bytes32[] memory data = new bytes32[](2);
@@ -142,9 +142,9 @@ contract TestBatchOffer is Test {
     testToken.transferOwnership(notryan);
 
     address payable[] memory _splitRecipients = new address payable[](1);
-    uint8[] memory _splitRatios = new uint8[](1);
+    uint16[] memory _splitRatios = new uint16[](1);
     _splitRecipients[0] = payable(notryan);
-    _splitRatios[0] = 100;
+    _splitRatios[0] = 10000;
 
     Merkle m = new Merkle();
     bytes32[] memory data = new bytes32[](2);
@@ -216,14 +216,14 @@ contract TestBatchOffer is Test {
       abi.encode(false)
     );
 
-    // setup has getERC721ContractPrimarySaleFeePercentage -- 15%
+    // setup has getERC721ContractPrimarySaleFeePercentage -- 15% (1500 bp)
     vm.mockCall(
       marketplaceSettings,
       abi.encodeWithSelector(
         IMarketplaceSettings.getERC721ContractPrimarySaleFeePercentage.selector,
         address(testToken)
       ),
-      abi.encode(15)
+      abi.encode(uint16(1500))
     );
   }
 }

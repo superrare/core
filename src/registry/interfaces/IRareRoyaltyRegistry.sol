@@ -8,15 +8,15 @@ import {ICreatorRegistry} from "./ICreatorRegistry.sol";
  */
 interface IRareRoyaltyRegistry is ICreatorRegistry {
     /**
-     * @dev Get the royalty fee percentage for a specific ERC721 contract.
+     * @dev Get the royalty fee percentage for a specific ERC721 contract in basis points (0-10000).
      * @param _contractAddress address ERC721Contract address.
      * @param _tokenId uint256 token ID.
-     * @return uint8 wei royalty fee.
+     * @return uint16 basis points royalty fee.
      */
     function getERC721TokenRoyaltyPercentage(
         address _contractAddress,
         uint256 _tokenId
-    ) external view returns (uint8);
+    ) external view returns (uint16);
 
     /**
      * @dev Utililty function to calculate the royalty fee for a token.
@@ -38,6 +38,6 @@ interface IRareRoyaltyRegistry is ICreatorRegistry {
      */
     function setPercentageForSetERC721ContractRoyalty(
         address _contractAddress,
-        uint8 _percentage
+        uint16 _percentage
     ) external;
 }

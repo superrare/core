@@ -1,0 +1,53 @@
+{
+  "lib/buffer": {
+    "rev": "c3a2e0aed8c07baee3d837f7e92532d28f249132"
+  },
+  "lib/ds-test": {
+    "rev": "e282159d5170298eb2455a6c05280ab5a73a4ef0"
+  },
+  "lib/ens-contracts": {
+    "rev": "f5f2ededccbb7e52be44925c0050620d71762e32"
+  },
+  "lib/forge-std": {
+    "rev": "e8a047e3f40f13fa37af6fe14e6e06283d9a060e"
+  },
+  "lib/governance-contracts": {
+    "rev": "30a1989d89ab6b859b23db5430d345ef84208616"
+  },
+  "lib/libraries-solidity": {
+    "tag": {
+      "name": "v1.0.5",
+      "rev": "c0fc1d47493e8abf33717e082bde0dad48a74a32"
+    }
+  },
+  "lib/murky": {
+    "branch": {
+      "name": "main",
+      "rev": "5feccd1253d7da820f7cccccdedf64471025455d"
+    }
+  },
+  "lib/openzeppelin-contracts": {
+    "rev": "dfef6a68ee18dbd2e1f5a099061a3b8a0e404485"
+  },
+  "lib/openzeppelin-contracts-upgradeable": {
+    "rev": "f6febd79e2a3a17e26969dd0d450c6ebd64bf459"
+  },
+  "lib/royalty-guard": {
+    "rev": "043a8bc0cdb215502470ab04b232636c5b7b3697"
+  },
+  "lib/royalty-registry-solidity": {
+    "rev": "c4ca8faf12e55e357a945bd65406dff9f32c8692"
+  },
+  "lib/solidity-stringutils": {
+    "rev": "46983c6d9462a80229cf0d5bab8ea3b3ee31066c"
+  },
+  "lib/solmate": {
+    "rev": "2001af43aedb46fdc2335d2a7714fb2dae7cfcd1"
+  },
+  "lib/v3-core": {
+    "rev": "ab80c076b3d7122eda2731303a346aa079d16c19"
+  },
+  "lib/v3-periphery": {
+    "rev": "b46983053823829c7a8dfbce39a26e0bfb48c76a"
+  }
+}

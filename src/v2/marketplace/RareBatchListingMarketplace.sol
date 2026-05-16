@@ -183,7 +183,7 @@ contract RareBatchListingMarketplace is
     address _currency,
     uint256 _amount,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external override {
     // Validate currency
     _marketConfig.checkIfCurrencyIsApproved(_currency);

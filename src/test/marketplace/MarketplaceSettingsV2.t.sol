@@ -19,6 +19,11 @@ contract MarketplaceSettingsV2Test is Test {
         marketplaceV1.grantMarketplaceAccess(address(marketplaceV2));
     }
 
+    function test_default_fees_are_zero() public {
+        assertEq(marketplaceV2.getMarketplaceFeePercentage(), 0);
+        assertEq(marketplaceV2.getERC721ContractPrimarySaleFeePercentage(address(0x1234)), 0);
+    }
+
     function testMarkTokenSold() public {
         address _contractAddress = address(0x1234);
         uint256 _tokenId = 1;
@@ -40,13 +45,13 @@ contract MarketplaceSettingsV2Test is Test {
         );
     }
 
-    function testFailMarkTokenAsNotAdmin() public {
+    function test_RevertWhen_MarkTokenAsNotAdmin() public {
         address _contractAddress = address(0x1234);
         uint256 _tokenId = 1;
         bool _hasSold = true;
 
         vm.prank(address(0));
+        vm.expectRevert();
         marketplaceV2.markERC721Token(_contractAddress, _tokenId, _hasSold);
-        assertTrue(marketplaceV2.markContractAsSold(_contractAddress));
     }
 }
