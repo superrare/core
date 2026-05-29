@@ -27,7 +27,7 @@ if [ -z "$RPC_URL" ]; then
     export RPC_URL="http://localhost:8545"
 fi
 
-REQUIRED_VARS=("PRIVATE_KEY" "BAZAAR_ADDRESS")
+REQUIRED_VARS=("PRIVATE_KEY" "BAZAAR_ADDRESS" "RARE_MINTER_ADDRESS")
 
 for var in "${REQUIRED_VARS[@]}"; do
     if [ -z "${!var}" ]; then
