@@ -9,8 +9,9 @@ import {
 import {
     ERC1155SupplyUpgradeable
 } from "openzeppelin-contracts-upgradeable/token/ERC1155/extensions/ERC1155SupplyUpgradeable.sol";
+import {ERC2981Upgradeable} from "openzeppelin-contracts-upgradeable/token/common/ERC2981Upgradeable.sol";
+import {IERC165Upgradeable} from "openzeppelin-contracts-upgradeable/utils/introspection/IERC165Upgradeable.sol";
 
-import {ERC2981Upgradeable} from "../extensions/ERC2981Upgradeable.sol";
 import {ITokenCreator} from "../extensions/ITokenCreator.sol";
 import {IRareERC1155} from "./IRareERC1155.sol";
 
@@ -33,6 +34,18 @@ contract RareERC1155 is
     /// @notice Last created token id.
     uint256 private tokenIdCounter;
 
+    /// @inheritdoc IRareERC1155
+    uint256 public constant MAX_BATCH_SIZE = 100;
+
+    /// @notice Default ERC2981 royalty fee in whole percentage points.
+    uint256 private constant DEFAULT_ROYALTY_PERCENTAGE = 10;
+
+    /// @notice Maximum ERC2981 royalty fee in whole percentage points.
+    uint256 private constant MAX_ROYALTY_PERCENTAGE = 100;
+
+    /// @notice ERC2981 fee denominator uses basis points.
+    uint256 private constant BASIS_POINTS_PER_PERCENT = 100;
+
     /// @notice Token configuration by token id.
     mapping(uint256 => TokenConfig) private tokenConfigs;
 
@@ -45,6 +58,12 @@ contract RareERC1155 is
     /// @notice Lifetime minted quantity by token id.
     mapping(uint256 => uint256) private tokenTotalMinted;
 
+    /// @notice Collection-wide ERC2981 royalty receiver.
+    address private defaultRoyaltyReceiver;
+
+    /// @notice Collection-wide ERC2981 royalty percentage, expressed as whole percentage points.
+    uint256 private defaultRoyaltyPercentage;
+
     /// @notice Ensures the collection has not been disabled.
     modifier ifNotDisabled() {
         // Atomic guard: disabled collections reject owner-managed writes before any state changes.
@@ -55,7 +74,7 @@ contract RareERC1155 is
     /// @notice Ensures a token id has been created.
     /// @param _tokenId Token id that must exist.
     modifier tokenExists(uint256 _tokenId) {
-        // Atomic guard: missing token ids cannot be minted, updated, or assigned royalties.
+        // Atomic guard: missing token ids cannot be minted or updated.
         if (!tokenConfigs[_tokenId].exists) revert TokenDoesNotExist(_tokenId);
         _;
     }
@@ -86,11 +105,10 @@ contract RareERC1155 is
         __ERC1155_init(_baseURI);
         __ERC1155Burnable_init();
         __ERC1155Supply_init();
-        __ERC2981__init();
+        __ERC2981_init();
 
-        // State writes: configure collection-wide default royalty behavior.
-        _setDefaultRoyaltyPercentage(10);
-        _setDefaultRoyaltyReceiver(_creator);
+        // State write: expose EIP-2981 royalties as 10% to the collection creator.
+        _setDefaultRoyaltyConfig(_creator, DEFAULT_ROYALTY_PERCENTAGE);
 
         if (_defaultMinter != address(0)) {
             // State write: grant optional marketplace or minter approval at initialization.
@@ -103,50 +121,61 @@ contract RareERC1155 is
     }
 
     /// @inheritdoc IRareERC1155
-    function createToken(string calldata _tokenURI, uint256 _maxSupply, address _royaltyReceiver)
-        external
-        onlyOwner
-        ifNotDisabled
-        returns (uint256)
-    {
-        return _createToken(_tokenURI, _maxSupply, msg.sender, _royaltyReceiver);
-    }
-
-    /// @inheritdoc IRareERC1155
     function createToken(string calldata _tokenURI, uint256 _maxSupply)
         external
         onlyOwner
         ifNotDisabled
         returns (uint256)
     {
-        return _createToken(_tokenURI, _maxSupply, msg.sender, msg.sender);
+        return _createToken(_tokenURI, _maxSupply, msg.sender);
     }
 
     /// @inheritdoc IRareERC1155
-    function mintTo(address _receiver, uint256 _tokenId, uint256 _amount)
+    function mintTo(address _receiver, uint256 _tokenId, uint256 _amount) external ifNotDisabled returns (uint256) {
+        uint256[] memory tokenIds = new uint256[](1);
+        uint256[] memory amounts = new uint256[](1);
+        tokenIds[0] = _tokenId;
+        amounts[0] = _amount;
+
+        _mintBatchTo(_receiver, tokenIds, amounts);
+        return _tokenId;
+    }
+
+    /// @inheritdoc IRareERC1155
+    function mintBatchTo(address _receiver, uint256[] calldata _tokenIds, uint256[] calldata _amounts)
         external
         ifNotDisabled
-        tokenExists(_tokenId)
-        returns (uint256)
     {
-        // Atomic guards: validate receiver, collection-wide minter authority, and non-zero mint amount before supply math.
+        _mintBatchTo(_receiver, _tokenIds, _amounts);
+    }
+
+    /// @notice Mints existing token ids to a receiver after shared mint validation.
+    /// @param _receiver Address that receives the minted tokens.
+    /// @param _tokenIds Existing token ids to mint.
+    /// @param _amounts Quantities to mint for each token id.
+    function _mintBatchTo(address _receiver, uint256[] memory _tokenIds, uint256[] memory _amounts) internal {
+        // Atomic guards: validate receiver, collection-wide minter authority, and batch shape before supply math.
         // Approved minters are deliberately not token-scoped so creators can approve a trusted marketplace once.
         if (_receiver == address(0)) revert ZeroAddressUnsupported();
         if (msg.sender != owner() && !minterAddresses[msg.sender]) revert CallerCannotMint(msg.sender);
-        if (_amount == 0) revert AmountCannotBeZero();
+        _validateMintBatch(_tokenIds, _amounts);
 
-        // Atomic lifetime supply check: burns must not reopen edition supply.
-        uint256 requestedTotalMinted = tokenTotalMinted[_tokenId] + _amount;
-        uint256 maxSupply = tokenConfigs[_tokenId].maxSupply;
-        if (requestedTotalMinted > maxSupply) revert ExceededMaxSupply(_tokenId, requestedTotalMinted, maxSupply);
+        for (uint256 i = 0; i < _tokenIds.length; i++) {
+            uint256 tokenId = _tokenIds[i];
+            if (!tokenConfigs[tokenId].exists) revert TokenDoesNotExist(tokenId);
+            if (_amounts[i] == 0) revert AmountCannotBeZero();
 
-        // State write: record lifetime minted supply before the ERC1155 receiver hook can run.
-        tokenTotalMinted[_tokenId] = requestedTotalMinted;
+            // Atomic lifetime supply check: burns must not reopen edition supply.
+            uint256 requestedTotalMinted = tokenTotalMinted[tokenId] + _amounts[i];
+            uint256 maxSupply = tokenConfigs[tokenId].maxSupply;
+            if (requestedTotalMinted > maxSupply) revert ExceededMaxSupply(tokenId, requestedTotalMinted, maxSupply);
 
-        // Token mint: OpenZeppelin ERC1155 updates balances, total supply, and emits TransferSingle.
-        _mint(_receiver, _tokenId, _amount, "");
+            // State write: record lifetime minted supply before the ERC1155 receiver hook can run.
+            tokenTotalMinted[tokenId] = requestedTotalMinted;
+        }
 
-        return _tokenId;
+        // Token mint: OpenZeppelin ERC1155 updates balances, total supply, and emits TransferBatch.
+        _mintBatch(_receiver, _tokenIds, _amounts, "");
     }
 
     /// @inheritdoc IRareERC1155
@@ -161,25 +190,12 @@ contract RareERC1155 is
 
     /// @inheritdoc IRareERC1155
     function setDefaultRoyaltyReceiver(address _receiver) external onlyOwner ifNotDisabled {
-        // Atomic guard: default royalties must pay a real recipient.
-        if (_receiver == address(0)) revert ZeroAddressUnsupported();
-
-        // State write: update inherited ERC2981 default royalty receiver.
-        _setDefaultRoyaltyReceiver(_receiver);
+        _setDefaultRoyaltyConfig(_receiver, defaultRoyaltyPercentage);
     }
 
     /// @inheritdoc IRareERC1155
-    function setRoyaltyReceiverForToken(address _receiver, uint256 _tokenId)
-        external
-        onlyOwner
-        ifNotDisabled
-        tokenExists(_tokenId)
-    {
-        // Atomic guard: token-specific royalties must pay a real recipient.
-        if (_receiver == address(0)) revert ZeroAddressUnsupported();
-
-        // State write: update inherited ERC2981 royalty receiver for a single token id.
-        _setRoyaltyReceiver(_tokenId, _receiver);
+    function setDefaultRoyaltyPercentage(uint256 _percentage) external onlyOwner ifNotDisabled {
+        _setDefaultRoyaltyConfig(defaultRoyaltyReceiver, _percentage);
     }
 
     /// @inheritdoc IRareERC1155
@@ -194,7 +210,6 @@ contract RareERC1155 is
 
         // ERC1155 metadata signal: notify indexers of the new URI.
         emit URI(_tokenURI, _tokenId);
-        emit MetadataUpdate(_tokenId);
     }
 
     /// @inheritdoc IRareERC1155
@@ -230,46 +245,66 @@ contract RareERC1155 is
         return bytes(tokenURI).length > 0 ? tokenURI : super.uri(_tokenId);
     }
 
-    /// @inheritdoc IRareERC1155
+    /// @inheritdoc IERC165Upgradeable
     function supportsInterface(bytes4 _interfaceId)
         public
         view
-        override(ERC1155Upgradeable, ERC2981Upgradeable, IRareERC1155)
+        override(ERC1155Upgradeable, ERC2981Upgradeable, IERC165Upgradeable)
         returns (bool)
     {
-        return _interfaceId == 0x49064906 || _interfaceId == type(IRareERC1155).interfaceId
-            || _interfaceId == type(ITokenCreator).interfaceId || super.supportsInterface(_interfaceId);
+        return _interfaceId == type(IRareERC1155).interfaceId || _interfaceId == type(ITokenCreator).interfaceId
+            || super.supportsInterface(_interfaceId);
     }
 
-    /// @notice Creates a token id and configures creator and royalty state.
+    /// @notice Creates a token id and configures creator state.
     /// @param _tokenURI Token-specific metadata URI.
     /// @param _maxSupply Maximum supply for the token id.
     /// @param _creator RARE creator recorded for the token id.
-    /// @param _royaltyReceiver ERC2981 receiver for the token id.
     /// @return tokenId Newly created token id.
-    function _createToken(string calldata _tokenURI, uint256 _maxSupply, address _creator, address _royaltyReceiver)
-        internal
-        returns (uint256)
-    {
-        // Atomic guards: token ids must be mintable and royalties must have a recipient.
+    function _createToken(string calldata _tokenURI, uint256 _maxSupply, address _creator) internal returns (uint256) {
+        // Atomic guard: token ids must be mintable.
         if (_maxSupply == 0) revert MaxSupplyCannotBeZero();
-        if (_royaltyReceiver == address(0)) revert ZeroAddressUnsupported();
 
         // State write: advance the monotonically increasing token id counter.
         tokenIdCounter++;
         uint256 tokenId = tokenIdCounter;
 
-        // State writes: register token constraints, creator lookup, and ERC2981 royalty settings.
+        // State writes: register token constraints and creator lookup.
         tokenConfigs[tokenId] = TokenConfig(_maxSupply, _tokenURI, true);
         tokenCreators[tokenId] = _creator;
-        _setRoyaltyReceiver(tokenId, _royaltyReceiver);
-        _setRoyaltyPercentage(tokenId, getDefaultRoyaltyPercentage());
 
         // Metadata and domain events: expose the new URI and token config to indexers.
         emit URI(_tokenURI, tokenId);
-        emit TokenCreated(tokenId, _creator, _maxSupply, _tokenURI, _royaltyReceiver);
+        emit TokenCreated(tokenId, _creator, _maxSupply, _tokenURI);
 
         return tokenId;
+    }
+
+    /// @notice Updates collection-wide default ERC2981 royalty config.
+    /// @param _receiver Royalty receiver address.
+    /// @param _percentage Royalty percentage, expressed as whole percentage points.
+    function _setDefaultRoyaltyConfig(address _receiver, uint256 _percentage) internal {
+        if (_receiver == address(0)) revert ZeroAddressUnsupported();
+        if (_percentage > MAX_ROYALTY_PERCENTAGE) {
+            revert RoyaltyPercentageTooHigh(_percentage, MAX_ROYALTY_PERCENTAGE);
+        }
+
+        defaultRoyaltyReceiver = _receiver;
+        defaultRoyaltyPercentage = _percentage;
+        _setDefaultRoyalty(_receiver, uint96(_percentage * BASIS_POINTS_PER_PERCENT));
+    }
+
+    /// @notice Validates batch mint input shape and token id ordering.
+    /// @param _tokenIds Token ids requested by the caller.
+    /// @param _amounts Amounts requested by the caller.
+    function _validateMintBatch(uint256[] memory _tokenIds, uint256[] memory _amounts) internal pure {
+        if (_tokenIds.length == 0) revert EmptyBatch();
+        if (_tokenIds.length != _amounts.length) revert BatchLengthMismatch();
+        if (_tokenIds.length > MAX_BATCH_SIZE) revert BatchSizeExceeded(_tokenIds.length, MAX_BATCH_SIZE);
+
+        for (uint256 i = 1; i < _tokenIds.length; i++) {
+            if (_tokenIds[i] <= _tokenIds[i - 1]) revert TokenIdsNotStrictlyAscending(_tokenIds[i]);
+        }
     }
 
     /// @notice Hook called by OpenZeppelin before ERC1155 token transfers, mints, and burns.

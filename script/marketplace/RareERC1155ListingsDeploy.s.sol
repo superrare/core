@@ -4,12 +4,12 @@ pragma solidity ^0.8.0;
 import "forge-std/Script.sol";
 import {ERC1967Proxy} from "openzeppelin-contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-import "../../src/marketplace/RareERC1155Marketplace.sol";
+import "../../src/marketplace/RareERC1155Listings.sol";
 
-/// @title RareERC1155MarketplaceDeploy
+/// @title RareERC1155ListingsDeploy
 /// @notice Forge deployment script for the ERC1155 marketplace implementation and ERC1967 proxy.
 /// @dev Reads market config addresses from environment variables and initializes the proxy in the same broadcast.
-contract RareERC1155MarketplaceDeploy is Script {
+contract RareERC1155ListingsDeploy is Script {
     /// @notice Deploys marketplace logic, deploys proxy, and initializes the proxied marketplace.
     function run() external {
         // Environment read: select deployer key for broadcast signing.
@@ -35,13 +35,13 @@ contract RareERC1155MarketplaceDeploy is Script {
         address erc1155ApprovalManager = vm.envAddress("ERC1155_APPROVAL_MANAGER");
 
         // Deployment operation: deploy UUPS implementation logic.
-        RareERC1155Marketplace marketplace = new RareERC1155Marketplace();
+        RareERC1155Listings marketplace = new RareERC1155Listings();
 
         // Deployment operation: deploy ERC1967 proxy pointing at the implementation.
         ERC1967Proxy marketplaceProxy = new ERC1967Proxy(address(marketplace), "");
 
         // Initialization transaction: configure proxied marketplace dependencies.
-        RareERC1155Marketplace(address(marketplaceProxy))
+        RareERC1155Listings(address(marketplaceProxy))
             .initialize(
                 networkBeneficiary,
                 marketplaceSettings,

@@ -4,11 +4,11 @@ pragma solidity ^0.8.0;
 import {MarketConfigV2} from "../v2/utils/MarketConfigV2.sol";
 
 /// @author SuperRare Labs Inc.
-/// @title IRareERC1155Marketplace
+/// @title IRareERC1155Listings
 /// @notice Interface for RARE Protocol ERC1155 primary mint sales and ERC1155 fixed-price secondary sales.
 /// @dev Primary sales are configured per `(collection, tokenId)`. Secondary listings are approval-based and keyed by `(collection, tokenId, seller)`.
 /// Secondary listings intentionally do not expire on-chain; they remain fillable until sold, cancelled, or made invalid by seller balance, ERC1155 approval, or currency policy.
-interface IRareERC1155Marketplace {
+interface IRareERC1155Listings {
     /// @notice Primary mint sale configuration for a collection token id.
     struct DirectSaleConfig {
         /// @notice Seller/creator that owns the primary sale and receives sale proceeds.
@@ -36,19 +36,85 @@ interface IRareERC1155Marketplace {
     }
 
     /// @notice Secondary fixed-price listing for an ERC1155 token id.
-    /// @dev Intentionally has no expiry timestamp or nonce. Product semantics treat listings as standing seller offers
-    /// that persist until filled, cancelled, or invalidated by balance, approval, or currency approval changes.
+    /// @dev `expirationTime == 0` means no expiration. Nonzero expiration timestamps are exclusive end times.
+    /// Listings persist until filled, cancelled, expired, or invalidated by balance, approval, or currency approval changes.
     struct SalePrice {
         /// @notice Currency accepted by the seller. Zero address indicates ETH.
         address currencyAddress;
         /// @notice Unit price per ERC1155 token.
         uint256 price;
-        /// @notice Remaining quantity available for purchase.
+        /// @notice Remaining quantity available for purchase. Allows for partial fills.
         uint256 quantity;
+        /// @notice Timestamp when the listing can no longer be filled. Zero means no expiration.
+        uint256 expirationTime;
         /// @notice Recipients that split seller proceeds after seller-side fee deductions.
         address payable[] splitRecipients;
         /// @notice Percentages corresponding to `splitRecipients`. Must total 100.
         uint8[] splitRatios;
+    }
+
+    /// @notice Primary sale setup input for one token id in a batch.
+    struct DirectSaleRequest {
+        /// @notice Token id to configure.
+        uint256 tokenId;
+        /// @notice Unit price per ERC1155 token.
+        uint256 price;
+        /// @notice Timestamp when minting may begin.
+        uint256 startTime;
+        /// @notice Max quantity allowed per mint transaction. Zero means unlimited per transaction.
+        uint256 maxMints;
+    }
+
+    /// @notice Primary mint input for one token id in a batch.
+    struct MintRequest {
+        /// @notice Token id to mint.
+        uint256 tokenId;
+        /// @notice Unit price expected by the buyer.
+        uint256 price;
+        /// @notice Quantity to mint.
+        uint256 quantity;
+        /// @notice Merkle proof for active allowlist sales.
+        bytes32[] proof;
+    }
+
+    /// @notice Allowlist setup input for one token id in a batch.
+    struct AllowListConfigRequest {
+        /// @notice Token id controlled by the allowlist.
+        uint256 tokenId;
+        /// @notice Merkle root for allowed minters. Zero root disables allowlist enforcement.
+        bytes32 root;
+        /// @notice Timestamp when allowlist enforcement expires.
+        uint256 endTimestamp;
+    }
+
+    /// @notice Limit setup input for one token id in a batch.
+    struct TokenLimitRequest {
+        /// @notice Token id controlled by the limit.
+        uint256 tokenId;
+        /// @notice New limit value. Zero disables the limit.
+        uint256 limit;
+    }
+
+    /// @notice Secondary listing setup input for one token id in a batch.
+    struct SalePriceRequest {
+        /// @notice Token id to list.
+        uint256 tokenId;
+        /// @notice Unit price per ERC1155 token.
+        uint256 price;
+        /// @notice Quantity listed.
+        uint256 quantity;
+        /// @notice Timestamp when the listing can no longer be filled. Zero means no expiration.
+        uint256 expirationTime;
+    }
+
+    /// @notice Secondary buy input for one token id in a batch.
+    struct BuyRequest {
+        /// @notice Token id to buy.
+        uint256 tokenId;
+        /// @notice Unit price expected by the buyer.
+        uint256 price;
+        /// @notice Quantity to buy.
+        uint256 quantity;
     }
 
     /// @notice Emitted when a creator configures a primary mint sale.
@@ -119,6 +185,7 @@ interface IRareERC1155Marketplace {
     /// @param currency Listing currency. Zero address indicates ETH.
     /// @param price Unit price per token.
     /// @param quantity Quantity listed.
+    /// @param expirationTime Timestamp when the listing can no longer be filled. Zero means no expiration.
     /// @param splitRecipients Recipients that split seller proceeds.
     /// @param splitRatios Percentages for `splitRecipients`.
     event SalePriceSet(
@@ -128,6 +195,7 @@ interface IRareERC1155Marketplace {
         address currency,
         uint256 price,
         uint256 quantity,
+        uint256 expirationTime,
         address payable[] splitRecipients,
         uint8[] splitRatios
     );
@@ -167,6 +235,20 @@ interface IRareERC1155Marketplace {
 
     /// @notice Reverted when a write function is called while the marketplace is paused.
     error ContractPaused();
+
+    /// @notice Reverted when a batch operation receives no items.
+    error EmptyBatch();
+
+    /// @notice Reverted when a batch exceeds the supported item count.
+    /// @param supplied Number of items supplied.
+    /// @param max Maximum supported item count.
+    error BatchSizeExceeded(uint256 supplied, uint256 max);
+
+    /// @notice Reverted when token ids are not strictly ascending.
+    /// @param index Index of the token id that is not greater than the previous token id.
+    /// @param previousTokenId Token id at `index - 1`.
+    /// @param tokenId Token id at `index`.
+    error TokenIdsNotStrictlyAscending(uint256 index, uint256 previousTokenId, uint256 tokenId);
 
     /// @notice Reverted when a caller is not the owner of a collection.
     /// @param _contractAddress Collection address whose owner was checked.
@@ -255,6 +337,11 @@ interface IRareERC1155Marketplace {
     /// @notice Reverted when a secondary listing price is zero.
     error SalePriceCannotBeZero();
 
+    /// @notice Reverted when a secondary listing expiration is nonzero and not in the future.
+    /// @param _expirationTime Expiration supplied for the listing.
+    /// @param _currentTime Current block timestamp.
+    error SalePriceExpirationInvalid(uint256 _expirationTime, uint256 _currentTime);
+
     /// @notice Reverted when a secondary collection is not a deployed ERC1155 contract.
     /// @param _contractAddress Collection address that failed validation.
     error InvalidERC1155Contract(address _contractAddress);
@@ -287,6 +374,13 @@ interface IRareERC1155Marketplace {
     /// @param _tokenId Token id requested.
     /// @param _seller Seller whose listing was requested.
     error SalePriceDoesNotExist(address _contractAddress, uint256 _tokenId, address _seller);
+
+    /// @notice Reverted when a buyer tries to fill an expired secondary listing.
+    /// @param _contractAddress ERC1155 collection address.
+    /// @param _tokenId Token id requested.
+    /// @param _seller Seller whose listing was requested.
+    /// @param _expirationTime Stored listing expiration timestamp.
+    error SalePriceExpired(address _contractAddress, uint256 _tokenId, address _seller, uint256 _expirationTime);
 
     /// @notice Reverted when a purchase quantity exceeds listed quantity.
     /// @param _requestedQuantity Quantity requested by the buyer.
@@ -399,100 +493,86 @@ interface IRareERC1155Marketplace {
         address _erc1155ApprovalManager
     ) external;
 
-    /// @notice Configures or replaces a primary mint sale for a token id.
+    /// @notice Maximum number of token ids accepted by public batch operations.
+    /// @return Maximum supported batch item count.
+    function MAX_BATCH_SIZE() external pure returns (uint256);
+
+    /// @notice Configures or replaces primary mint sales for token ids.
+    /// @dev Request token ids must be strictly ascending. A one-token sale is represented by a one-item batch.
     /// @param _contractAddress ERC1155 collection address.
-    /// @param _tokenId Token id to sell through primary minting.
     /// @param _currencyAddress Sale currency. Zero address indicates ETH.
-    /// @param _price Unit price per token.
-    /// @param _startTime Timestamp when minting may begin.
-    /// @param _maxMints Max quantity per mint transaction. Zero means unlimited.
+    /// @param _requests Sale configs to apply.
     /// @param _splitRecipients Recipients that split seller proceeds.
     /// @param _splitRatios Percentages for `splitRecipients`, totaling 100.
-    function prepareMintDirectSale(
+    function prepareMintDirectSales(
         address _contractAddress,
-        uint256 _tokenId,
         address _currencyAddress,
-        uint256 _price,
-        uint256 _startTime,
-        uint256 _maxMints,
+        DirectSaleRequest[] calldata _requests,
         address payable[] calldata _splitRecipients,
         uint8[] calldata _splitRatios
     ) external;
 
-    /// @notice Mints tokens from a configured primary sale.
+    /// @notice Mints tokens from configured primary sales.
+    /// @dev Request token ids must be strictly ascending. Each token id included in a batch consumes one
+    /// transaction against that token's tx limit when the token tx limit is enabled.
     /// @param _contractAddress ERC1155 collection address.
-    /// @param _tokenId Token id to mint.
     /// @param _currencyAddress Currency expected by the buyer.
-    /// @param _price Unit price expected by the buyer.
-    /// @param _quantity Quantity to mint.
-    /// @param _proof Merkle proof for active allowlist sales.
-    function mintDirectSale(
-        address _contractAddress,
-        uint256 _tokenId,
-        address _currencyAddress,
-        uint256 _price,
-        uint256 _quantity,
-        bytes32[] calldata _proof
-    ) external payable;
+    /// @param _requests Mint requests to execute.
+    function mintDirectSaleBatch(address _contractAddress, address _currencyAddress, MintRequest[] calldata _requests)
+        external
+        payable;
 
-    /// @notice Sets a token id allowlist configuration.
-    /// @param _root Merkle root for allowlisted minters. Zero root disables allowlist enforcement.
-    /// @param _endTimestamp Timestamp when allowlist enforcement expires.
+    /// @notice Sets token id allowlist configurations.
+    /// @dev Request token ids must be strictly ascending.
     /// @param _contractAddress ERC1155 collection address.
-    /// @param _tokenId Token id controlled by the allowlist.
-    function setTokenAllowListConfig(bytes32 _root, uint256 _endTimestamp, address _contractAddress, uint256 _tokenId)
-        external;
+    /// @param _requests Allowlist configs to apply.
+    function setTokenAllowListConfigs(address _contractAddress, AllowListConfigRequest[] calldata _requests) external;
 
-    /// @notice Sets the max quantity each address may mint for a token id while the limit is enabled.
+    /// @notice Sets the max quantity each address may mint for token ids while the limit is enabled.
+    /// @dev Request token ids must be strictly ascending.
     /// @param _contractAddress ERC1155 collection address.
-    /// @param _tokenId Token id controlled by the limit.
-    /// @param _limit Max mint quantity per address. Zero disables the limit and disabled periods are not counted.
-    function setTokenMintLimit(address _contractAddress, uint256 _tokenId, uint256 _limit) external;
+    /// @param _requests Mint limits to apply. Zero disables a token id's limit and disabled periods are not counted.
+    function setTokenMintLimits(address _contractAddress, TokenLimitRequest[] calldata _requests) external;
 
-    /// @notice Sets the max number of mint transactions each address may submit for a token id while the limit is enabled.
+    /// @notice Sets the max number of mint transactions each address may submit for token ids while the limit is enabled.
+    /// @dev Request token ids must be strictly ascending.
     /// @param _contractAddress ERC1155 collection address.
-    /// @param _tokenId Token id controlled by the limit.
-    /// @param _limit Max transactions per address. Zero disables the limit and disabled periods are not counted.
-    function setTokenTxLimit(address _contractAddress, uint256 _tokenId, uint256 _limit) external;
+    /// @param _requests Transaction limits to apply. Zero disables a token id's limit and disabled periods are not counted.
+    function setTokenTxLimits(address _contractAddress, TokenLimitRequest[] calldata _requests) external;
 
-    /// @notice Creates or replaces a secondary fixed-price listing.
-    /// @dev Listings intentionally have no expiry timestamp and can be cancelled by the seller with `cancelSalePrice`.
+    /// @notice Creates or replaces secondary fixed-price listings.
+    /// @dev Request token ids must be strictly ascending. `expirationTime == 0` means no expiration.
+    /// Listings can be cancelled by the seller with `cancelSalePrices`.
     /// @param _contractAddress ERC1155 collection address.
-    /// @param _tokenId Token id to list.
     /// @param _currencyAddress Listing currency. Zero address indicates ETH.
-    /// @param _price Unit price per token.
-    /// @param _quantity Quantity listed.
+    /// @param _requests Listing configs to apply.
     /// @param _splitRecipients Recipients that split seller proceeds.
     /// @param _splitRatios Percentages for `splitRecipients`, totaling 100.
-    function setSalePrice(
+    function setSalePrices(
         address _contractAddress,
-        uint256 _tokenId,
         address _currencyAddress,
-        uint256 _price,
-        uint256 _quantity,
+        SalePriceRequest[] calldata _requests,
         address payable[] calldata _splitRecipients,
         uint8[] calldata _splitRatios
     ) external;
 
-    /// @notice Cancels the caller's secondary listing for a token id.
+    /// @notice Cancels the caller's secondary listings for token ids.
+    /// @dev Token ids must be strictly ascending.
     /// @param _contractAddress ERC1155 collection address.
-    /// @param _tokenId Listed token id.
-    function cancelSalePrice(address _contractAddress, uint256 _tokenId) external;
+    /// @param _tokenIds Listed token ids.
+    function cancelSalePrices(address _contractAddress, uint256[] calldata _tokenIds) external;
 
-    /// @notice Buys tokens from a seller's secondary fixed-price listing.
+    /// @notice Buys tokens from a seller's secondary fixed-price listings.
+    /// @dev Request token ids must be strictly ascending. A one-token buy is represented by a one-item batch.
     /// @param _contractAddress ERC1155 collection address.
-    /// @param _tokenId Token id to buy.
     /// @param _seller Seller whose listing is being filled.
     /// @param _currencyAddress Currency expected by the buyer.
-    /// @param _price Unit price expected by the buyer.
-    /// @param _quantity Quantity to buy.
-    function buy(
+    /// @param _requests Buy requests to execute.
+    function buyBatch(
         address _contractAddress,
-        uint256 _tokenId,
         address _seller,
         address _currencyAddress,
-        uint256 _price,
-        uint256 _quantity
+        BuyRequest[] calldata _requests
     ) external payable;
 
     /// @notice Returns the primary mint sale config for a token id.

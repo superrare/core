@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {IERC2981Upgradeable} from "openzeppelin-contracts-upgradeable/interfaces/IERC2981Upgradeable.sol";
+
 import {ITokenCreator} from "../extensions/ITokenCreator.sol";
 
 /// @author SuperRare Labs Inc.
 /// @title IRareERC1155
 /// @notice Interface for the RARE Protocol ERC1155 token.
 /// @dev Extends the RARE `ITokenCreator` interface so marketplace and royalty infrastructure can resolve creators per token id.
-interface IRareERC1155 is ITokenCreator {
+interface IRareERC1155 is ITokenCreator, IERC2981Upgradeable {
     /// @notice Per-token configuration for an ERC1155 edition.
     struct TokenConfig {
         /// @notice Maximum supply that may ever be minted for the token id.
@@ -27,24 +29,12 @@ interface IRareERC1155 is ITokenCreator {
     /// @param creator RARE creator recorded for the token id.
     /// @param maxSupply Maximum supply configured for the token id.
     /// @param tokenURI Token-specific metadata URI.
-    /// @param royaltyReceiver ERC2981 royalty receiver configured for the token id.
-    event TokenCreated(
-        uint256 indexed tokenId, address indexed creator, uint256 maxSupply, string tokenURI, address royaltyReceiver
-    );
+    event TokenCreated(uint256 indexed tokenId, address indexed creator, uint256 maxSupply, string tokenURI);
 
     /// @notice Emitted when owner changes minter approval.
     /// @param minter Address whose approval changed.
     /// @param isMinter True when the address is approved to mint.
     event MinterApprovalUpdated(address indexed minter, bool isMinter);
-
-    /// @notice Emitted when the metadata of a token is changed.
-    /// @param _tokenId Token id whose metadata changed.
-    event MetadataUpdate(uint256 _tokenId);
-
-    /// @notice Emitted when the metadata of a consecutive range of tokens is changed.
-    /// @param _fromTokenId First token id in the changed range.
-    /// @param _toTokenId Last token id in the changed range.
-    event BatchMetadataUpdate(uint256 _fromTokenId, uint256 _toTokenId);
 
     /// @notice Reverted when a write operation is attempted after the collection has been disabled.
     error ContractIsDisabled();
@@ -72,6 +62,30 @@ interface IRareERC1155 is ITokenCreator {
     /// @param _maxSupply The configured max supply for the token id.
     error ExceededMaxSupply(uint256 _tokenId, uint256 _requestedTotalMinted, uint256 _maxSupply);
 
+    /// @notice Reverted when a batch operation receives no items.
+    error EmptyBatch();
+
+    /// @notice Reverted when parallel batch arrays have different lengths.
+    error BatchLengthMismatch();
+
+    /// @notice Reverted when a batch exceeds the supported item count.
+    /// @param supplied Number of items supplied.
+    /// @param max Maximum supported item count.
+    error BatchSizeExceeded(uint256 supplied, uint256 max);
+
+    /// @notice Reverted when token ids are not strictly ascending.
+    /// @param tokenId Token id that is not greater than the previous token id.
+    error TokenIdsNotStrictlyAscending(uint256 tokenId);
+
+    /// @notice Reverted when the default royalty percentage is above 100%.
+    /// @param supplied Percentage supplied by the caller.
+    /// @param max Maximum supported percentage.
+    error RoyaltyPercentageTooHigh(uint256 supplied, uint256 max);
+
+    /// @notice Maximum number of token ids accepted by public batch mint operations.
+    /// @return Maximum supported batch item count.
+    function MAX_BATCH_SIZE() external pure returns (uint256);
+
     /// @notice Returns the human-readable collection name.
     /// @return Collection name.
     function name() external view returns (string memory);
@@ -89,7 +103,7 @@ interface IRareERC1155 is ITokenCreator {
     /// @param _name Human-readable collection name.
     /// @param _symbol Human-readable collection symbol.
     /// @param _baseURI Base ERC1155 URI used when a token id has no token-specific URI.
-    /// @param _creator Initial collection owner and default royalty receiver.
+    /// @param _creator Initial collection owner and ERC2981 royalty receiver.
     /// @param _defaultMinter Optional minter approved during initialization. Use zero address for no default minter.
     function init(
         string calldata _name,
@@ -99,31 +113,30 @@ interface IRareERC1155 is ITokenCreator {
         address _defaultMinter
     ) external;
 
-    /// @notice Creates a new token type with a token-specific URI, max supply, and royalty receiver.
-    /// @param _tokenURI Metadata URI returned for the new token id.
-    /// @param _maxSupply Maximum supply that may ever be minted for the new token id.
-    /// @param _royaltyReceiver Address that receives ERC2981 royalties for the new token id.
-    /// @return The newly created token id.
-    function createToken(string calldata _tokenURI, uint256 _maxSupply, address _royaltyReceiver)
-        external
-        returns (uint256);
-
-    /// @notice Creates a new token type using the caller as the royalty receiver.
+    /// @notice Creates a new token type.
     /// @param _tokenURI Metadata URI returned for the new token id.
     /// @param _maxSupply Maximum supply that may ever be minted for the new token id.
     /// @return The newly created token id.
     function createToken(string calldata _tokenURI, uint256 _maxSupply) external returns (uint256);
 
-    /// @notice Mints an existing token id to a receiver.
-    /// @dev Callable by the owner or an approved minter only. Approved minters intentionally have
-    /// collection-wide mint authority for any existing token id, up to that token's max supply, so
-    /// creators can approve a trusted marketplace contract once instead of approving per token.
-    /// Owners should only approve minters they trust to mint remaining collection supply.
+    /// @notice Mints one existing token id to a receiver.
+    /// @dev Callable by the owner or an approved minter only. This is a one-item wrapper over batch minting.
     /// @param _receiver Address that receives the minted tokens.
     /// @param _tokenId Existing token id to mint.
     /// @param _amount Quantity to mint.
-    /// @return The minted token id.
+    /// @return Minted token id.
     function mintTo(address _receiver, uint256 _tokenId, uint256 _amount) external returns (uint256);
+
+    /// @notice Mints existing token ids to a receiver.
+    /// @dev Callable by the owner or an approved minter only. Token ids must be strictly ascending.
+    /// Approved minters intentionally have collection-wide mint authority for any existing token id,
+    /// up to that token's max supply, so creators can approve a trusted marketplace contract once
+    /// instead of approving per token. Owners should only approve minters they trust to mint remaining
+    /// collection supply.
+    /// @param _receiver Address that receives the minted tokens.
+    /// @param _tokenIds Existing token ids to mint.
+    /// @param _amounts Quantities to mint for each token id.
+    function mintBatchTo(address _receiver, uint256[] calldata _tokenIds, uint256[] calldata _amounts) external;
 
     /// @notice Grants or revokes collection-wide minter approval for an address.
     /// @dev Approval is deliberately collection-wide rather than token-scoped to keep the creator UX
@@ -133,14 +146,13 @@ interface IRareERC1155 is ITokenCreator {
     /// @param _isMinter Whether the address should be allowed to mint.
     function setMinterApproval(address _minter, bool _isMinter) external;
 
-    /// @notice Updates the fallback royalty receiver for tokens that rely on default royalties.
+    /// @notice Updates the collection-wide ERC2981 royalty receiver.
     /// @param _receiver New default royalty receiver.
     function setDefaultRoyaltyReceiver(address _receiver) external;
 
-    /// @notice Updates the royalty receiver for a specific token id.
-    /// @param _receiver New royalty receiver for the token id.
-    /// @param _tokenId Token id whose royalty receiver is updated.
-    function setRoyaltyReceiverForToken(address _receiver, uint256 _tokenId) external;
+    /// @notice Updates the collection-wide ERC2981 royalty percentage.
+    /// @param _percentage New royalty percentage, expressed as whole percentage points.
+    function setDefaultRoyaltyPercentage(uint256 _percentage) external;
 
     /// @notice Updates the token-specific metadata URI for an existing token id.
     /// @param _tokenId Token id whose URI is updated.
@@ -171,10 +183,4 @@ interface IRareERC1155 is ITokenCreator {
     /// @param _tokenId Token id to inspect.
     /// @return Metadata URI for the token id.
     function uri(uint256 _tokenId) external view returns (string memory);
-
-    /// @notice Returns whether this contract supports an interface id.
-    /// @dev Returns true for ERC-4906 metadata updates at interface id `0x49064906`.
-    /// @param _interfaceId Interface id to inspect.
-    /// @return True when the interface id is supported.
-    function supportsInterface(bytes4 _interfaceId) external view returns (bool);
 }

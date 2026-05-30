@@ -16,8 +16,8 @@ import {IMarketplaceSettings} from "../../marketplace/IMarketplaceSettings.sol";
 import {Payments} from "../../payments/Payments.sol";
 import {RareERC1155} from "../../token/ERC1155/RareERC1155.sol";
 import {RareERC1155ContractFactory} from "../../token/ERC1155/RareERC1155ContractFactory.sol";
-import {RareERC1155Marketplace} from "../../marketplace/RareERC1155Marketplace.sol";
-import {IRareERC1155Marketplace} from "../../marketplace/IRareERC1155Marketplace.sol";
+import {RareERC1155Listings} from "../../marketplace/RareERC1155Listings.sol";
+import {IRareERC1155Listings} from "../../marketplace/IRareERC1155Listings.sol";
 import {ERC20ApprovalManager} from "../../v2/approver/ERC20/ERC20ApprovalManager.sol";
 import {ERC721ApprovalManager} from "../../v2/approver/ERC721/ERC721ApprovalManager.sol";
 import {ERC1155ApprovalManager} from "../../v2/approver/ERC1155/ERC1155ApprovalManager.sol";
@@ -106,11 +106,22 @@ contract TestNoOpERC1155 is IERC1155 {
     {}
 }
 
-contract RareERC1155MarketplaceTest is Test {
+contract RareERC1155ListingsTest is Test {
     event MarketplaceDependencyUpdated(bytes32 indexed field, address indexed dependency);
     event ContractPausedUpdated(bool isPaused);
+    event SalePriceSet(
+        address indexed seller,
+        address indexed contractAddress,
+        uint256 indexed tokenId,
+        address currency,
+        uint256 price,
+        uint256 quantity,
+        uint256 expirationTime,
+        address payable[] splitRecipients,
+        uint8[] splitRatios
+    );
 
-    RareERC1155Marketplace private market;
+    RareERC1155Listings private market;
     RareERC1155 private token;
     TestERC1155Currency private currency;
     ERC20ApprovalManager private erc20ApprovalManager;
@@ -153,8 +164,8 @@ contract RareERC1155MarketplaceTest is Test {
         erc721ApprovalManager = new ERC721ApprovalManager();
         erc1155ApprovalManager = new ERC1155ApprovalManager();
 
-        RareERC1155Marketplace implementation = new RareERC1155Marketplace();
-        market = RareERC1155Marketplace(address(new ERC1967Proxy(address(implementation), "")));
+        RareERC1155Listings implementation = new RareERC1155Listings();
+        market = RareERC1155Listings(address(new ERC1967Proxy(address(implementation), "")));
         market.initialize(
             networkBeneficiary,
             marketplaceSettings,
@@ -179,7 +190,7 @@ contract RareERC1155MarketplaceTest is Test {
         token = RareERC1155(tokenFactory.createRareERC1155Contract("Rare Editions", "RED", "ipfs://base/{id}.json"));
 
         vm.prank(seller);
-        tokenId = token.createToken("ipfs://token/1.json", 20, royaltyReceiver);
+        tokenId = token.createToken("ipfs://token/1.json", 20);
 
         vm.etch(marketplaceSettings, address(market).code);
         vm.etch(stakingSettings, address(market).code);
@@ -190,7 +201,7 @@ contract RareERC1155MarketplaceTest is Test {
     }
 
     function testImplementationCannotBeInitialized() public {
-        RareERC1155Marketplace directImplementation = new RareERC1155Marketplace();
+        RareERC1155Listings directImplementation = new RareERC1155Listings();
         Payments payments = new Payments();
 
         vm.expectRevert("Initializable: contract is already initialized");
@@ -207,6 +218,10 @@ contract RareERC1155MarketplaceTest is Test {
             address(erc721ApprovalManager),
             address(erc1155ApprovalManager)
         );
+    }
+
+    function testMaxBatchSize() public {
+        assertEq(market.MAX_BATCH_SIZE(), 100);
     }
 
     function testPrepareAndMintDirectSaleERC20() public {
@@ -228,7 +243,7 @@ contract RareERC1155MarketplaceTest is Test {
         uint256 rewardBalanceBefore = currency.balanceOf(rewardAccumulator);
 
         vm.prank(buyer);
-        market.mintDirectSale(address(token), tokenId, address(currency), price, quantity, emptyProof);
+        _mintDirectSale(tokenId, address(currency), price, quantity, emptyProof, 0);
 
         assertEq(token.balanceOf(buyer, tokenId), quantity);
         assertEq(buyerBalanceBefore - currency.balanceOf(buyer), totalPrice + ((totalPrice * 3) / 100));
@@ -265,7 +280,7 @@ contract RareERC1155MarketplaceTest is Test {
         uint256 rewardBalanceBefore = currency.balanceOf(rewardAccumulator);
 
         vm.prank(buyer);
-        market.mintDirectSale(address(token), tokenId, address(currency), price, 1, emptyProof);
+        _mintDirectSale(tokenId, address(currency), price, 1, emptyProof, 0);
 
         assertEq(buyerBalanceBefore - currency.balanceOf(buyer), price + marketplaceFee);
         assertEq(currency.balanceOf(seller), 28);
@@ -289,9 +304,7 @@ contract RareERC1155MarketplaceTest is Test {
         uint256 rewardBalanceBefore = rewardAccumulator.balance;
 
         vm.prank(buyer);
-        market.mintDirectSale{value: totalPrice + ((totalPrice * 3) / 100)}(
-            address(token), tokenId, address(0), price, quantity, emptyProof
-        );
+        _mintDirectSale(tokenId, address(0), price, quantity, emptyProof, totalPrice + ((totalPrice * 3) / 100));
 
         assertEq(token.balanceOf(buyer, tokenId), quantity);
         assertEq(seller.balance - sellerBalanceBefore, (totalPrice * 85) / 100);
@@ -305,7 +318,7 @@ contract RareERC1155MarketplaceTest is Test {
         _prepareDirectSale(address(0), 0, block.timestamp, 0);
 
         vm.prank(buyer);
-        market.mintDirectSale(address(token), tokenId, address(0), 0, 3, emptyProof);
+        _mintDirectSale(tokenId, address(0), 0, 3, emptyProof, 0);
 
         assertEq(token.balanceOf(buyer, tokenId), 3);
     }
@@ -319,9 +332,13 @@ contract RareERC1155MarketplaceTest is Test {
         splitRatios[1] = 50;
 
         vm.prank(seller);
-        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Marketplace.SplitRecipientCannotBeZero.selector, 0));
-        market.prepareMintDirectSale(
-            address(token), tokenId, address(0), 1 ether, block.timestamp, 0, splitRecipients, splitRatios
+        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Listings.SplitRecipientCannotBeZero.selector, 0));
+        market.prepareMintDirectSales(
+            address(token),
+            address(0),
+            _singleDirectSaleRequest(tokenId, 1 ether, block.timestamp, 0),
+            splitRecipients,
+            splitRatios
         );
     }
 
@@ -334,9 +351,13 @@ contract RareERC1155MarketplaceTest is Test {
         splitRatios[1] = 100;
 
         vm.prank(seller);
-        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Marketplace.SplitRatioCannotBeZero.selector, 0));
-        market.prepareMintDirectSale(
-            address(token), tokenId, address(0), 1 ether, block.timestamp, 0, splitRecipients, splitRatios
+        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Listings.SplitRatioCannotBeZero.selector, 0));
+        market.prepareMintDirectSales(
+            address(token),
+            address(0),
+            _singleDirectSaleRequest(tokenId, 1 ether, block.timestamp, 0),
+            splitRecipients,
+            splitRatios
         );
     }
 
@@ -348,12 +369,8 @@ contract RareERC1155MarketplaceTest is Test {
         token.transferOwnership(nextOwner);
 
         vm.prank(buyer);
-        vm.expectRevert(
-            abi.encodeWithSelector(IRareERC1155Marketplace.NotContractOwner.selector, address(token), seller)
-        );
-        market.mintDirectSale{value: price + ((price * 3) / 100)}(
-            address(token), tokenId, address(0), price, 1, emptyProof
-        );
+        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Listings.NotContractOwner.selector, address(token), seller));
+        _mintDirectSale(tokenId, address(0), price, 1, emptyProof, price + ((price * 3) / 100));
 
         assertEq(token.balanceOf(buyer, tokenId), 0);
     }
@@ -380,7 +397,7 @@ contract RareERC1155MarketplaceTest is Test {
         uint256 rewardBalanceBefore = rewardAccumulator.balance;
 
         vm.prank(buyer);
-        market.mintDirectSale{value: 104}(address(token), tokenId, address(0), price, 1, emptyProof);
+        _mintDirectSale(tokenId, address(0), price, 1, emptyProof, 104);
 
         assertEq(token.balanceOf(buyer, tokenId), 1);
         assertEq(seller.balance - sellerBalanceBefore, 86);
@@ -407,8 +424,8 @@ contract RareERC1155MarketplaceTest is Test {
         );
 
         vm.prank(buyer);
-        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Marketplace.StakingFeeExceedsMarketplaceFee.selector, 3, 4));
-        market.mintDirectSale{value: 104}(address(token), tokenId, address(0), price, 1, emptyProof);
+        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Listings.StakingFeeExceedsMarketplaceFee.selector, 3, 4));
+        _mintDirectSale(tokenId, address(0), price, 1, emptyProof, 104);
 
         assertEq(token.balanceOf(buyer, tokenId), 0);
         assertEq(address(market).balance, 0);
@@ -432,10 +449,8 @@ contract RareERC1155MarketplaceTest is Test {
         );
 
         vm.prank(buyer);
-        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Marketplace.PlatformCommissionExceeded.selector, 101, 100));
-        market.mintDirectSale{value: price + ((price * 3) / 100)}(
-            address(token), tokenId, address(0), price, 1, emptyProof
-        );
+        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Listings.PlatformCommissionExceeded.selector, 101, 100));
+        _mintDirectSale(tokenId, address(0), price, 1, emptyProof, price + ((price * 3) / 100));
 
         assertEq(token.balanceOf(buyer, tokenId), 0);
         assertEq(address(market).balance, 0);
@@ -457,10 +472,8 @@ contract RareERC1155MarketplaceTest is Test {
         );
 
         vm.prank(buyer);
-        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Marketplace.PlatformCommissionExceeded.selector, 101, 100));
-        market.mintDirectSale{value: price + ((price * 3) / 100)}(
-            address(token), tokenId, address(0), price, 1, emptyProof
-        );
+        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Listings.PlatformCommissionExceeded.selector, 101, 100));
+        _mintDirectSale(tokenId, address(0), price, 1, emptyProof, price + ((price * 3) / 100));
 
         assertEq(token.balanceOf(buyer, tokenId), 0);
         assertEq(address(market).balance, 0);
@@ -473,26 +486,22 @@ contract RareERC1155MarketplaceTest is Test {
         _prepareDirectSale(address(0), price, block.timestamp, 2);
 
         vm.prank(seller);
-        market.setTokenAllowListConfig(root, block.timestamp + 1 days, address(token), tokenId);
+        _setTokenAllowListConfig(tokenId, root, block.timestamp + 1 days);
 
         vm.prank(seller);
-        market.setTokenMintLimit(address(token), tokenId, 2);
+        _setTokenMintLimit(tokenId, 2);
 
         _mockPrimaryPayout(price * 2, seller);
         vm.prank(buyer);
-        market.mintDirectSale{value: (price * 2) + (((price * 2) * 3) / 100)}(
-            address(token), tokenId, address(0), price, 2, emptyProof
-        );
+        _mintDirectSale(tokenId, address(0), price, 2, emptyProof, (price * 2) + (((price * 2) * 3) / 100));
 
         vm.prank(buyer);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IRareERC1155Marketplace.MintLimitExceeded.selector, address(token), tokenId, buyer, 1, 2, 2
+                IRareERC1155Listings.MintLimitExceeded.selector, address(token), tokenId, buyer, 1, 2, 2
             )
         );
-        market.mintDirectSale{value: price + ((price * 3) / 100)}(
-            address(token), tokenId, address(0), price, 1, emptyProof
-        );
+        _mintDirectSale(tokenId, address(0), price, 1, emptyProof, price + ((price * 3) / 100));
     }
 
     function testMintDirectSaleAllowListRejectsNonMember() public {
@@ -502,13 +511,11 @@ contract RareERC1155MarketplaceTest is Test {
         _prepareDirectSale(address(0), price, block.timestamp, 0);
 
         vm.prank(seller);
-        market.setTokenAllowListConfig(root, block.timestamp + 1 days, address(token), tokenId);
+        _setTokenAllowListConfig(tokenId, root, block.timestamp + 1 days);
 
         vm.prank(buyer);
-        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Marketplace.AddressNotAllowlisted.selector, buyer));
-        market.mintDirectSale{value: price + ((price * 3) / 100)}(
-            address(token), tokenId, address(0), price, 1, emptyProof
-        );
+        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Listings.AddressNotAllowlisted.selector, buyer));
+        _mintDirectSale(tokenId, address(0), price, 1, emptyProof, price + ((price * 3) / 100));
     }
 
     function testTokenScopedPrimaryConfigRevertsForUnknownTokenId() public {
@@ -517,19 +524,19 @@ contract RareERC1155MarketplaceTest is Test {
 
         vm.startPrank(seller);
         vm.expectRevert(
-            abi.encodeWithSelector(IRareERC1155Marketplace.TokenNotFound.selector, address(token), missingTokenId)
+            abi.encodeWithSelector(IRareERC1155Listings.TokenNotFound.selector, address(token), missingTokenId)
         );
-        market.setTokenAllowListConfig(root, block.timestamp + 1 days, address(token), missingTokenId);
+        _setTokenAllowListConfig(missingTokenId, root, block.timestamp + 1 days);
 
         vm.expectRevert(
-            abi.encodeWithSelector(IRareERC1155Marketplace.TokenNotFound.selector, address(token), missingTokenId)
+            abi.encodeWithSelector(IRareERC1155Listings.TokenNotFound.selector, address(token), missingTokenId)
         );
-        market.setTokenMintLimit(address(token), missingTokenId, 1);
+        _setTokenMintLimit(missingTokenId, 1);
 
         vm.expectRevert(
-            abi.encodeWithSelector(IRareERC1155Marketplace.TokenNotFound.selector, address(token), missingTokenId)
+            abi.encodeWithSelector(IRareERC1155Listings.TokenNotFound.selector, address(token), missingTokenId)
         );
-        market.setTokenTxLimit(address(token), missingTokenId, 1);
+        _setTokenTxLimit(missingTokenId, 1);
         vm.stopPrank();
     }
 
@@ -538,41 +545,37 @@ contract RareERC1155MarketplaceTest is Test {
         _prepareDirectSale(address(0), price, block.timestamp, 0);
 
         vm.prank(seller);
-        market.setTokenTxLimit(address(token), tokenId, 1);
+        _setTokenTxLimit(tokenId, 1);
 
         _mockPrimaryPayout(price, seller);
         vm.prank(buyer);
-        market.mintDirectSale{value: price + ((price * 3) / 100)}(
-            address(token), tokenId, address(0), price, 1, emptyProof
-        );
+        _mintDirectSale(tokenId, address(0), price, 1, emptyProof, price + ((price * 3) / 100));
 
         vm.prank(buyer);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IRareERC1155Marketplace.TransactionLimitExceeded.selector, address(token), tokenId, buyer, 1, 1
+                IRareERC1155Listings.TransactionLimitExceeded.selector, address(token), tokenId, buyer, 1, 1
             )
         );
-        market.mintDirectSale{value: price + ((price * 3) / 100)}(
-            address(token), tokenId, address(0), price, 1, emptyProof
-        );
+        _mintDirectSale(tokenId, address(0), price, 1, emptyProof, price + ((price * 3) / 100));
     }
 
     function testMintDirectSaleLimitsOnlyCountWhileEnabled() public {
         _prepareDirectSale(address(0), 0, block.timestamp, 0);
 
         vm.prank(buyer);
-        market.mintDirectSale(address(token), tokenId, address(0), 0, 2, emptyProof);
+        _mintDirectSale(tokenId, address(0), 0, 2, emptyProof, 0);
 
         assertEq(market.getTokenMintsPerAddress(address(token), tokenId, buyer), 0);
         assertEq(market.getTokenTxsPerAddress(address(token), tokenId, buyer), 0);
 
         vm.startPrank(seller);
-        market.setTokenMintLimit(address(token), tokenId, 1);
-        market.setTokenTxLimit(address(token), tokenId, 1);
+        _setTokenMintLimit(tokenId, 1);
+        _setTokenTxLimit(tokenId, 1);
         vm.stopPrank();
 
         vm.prank(buyer);
-        market.mintDirectSale(address(token), tokenId, address(0), 0, 1, emptyProof);
+        _mintDirectSale(tokenId, address(0), 0, 1, emptyProof, 0);
 
         assertEq(market.getTokenMintsPerAddress(address(token), tokenId, buyer), 1);
         assertEq(market.getTokenTxsPerAddress(address(token), tokenId, buyer), 1);
@@ -580,37 +583,37 @@ contract RareERC1155MarketplaceTest is Test {
         vm.prank(buyer);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IRareERC1155Marketplace.MintLimitExceeded.selector, address(token), tokenId, buyer, 1, 1, 1
+                IRareERC1155Listings.MintLimitExceeded.selector, address(token), tokenId, buyer, 1, 1, 1
             )
         );
-        market.mintDirectSale(address(token), tokenId, address(0), 0, 1, emptyProof);
+        _mintDirectSale(tokenId, address(0), 0, 1, emptyProof, 0);
     }
 
     function testMintDirectSaleLimitsAreTokenScoped() public {
         uint256 otherTokenId;
 
         vm.prank(seller);
-        otherTokenId = token.createToken("ipfs://token/2.json", 20, royaltyReceiver);
+        otherTokenId = token.createToken("ipfs://token/2.json", 20);
 
         _prepareDirectSale(address(0), 0, block.timestamp, 0);
         _prepareDirectSaleForToken(otherTokenId, address(0), 0, block.timestamp, 0);
 
         vm.prank(seller);
-        market.setTokenMintLimit(address(token), tokenId, 1);
+        _setTokenMintLimit(tokenId, 1);
 
         vm.prank(buyer);
-        market.mintDirectSale(address(token), tokenId, address(0), 0, 1, emptyProof);
+        _mintDirectSale(tokenId, address(0), 0, 1, emptyProof, 0);
 
         vm.prank(buyer);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IRareERC1155Marketplace.MintLimitExceeded.selector, address(token), tokenId, buyer, 1, 1, 1
+                IRareERC1155Listings.MintLimitExceeded.selector, address(token), tokenId, buyer, 1, 1, 1
             )
         );
-        market.mintDirectSale(address(token), tokenId, address(0), 0, 1, emptyProof);
+        _mintDirectSale(tokenId, address(0), 0, 1, emptyProof, 0);
 
         vm.prank(buyer);
-        market.mintDirectSale(address(token), otherTokenId, address(0), 0, 2, emptyProof);
+        _mintDirectSale(otherTokenId, address(0), 0, 2, emptyProof, 0);
 
         assertEq(token.balanceOf(buyer, tokenId), 1);
         assertEq(token.balanceOf(buyer, otherTokenId), 2);
@@ -624,22 +627,161 @@ contract RareERC1155MarketplaceTest is Test {
         _prepareDirectSale(address(currency), price, block.timestamp + 1 hours, 0);
 
         vm.prank(buyer);
-        vm.expectRevert(
-            abi.encodeWithSelector(IRareERC1155Marketplace.SaleNotStarted.selector, block.timestamp + 1 hours)
-        );
-        market.mintDirectSale(address(token), tokenId, address(currency), price, 1, emptyProof);
+        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Listings.SaleNotStarted.selector, block.timestamp + 1 hours));
+        _mintDirectSale(tokenId, address(currency), price, 1, emptyProof, 0);
 
         skip(1 hours);
 
         vm.prank(buyer);
-        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Marketplace.PriceMismatch.selector, price + 1, price));
-        market.mintDirectSale(address(token), tokenId, address(currency), price + 1, 1, emptyProof);
+        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Listings.PriceMismatch.selector, price + 1, price));
+        _mintDirectSale(tokenId, address(currency), price + 1, 1, emptyProof, 0);
 
         vm.prank(buyer);
         vm.expectRevert(
-            abi.encodeWithSelector(IRareERC1155Marketplace.CurrencyMismatch.selector, address(0), address(currency))
+            abi.encodeWithSelector(IRareERC1155Listings.CurrencyMismatch.selector, address(0), address(currency))
         );
-        market.mintDirectSale(address(token), tokenId, address(0), price, 1, emptyProof);
+        _mintDirectSale(tokenId, address(0), price, 1, emptyProof, 0);
+    }
+
+    function testMintDirectSaleBatchRejectsBadBatchShape() public {
+        IRareERC1155Listings.MintRequest[] memory emptyRequests = new IRareERC1155Listings.MintRequest[](0);
+
+        vm.prank(buyer);
+        vm.expectRevert(IRareERC1155Listings.EmptyBatch.selector);
+        market.mintDirectSaleBatch(address(token), address(0), emptyRequests);
+
+        bytes32[] memory proof = new bytes32[](0);
+        IRareERC1155Listings.MintRequest[] memory requests = new IRareERC1155Listings.MintRequest[](2);
+        requests[0] = IRareERC1155Listings.MintRequest(1, 0, 1, proof);
+        requests[1] = IRareERC1155Listings.MintRequest(1, 0, 1, proof);
+
+        vm.prank(buyer);
+        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Listings.TokenIdsNotStrictlyAscending.selector, 1, 1, 1));
+        market.mintDirectSaleBatch(address(token), address(0), requests);
+
+        requests[0] = IRareERC1155Listings.MintRequest(2, 0, 1, proof);
+        requests[1] = IRareERC1155Listings.MintRequest(1, 0, 1, proof);
+
+        vm.prank(buyer);
+        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Listings.TokenIdsNotStrictlyAscending.selector, 1, 2, 1));
+        market.mintDirectSaleBatch(address(token), address(0), requests);
+    }
+
+    function testMintDirectSaleBatchRejectsOversizedBatch() public {
+        bytes32[] memory proof = new bytes32[](0);
+        IRareERC1155Listings.MintRequest[] memory requests = new IRareERC1155Listings.MintRequest[](101);
+
+        for (uint256 i = 0; i < requests.length; i++) {
+            requests[i] = IRareERC1155Listings.MintRequest(i + 1, 0, 1, proof);
+        }
+
+        vm.prank(buyer);
+        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Listings.BatchSizeExceeded.selector, 101, 100));
+        market.mintDirectSaleBatch(address(token), address(0), requests);
+    }
+
+    function testMintDirectSaleBatchRejectsZeroQuantity() public {
+        _prepareDirectSale(address(0), 0, block.timestamp, 0);
+
+        vm.prank(buyer);
+        vm.expectRevert(IRareERC1155Listings.QuantityCannotBeZero.selector);
+        _mintDirectSale(tokenId, address(0), 0, 0, emptyProof, 0);
+    }
+
+    function testMintDirectSaleBatchAggregatesFreeAndPaidETHPayment() public {
+        uint256 paidTokenId;
+        uint256 price = 1 ether;
+
+        vm.prank(seller);
+        paidTokenId = token.createToken("ipfs://token/2.json", 20);
+
+        _prepareDirectSale(address(0), 0, block.timestamp, 0);
+        _prepareDirectSaleForToken(paidTokenId, address(0), price, block.timestamp, 0);
+        _mockPrimaryPayout(price, seller);
+
+        IRareERC1155Listings.MintRequest[] memory requests = new IRareERC1155Listings.MintRequest[](2);
+        bytes32[] memory proof = new bytes32[](0);
+        requests[0] = IRareERC1155Listings.MintRequest(tokenId, 0, 2, proof);
+        requests[1] = IRareERC1155Listings.MintRequest(paidTokenId, price, 1, proof);
+
+        vm.prank(buyer);
+        market.mintDirectSaleBatch{value: price + ((price * 3) / 100)}(address(token), address(0), requests);
+
+        assertEq(token.balanceOf(buyer, tokenId), 2);
+        assertEq(token.balanceOf(buyer, paidTokenId), 1);
+    }
+
+    function testMintDirectSaleBatchRejectsValueForAllFreeBatch() public {
+        _prepareDirectSale(address(0), 0, block.timestamp, 0);
+
+        vm.prank(buyer);
+        vm.expectRevert(IRareERC1155Listings.MsgValueMustBeZero.selector);
+        _mintDirectSale(tokenId, address(0), 0, 1, emptyProof, 1);
+    }
+
+    function testMintDirectSaleBatchRejectsMsgValueForERC20Batch() public {
+        uint256 price = 1 ether;
+        _mockApprovedCurrency(true);
+        _prepareDirectSale(address(currency), price, block.timestamp, 0);
+        _mockMarketplaceFee(price, seller);
+
+        vm.prank(buyer);
+        vm.expectRevert(IRareERC1155Listings.MsgValueUnsupportedForERC20.selector);
+        _mintDirectSale(tokenId, address(currency), price, 1, emptyProof, 1);
+    }
+
+    function testMintDirectSaleBatchCalculatesFeesPerItem() public {
+        uint256 otherTokenId;
+        uint256 price = 33;
+
+        vm.prank(seller);
+        otherTokenId = token.createToken("ipfs://token/2.json", 20);
+
+        _prepareDirectSale(address(0), price, block.timestamp, 0);
+        _prepareDirectSaleForToken(otherTokenId, address(0), price, block.timestamp, 0);
+        _mockPrimaryPayout(price, seller);
+
+        IRareERC1155Listings.MintRequest[] memory requests = new IRareERC1155Listings.MintRequest[](2);
+        bytes32[] memory proof = new bytes32[](0);
+        requests[0] = IRareERC1155Listings.MintRequest(tokenId, price, 1, proof);
+        requests[1] = IRareERC1155Listings.MintRequest(otherTokenId, price, 1, proof);
+
+        vm.prank(buyer);
+        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Listings.IncorrectETHAmount.selector, 66, 67));
+        market.mintDirectSaleBatch{value: 67}(address(token), address(0), requests);
+
+        vm.prank(buyer);
+        market.mintDirectSaleBatch{value: 66}(address(token), address(0), requests);
+
+        assertEq(token.balanceOf(buyer, tokenId), 1);
+        assertEq(token.balanceOf(buyer, otherTokenId), 1);
+        assertEq(address(market).balance, 0);
+    }
+
+    function testMintDirectSaleBatchCountsOneTxPerTokenId() public {
+        uint256 otherTokenId;
+
+        vm.prank(seller);
+        otherTokenId = token.createToken("ipfs://token/2.json", 20);
+
+        _prepareDirectSale(address(0), 0, block.timestamp, 0);
+        _prepareDirectSaleForToken(otherTokenId, address(0), 0, block.timestamp, 0);
+
+        vm.startPrank(seller);
+        _setTokenTxLimit(tokenId, 1);
+        _setTokenTxLimit(otherTokenId, 1);
+        vm.stopPrank();
+
+        IRareERC1155Listings.MintRequest[] memory requests = new IRareERC1155Listings.MintRequest[](2);
+        bytes32[] memory proof = new bytes32[](0);
+        requests[0] = IRareERC1155Listings.MintRequest(tokenId, 0, 1, proof);
+        requests[1] = IRareERC1155Listings.MintRequest(otherTokenId, 0, 2, proof);
+
+        vm.prank(buyer);
+        market.mintDirectSaleBatch(address(token), address(0), requests);
+
+        assertEq(market.getTokenTxsPerAddress(address(token), tokenId, buyer), 1);
+        assertEq(market.getTokenTxsPerAddress(address(token), otherTokenId, buyer), 1);
     }
 
     function testSetSalePriceAndBuyPartialERC20() public {
@@ -660,7 +802,7 @@ contract RareERC1155MarketplaceTest is Test {
         uint256 rewardBalanceBefore = currency.balanceOf(rewardAccumulator);
 
         vm.prank(buyer);
-        market.buy(address(token), tokenId, seller, address(currency), price, quantity);
+        _buy(address(token), tokenId, seller, address(currency), price, quantity, 0);
 
         assertEq(token.balanceOf(buyer, tokenId), quantity);
         assertEq(currency.balanceOf(seller) - sellerBalanceBefore, (totalPrice * 90) / 100);
@@ -668,8 +810,122 @@ contract RareERC1155MarketplaceTest is Test {
         assertEq(currency.balanceOf(networkBeneficiary) - networkBalanceBefore, (totalPrice * 2) / 100);
         assertEq(currency.balanceOf(rewardAccumulator) - rewardBalanceBefore, (totalPrice * 1) / 100);
 
-        IRareERC1155Marketplace.SalePrice memory salePrice = market.getSalePrice(address(token), tokenId, seller);
+        IRareERC1155Listings.SalePrice memory salePrice = market.getSalePrice(address(token), tokenId, seller);
         assertEq(salePrice.quantity, 2);
+    }
+
+    function testNoExpirySalePriceRemainsBuyableAfterTimePasses() public {
+        uint256 price = 1 ether;
+
+        _mintToSellerAndList(address(0), price, 1);
+        vm.warp(block.timestamp + 30 days);
+        _mockSecondaryPayout(price, seller);
+
+        vm.prank(buyer);
+        _buy(address(token), tokenId, seller, address(0), price, 1, price + ((price * 3) / 100));
+
+        assertEq(token.balanceOf(buyer, tokenId), 1);
+    }
+
+    function testSetSalePriceStoresAndEmitsExpiration() public {
+        uint256 price = 1 ether;
+        uint256 quantity = 2;
+        uint256 expirationTime = block.timestamp + 1 days;
+
+        vm.prank(seller);
+        token.mintBatchTo(seller, _singleTokenIds(tokenId), _singleAmounts(quantity));
+
+        vm.prank(seller);
+        token.setApprovalForAll(address(erc1155ApprovalManager), true);
+
+        address payable[] memory splitRecipients = new address payable[](1);
+        uint8[] memory splitRatios = new uint8[](1);
+        splitRecipients[0] = payable(seller);
+        splitRatios[0] = 100;
+
+        vm.prank(seller);
+        vm.expectEmit(true, true, true, true, address(market));
+        emit SalePriceSet(
+            seller, address(token), tokenId, address(0), price, quantity, expirationTime, splitRecipients, splitRatios
+        );
+        market.setSalePrices(
+            address(token),
+            address(0),
+            _singleSalePriceRequest(tokenId, price, quantity, expirationTime),
+            splitRecipients,
+            splitRatios
+        );
+
+        IRareERC1155Listings.SalePrice memory salePrice = market.getSalePrice(address(token), tokenId, seller);
+        assertEq(salePrice.expirationTime, expirationTime);
+    }
+
+    function testBuyBeforeExpirationPreservesExpirationOnPartialFill() public {
+        uint256 price = 1 ether;
+        uint256 expirationTime = block.timestamp + 1 days;
+
+        _mintToSellerAndListWithExpiration(address(0), price, 3, expirationTime);
+        _mockSecondaryPayout(price, seller);
+
+        vm.prank(buyer);
+        _buy(address(token), tokenId, seller, address(0), price, 1, price + ((price * 3) / 100));
+
+        IRareERC1155Listings.SalePrice memory salePrice = market.getSalePrice(address(token), tokenId, seller);
+        assertEq(salePrice.quantity, 2);
+        assertEq(salePrice.expirationTime, expirationTime);
+    }
+
+    function testBuyAtExpirationRevertsAndLeavesListingReadable() public {
+        uint256 price = 1 ether;
+        uint256 expirationTime = block.timestamp + 1 days;
+
+        _mintToSellerAndListWithExpiration(address(0), price, 2, expirationTime);
+        vm.warp(expirationTime);
+
+        vm.prank(buyer);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IRareERC1155Listings.SalePriceExpired.selector, address(token), tokenId, seller, expirationTime
+            )
+        );
+        _buy(address(token), tokenId, seller, address(0), price, 1, price + ((price * 3) / 100));
+
+        IRareERC1155Listings.SalePrice memory salePrice = market.getSalePrice(address(token), tokenId, seller);
+        assertEq(salePrice.quantity, 2);
+        assertEq(salePrice.expirationTime, expirationTime);
+    }
+
+    function testSetSalePriceRevertsForCurrentOrPastExpiration() public {
+        uint256 price = 1 ether;
+        vm.warp(100);
+
+        vm.prank(seller);
+        token.setApprovalForAll(address(erc1155ApprovalManager), true);
+
+        address payable[] memory splitRecipients = new address payable[](1);
+        uint8[] memory splitRatios = new uint8[](1);
+        splitRecipients[0] = payable(seller);
+        splitRatios[0] = 100;
+
+        vm.prank(seller);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IRareERC1155Listings.SalePriceExpirationInvalid.selector, block.timestamp, block.timestamp
+            )
+        );
+        _setSalePriceWithExpiration(
+            address(token), tokenId, address(0), price, 1, block.timestamp, splitRecipients, splitRatios
+        );
+
+        vm.prank(seller);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IRareERC1155Listings.SalePriceExpirationInvalid.selector, block.timestamp - 1, block.timestamp
+            )
+        );
+        _setSalePriceWithExpiration(
+            address(token), tokenId, address(0), price, 1, block.timestamp - 1, splitRecipients, splitRatios
+        );
     }
 
     function testBuyRevertsForRoyaltyPayoutLengthMismatch() public {
@@ -691,8 +947,8 @@ contract RareERC1155MarketplaceTest is Test {
         );
 
         vm.prank(buyer);
-        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Marketplace.PayoutLengthMismatch.selector, 1, 2));
-        market.buy{value: price + ((price * 3) / 100)}(address(token), tokenId, seller, address(0), price, 1);
+        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Listings.PayoutLengthMismatch.selector, 1, 2));
+        _buy(address(token), tokenId, seller, address(0), price, 1, price + ((price * 3) / 100));
 
         assertEq(token.balanceOf(buyer, tokenId), 0);
         assertEq(token.balanceOf(seller, tokenId), 1);
@@ -703,17 +959,110 @@ contract RareERC1155MarketplaceTest is Test {
         uint256 price = 1 ether;
         uint256 quantity = 2;
         uint256 totalPrice = price * quantity;
+        uint256 expirationTime = block.timestamp + 1 days;
 
-        _mintToSellerAndList(address(0), price, quantity);
+        _mintToSellerAndListWithExpiration(address(0), price, quantity, expirationTime);
         _mockSecondaryPayout(totalPrice, seller);
 
         vm.prank(buyer);
-        market.buy{value: totalPrice + ((totalPrice * 3) / 100)}(
-            address(token), tokenId, seller, address(0), price, quantity
+        _buy(address(token), tokenId, seller, address(0), price, quantity, totalPrice + ((totalPrice * 3) / 100));
+
+        IRareERC1155Listings.SalePrice memory salePrice = market.getSalePrice(address(token), tokenId, seller);
+        assertEq(salePrice.quantity, 0);
+        assertEq(salePrice.expirationTime, 0);
+    }
+
+    function testBuyBatchPartialAndFinalFillUpdatesListingsAndBalances() public {
+        uint256 otherTokenId;
+        uint256 price = 1 ether;
+
+        vm.prank(seller);
+        otherTokenId = token.createToken("ipfs://token/2.json", 20);
+
+        uint256[] memory tokenIds = new uint256[](2);
+        uint256[] memory mintAmounts = new uint256[](2);
+        tokenIds[0] = tokenId;
+        tokenIds[1] = otherTokenId;
+        mintAmounts[0] = 5;
+        mintAmounts[1] = 5;
+
+        vm.prank(seller);
+        token.mintBatchTo(seller, tokenIds, mintAmounts);
+
+        vm.prank(seller);
+        token.setApprovalForAll(address(erc1155ApprovalManager), true);
+
+        address payable[] memory splitRecipients = new address payable[](1);
+        uint8[] memory splitRatios = new uint8[](1);
+        splitRecipients[0] = payable(seller);
+        splitRatios[0] = 100;
+
+        IRareERC1155Listings.SalePriceRequest[] memory saleRequests = new IRareERC1155Listings.SalePriceRequest[](2);
+        saleRequests[0] = IRareERC1155Listings.SalePriceRequest(tokenId, price, 5, 0);
+        saleRequests[1] = IRareERC1155Listings.SalePriceRequest(otherTokenId, price, 5, 0);
+
+        vm.prank(seller);
+        market.setSalePrices(address(token), address(0), saleRequests, splitRecipients, splitRatios);
+
+        IRareERC1155Listings.BuyRequest[] memory buyRequests = new IRareERC1155Listings.BuyRequest[](2);
+        buyRequests[0] = IRareERC1155Listings.BuyRequest(tokenId, price, 2);
+        buyRequests[1] = IRareERC1155Listings.BuyRequest(otherTokenId, price, 3);
+
+        _mockSecondaryPayoutFor(address(token), tokenId, 2 ether, seller);
+        _mockSecondaryPayoutFor(address(token), otherTokenId, 3 ether, seller);
+
+        vm.prank(buyer);
+        market.buyBatch{value: 5 ether + ((2 ether * 3) / 100) + ((3 ether * 3) / 100)}(
+            address(token), seller, address(0), buyRequests
         );
 
-        IRareERC1155Marketplace.SalePrice memory salePrice = market.getSalePrice(address(token), tokenId, seller);
-        assertEq(salePrice.quantity, 0);
+        assertEq(token.balanceOf(seller, tokenId), 3);
+        assertEq(token.balanceOf(seller, otherTokenId), 2);
+        assertEq(token.balanceOf(buyer, tokenId), 2);
+        assertEq(token.balanceOf(buyer, otherTokenId), 3);
+        assertEq(market.getSalePrice(address(token), tokenId, seller).quantity, 3);
+        assertEq(market.getSalePrice(address(token), otherTokenId, seller).quantity, 2);
+
+        buyRequests[0] = IRareERC1155Listings.BuyRequest(tokenId, price, 3);
+        buyRequests[1] = IRareERC1155Listings.BuyRequest(otherTokenId, price, 2);
+
+        _mockSecondaryPayoutFor(address(token), tokenId, 3 ether, seller);
+        _mockSecondaryPayoutFor(address(token), otherTokenId, 2 ether, seller);
+
+        vm.prank(buyer);
+        market.buyBatch{value: 5 ether + ((3 ether * 3) / 100) + ((2 ether * 3) / 100)}(
+            address(token), seller, address(0), buyRequests
+        );
+
+        assertEq(token.balanceOf(seller, tokenId), 0);
+        assertEq(token.balanceOf(seller, otherTokenId), 0);
+        assertEq(token.balanceOf(buyer, tokenId), 5);
+        assertEq(token.balanceOf(buyer, otherTokenId), 5);
+        assertEq(market.getSalePrice(address(token), tokenId, seller).quantity, 0);
+        assertEq(market.getSalePrice(address(token), otherTokenId, seller).quantity, 0);
+    }
+
+    function testBuyBatchRejectsBadBatchShape() public {
+        IRareERC1155Listings.BuyRequest[] memory emptyRequests = new IRareERC1155Listings.BuyRequest[](0);
+
+        vm.prank(buyer);
+        vm.expectRevert(IRareERC1155Listings.EmptyBatch.selector);
+        market.buyBatch(address(token), seller, address(0), emptyRequests);
+
+        IRareERC1155Listings.BuyRequest[] memory requests = new IRareERC1155Listings.BuyRequest[](2);
+        requests[0] = IRareERC1155Listings.BuyRequest(1, 1 ether, 1);
+        requests[1] = IRareERC1155Listings.BuyRequest(1, 1 ether, 1);
+
+        vm.prank(buyer);
+        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Listings.TokenIdsNotStrictlyAscending.selector, 1, 1, 1));
+        market.buyBatch(address(token), seller, address(0), requests);
+
+        requests[0] = IRareERC1155Listings.BuyRequest(2, 1 ether, 1);
+        requests[1] = IRareERC1155Listings.BuyRequest(1, 1 ether, 1);
+
+        vm.prank(buyer);
+        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Listings.TokenIdsNotStrictlyAscending.selector, 1, 2, 1));
+        market.buyBatch(address(token), seller, address(0), requests);
     }
 
     function testSetSalePriceAndBuyArbitraryERC1155() public {
@@ -734,13 +1083,13 @@ contract RareERC1155MarketplaceTest is Test {
         splitRatios[0] = 100;
 
         vm.prank(seller);
-        market.setSalePrice(address(openToken), openTokenId, address(0), price, quantity, splitRecipients, splitRatios);
+        _setSalePrice(address(openToken), openTokenId, address(0), price, quantity, splitRecipients, splitRatios);
 
         _mockSecondaryPayoutFor(address(openToken), openTokenId, totalPrice, seller);
 
         vm.prank(buyer);
-        market.buy{value: totalPrice + ((totalPrice * 3) / 100)}(
-            address(openToken), openTokenId, seller, address(0), price, quantity
+        _buy(
+            address(openToken), openTokenId, seller, address(0), price, quantity, totalPrice + ((totalPrice * 3) / 100)
         );
 
         assertEq(openToken.balanceOf(seller, openTokenId), 0);
@@ -757,9 +1106,9 @@ contract RareERC1155MarketplaceTest is Test {
 
         vm.prank(buyer);
         vm.expectRevert(
-            abi.encodeWithSelector(IRareERC1155Marketplace.MarketplaceNotApproved.selector, seller, address(token))
+            abi.encodeWithSelector(IRareERC1155Listings.MarketplaceNotApproved.selector, seller, address(token))
         );
-        market.buy{value: price + ((price * 3) / 100)}(address(token), tokenId, seller, address(0), price, 1);
+        _buy(address(token), tokenId, seller, address(0), price, 1, price + ((price * 3) / 100));
 
         vm.prank(seller);
         token.setApprovalForAll(address(erc1155ApprovalManager), true);
@@ -770,10 +1119,10 @@ contract RareERC1155MarketplaceTest is Test {
         vm.prank(buyer);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IRareERC1155Marketplace.InsufficientTokenBalance.selector, seller, address(token), tokenId, 1, 0
+                IRareERC1155Listings.InsufficientTokenBalance.selector, seller, address(token), tokenId, 1, 0
             )
         );
-        market.buy{value: price + ((price * 3) / 100)}(address(token), tokenId, seller, address(0), price, 1);
+        _buy(address(token), tokenId, seller, address(0), price, 1, price + ((price * 3) / 100));
     }
 
     function testSetSalePriceRevertsForNonERC1155Contract() public {
@@ -792,11 +1141,9 @@ contract RareERC1155MarketplaceTest is Test {
 
         vm.prank(seller);
         vm.expectRevert(
-            abi.encodeWithSelector(IRareERC1155Marketplace.InvalidERC1155Contract.selector, address(nonERC1155))
+            abi.encodeWithSelector(IRareERC1155Listings.InvalidERC1155Contract.selector, address(nonERC1155))
         );
-        market.setSalePrice(
-            address(nonERC1155), unsupportedTokenId, address(0), 1 ether, 1, splitRecipients, splitRatios
-        );
+        _setSalePrice(address(nonERC1155), unsupportedTokenId, address(0), 1 ether, 1, splitRecipients, splitRatios);
     }
 
     function testSetSalePriceRevertsForZeroSplitRecipient() public {
@@ -808,8 +1155,8 @@ contract RareERC1155MarketplaceTest is Test {
         splitRatios[1] = 50;
 
         vm.prank(seller);
-        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Marketplace.SplitRecipientCannotBeZero.selector, 1));
-        market.setSalePrice(address(token), tokenId, address(0), 1 ether, 1, splitRecipients, splitRatios);
+        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Listings.SplitRecipientCannotBeZero.selector, 1));
+        _setSalePrice(address(token), tokenId, address(0), 1 ether, 1, splitRecipients, splitRatios);
     }
 
     function testSetSalePriceRevertsForZeroSplitRatio() public {
@@ -821,8 +1168,8 @@ contract RareERC1155MarketplaceTest is Test {
         splitRatios[1] = 0;
 
         vm.prank(seller);
-        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Marketplace.SplitRatioCannotBeZero.selector, 1));
-        market.setSalePrice(address(token), tokenId, address(0), 1 ether, 1, splitRecipients, splitRatios);
+        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Listings.SplitRatioCannotBeZero.selector, 1));
+        _setSalePrice(address(token), tokenId, address(0), 1 ether, 1, splitRecipients, splitRatios);
     }
 
     function testBuyRevertsWhenERC1155TransferDoesNotMoveBalances() public {
@@ -841,14 +1188,14 @@ contract RareERC1155MarketplaceTest is Test {
         splitRatios[0] = 100;
 
         vm.prank(seller);
-        market.setSalePrice(address(brokenToken), brokenTokenId, address(0), price, 1, splitRecipients, splitRatios);
+        _setSalePrice(address(brokenToken), brokenTokenId, address(0), price, 1, splitRecipients, splitRatios);
 
         _mockMarketplaceFee(price, seller);
 
         vm.prank(buyer);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IRareERC1155Marketplace.InvalidERC1155Transfer.selector,
+                IRareERC1155Listings.InvalidERC1155Transfer.selector,
                 address(brokenToken),
                 brokenTokenId,
                 seller,
@@ -856,9 +1203,7 @@ contract RareERC1155MarketplaceTest is Test {
                 1
             )
         );
-        market.buy{value: price + ((price * 3) / 100)}(
-            address(brokenToken), brokenTokenId, seller, address(0), price, 1
-        );
+        _buy(address(brokenToken), brokenTokenId, seller, address(0), price, 1, price + ((price * 3) / 100));
 
         assertEq(brokenToken.balanceOf(seller, brokenTokenId), 1);
         assertEq(brokenToken.balanceOf(buyer, brokenTokenId), 0);
@@ -870,17 +1215,17 @@ contract RareERC1155MarketplaceTest is Test {
         _mintToSellerAndList(address(0), price, 1);
 
         vm.prank(seller);
-        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Marketplace.SelfPurchaseUnsupported.selector, seller));
-        market.buy{value: price + ((price * 3) / 100)}(address(token), tokenId, seller, address(0), price, 1);
+        vm.expectRevert(abi.encodeWithSelector(IRareERC1155Listings.SelfPurchaseUnsupported.selector, seller));
+        _buy(address(token), tokenId, seller, address(0), price, 1, price + ((price * 3) / 100));
     }
 
     function testCancelSalePrice() public {
         _mintToSellerAndList(address(0), 1 ether, 2);
 
         vm.prank(seller);
-        market.cancelSalePrice(address(token), tokenId);
+        market.cancelSalePrices(address(token), _singleTokenIds(tokenId));
 
-        IRareERC1155Marketplace.SalePrice memory salePrice = market.getSalePrice(address(token), tokenId, seller);
+        IRareERC1155Listings.SalePrice memory salePrice = market.getSalePrice(address(token), tokenId, seller);
         assertEq(salePrice.quantity, 0);
     }
 
@@ -891,9 +1236,9 @@ contract RareERC1155MarketplaceTest is Test {
         market.setContractPaused(true);
 
         vm.prank(seller);
-        market.cancelSalePrice(address(token), tokenId);
+        market.cancelSalePrices(address(token), _singleTokenIds(tokenId));
 
-        IRareERC1155Marketplace.SalePrice memory salePrice = market.getSalePrice(address(token), tokenId, seller);
+        IRareERC1155Listings.SalePrice memory salePrice = market.getSalePrice(address(token), tokenId, seller);
         assertEq(salePrice.quantity, 0);
     }
 
@@ -928,8 +1273,8 @@ contract RareERC1155MarketplaceTest is Test {
         market.setContractPaused(true);
 
         vm.prank(seller);
-        vm.expectRevert(IRareERC1155Marketplace.ContractPaused.selector);
-        market.setSalePrice(address(token), tokenId, address(0), 1 ether, 1, splitRecipients, splitRatios);
+        vm.expectRevert(IRareERC1155Listings.ContractPaused.selector);
+        _setSalePrice(address(token), tokenId, address(0), 1 ether, 1, splitRecipients, splitRatios);
     }
 
     function testBuyRevertsWhilePaused() public {
@@ -940,8 +1285,8 @@ contract RareERC1155MarketplaceTest is Test {
         market.setContractPaused(true);
 
         vm.prank(buyer);
-        vm.expectRevert(IRareERC1155Marketplace.ContractPaused.selector);
-        market.buy{value: price + ((price * 3) / 100)}(address(token), tokenId, seller, address(0), price, 1);
+        vm.expectRevert(IRareERC1155Listings.ContractPaused.selector);
+        _buy(address(token), tokenId, seller, address(0), price, 1, price + ((price * 3) / 100));
     }
 
     function _expectDependencyUpdate(bytes32 _field, address _dependency, function(address) external _setter) private {
@@ -1068,14 +1413,27 @@ contract RareERC1155MarketplaceTest is Test {
         uint8[] memory _splitRatios
     ) internal {
         vm.prank(seller);
-        market.prepareMintDirectSale(
-            address(token), _tokenId, _currencyAddress, _price, _startTime, _maxMints, _splitRecipients, _splitRatios
+        market.prepareMintDirectSales(
+            address(token),
+            _currencyAddress,
+            _singleDirectSaleRequest(_tokenId, _price, _startTime, _maxMints),
+            _splitRecipients,
+            _splitRatios
         );
     }
 
     function _mintToSellerAndList(address _currencyAddress, uint256 _price, uint256 _quantity) internal {
+        _mintToSellerAndListWithExpiration(_currencyAddress, _price, _quantity, 0);
+    }
+
+    function _mintToSellerAndListWithExpiration(
+        address _currencyAddress,
+        uint256 _price,
+        uint256 _quantity,
+        uint256 _expirationTime
+    ) internal {
         vm.prank(seller);
-        token.mintTo(seller, tokenId, _quantity);
+        token.mintBatchTo(seller, _singleTokenIds(tokenId), _singleAmounts(_quantity));
 
         vm.prank(seller);
         token.setApprovalForAll(address(erc1155ApprovalManager), true);
@@ -1090,7 +1448,166 @@ contract RareERC1155MarketplaceTest is Test {
         splitRatios[0] = 100;
 
         vm.prank(seller);
-        market.setSalePrice(address(token), tokenId, _currencyAddress, _price, _quantity, splitRecipients, splitRatios);
+        market.setSalePrices(
+            address(token),
+            _currencyAddress,
+            _singleSalePriceRequest(tokenId, _price, _quantity, _expirationTime),
+            splitRecipients,
+            splitRatios
+        );
+    }
+
+    function _mintDirectSale(
+        uint256 _tokenId,
+        address _currencyAddress,
+        uint256 _price,
+        uint256 _quantity,
+        bytes32[] memory _proof,
+        uint256 _value
+    ) internal {
+        market.mintDirectSaleBatch{value: _value}(
+            address(token), _currencyAddress, _singleMintRequest(_tokenId, _price, _quantity, _proof)
+        );
+    }
+
+    function _setTokenAllowListConfig(uint256 _tokenId, bytes32 _root, uint256 _endTimestamp) internal {
+        market.setTokenAllowListConfigs(address(token), _singleAllowListConfigRequest(_tokenId, _root, _endTimestamp));
+    }
+
+    function _setTokenMintLimit(uint256 _tokenId, uint256 _limit) internal {
+        market.setTokenMintLimits(address(token), _singleTokenLimitRequest(_tokenId, _limit));
+    }
+
+    function _setTokenTxLimit(uint256 _tokenId, uint256 _limit) internal {
+        market.setTokenTxLimits(address(token), _singleTokenLimitRequest(_tokenId, _limit));
+    }
+
+    function _setSalePrice(
+        address _contractAddress,
+        uint256 _tokenId,
+        address _currencyAddress,
+        uint256 _price,
+        uint256 _quantity,
+        address payable[] memory _splitRecipients,
+        uint8[] memory _splitRatios
+    ) internal {
+        _setSalePriceWithExpiration(
+            _contractAddress, _tokenId, _currencyAddress, _price, _quantity, 0, _splitRecipients, _splitRatios
+        );
+    }
+
+    function _setSalePriceWithExpiration(
+        address _contractAddress,
+        uint256 _tokenId,
+        address _currencyAddress,
+        uint256 _price,
+        uint256 _quantity,
+        uint256 _expirationTime,
+        address payable[] memory _splitRecipients,
+        uint8[] memory _splitRatios
+    ) internal {
+        market.setSalePrices(
+            _contractAddress,
+            _currencyAddress,
+            _singleSalePriceRequest(_tokenId, _price, _quantity, _expirationTime),
+            _splitRecipients,
+            _splitRatios
+        );
+    }
+
+    function _buy(
+        address _contractAddress,
+        uint256 _tokenId,
+        address _seller,
+        address _currencyAddress,
+        uint256 _price,
+        uint256 _quantity,
+        uint256 _value
+    ) internal {
+        market.buyBatch{value: _value}(
+            _contractAddress, _seller, _currencyAddress, _singleBuyRequest(_tokenId, _price, _quantity)
+        );
+    }
+
+    function _singleDirectSaleRequest(uint256 _tokenId, uint256 _price, uint256 _startTime, uint256 _maxMints)
+        internal
+        pure
+        returns (IRareERC1155Listings.DirectSaleRequest[] memory)
+    {
+        IRareERC1155Listings.DirectSaleRequest[] memory requests = new IRareERC1155Listings.DirectSaleRequest[](1);
+        requests[0] = IRareERC1155Listings.DirectSaleRequest(_tokenId, _price, _startTime, _maxMints);
+        return requests;
+    }
+
+    function _singleMintRequest(uint256 _tokenId, uint256 _price, uint256 _quantity, bytes32[] memory _proof)
+        internal
+        pure
+        returns (IRareERC1155Listings.MintRequest[] memory)
+    {
+        IRareERC1155Listings.MintRequest[] memory requests = new IRareERC1155Listings.MintRequest[](1);
+        requests[0] = IRareERC1155Listings.MintRequest(_tokenId, _price, _quantity, _proof);
+        return requests;
+    }
+
+    function _singleAllowListConfigRequest(uint256 _tokenId, bytes32 _root, uint256 _endTimestamp)
+        internal
+        pure
+        returns (IRareERC1155Listings.AllowListConfigRequest[] memory)
+    {
+        IRareERC1155Listings.AllowListConfigRequest[] memory requests =
+            new IRareERC1155Listings.AllowListConfigRequest[](1);
+        requests[0] = IRareERC1155Listings.AllowListConfigRequest(_tokenId, _root, _endTimestamp);
+        return requests;
+    }
+
+    function _singleTokenLimitRequest(uint256 _tokenId, uint256 _limit)
+        internal
+        pure
+        returns (IRareERC1155Listings.TokenLimitRequest[] memory)
+    {
+        IRareERC1155Listings.TokenLimitRequest[] memory requests = new IRareERC1155Listings.TokenLimitRequest[](1);
+        requests[0] = IRareERC1155Listings.TokenLimitRequest(_tokenId, _limit);
+        return requests;
+    }
+
+    function _singleSalePriceRequest(uint256 _tokenId, uint256 _price, uint256 _quantity)
+        internal
+        pure
+        returns (IRareERC1155Listings.SalePriceRequest[] memory)
+    {
+        return _singleSalePriceRequest(_tokenId, _price, _quantity, 0);
+    }
+
+    function _singleSalePriceRequest(uint256 _tokenId, uint256 _price, uint256 _quantity, uint256 _expirationTime)
+        internal
+        pure
+        returns (IRareERC1155Listings.SalePriceRequest[] memory)
+    {
+        IRareERC1155Listings.SalePriceRequest[] memory requests = new IRareERC1155Listings.SalePriceRequest[](1);
+        requests[0] = IRareERC1155Listings.SalePriceRequest(_tokenId, _price, _quantity, _expirationTime);
+        return requests;
+    }
+
+    function _singleBuyRequest(uint256 _tokenId, uint256 _price, uint256 _quantity)
+        internal
+        pure
+        returns (IRareERC1155Listings.BuyRequest[] memory)
+    {
+        IRareERC1155Listings.BuyRequest[] memory requests = new IRareERC1155Listings.BuyRequest[](1);
+        requests[0] = IRareERC1155Listings.BuyRequest(_tokenId, _price, _quantity);
+        return requests;
+    }
+
+    function _singleTokenIds(uint256 _tokenId) internal pure returns (uint256[] memory) {
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = _tokenId;
+        return tokenIds;
+    }
+
+    function _singleAmounts(uint256 _amount) internal pure returns (uint256[] memory) {
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = _amount;
+        return amounts;
     }
 
     function _mockApprovedCurrency(bool _approved) internal {

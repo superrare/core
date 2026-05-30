@@ -12,28 +12,22 @@ import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol"
 
 import {MarketConfigV2} from "../v2/utils/MarketConfigV2.sol";
 import {IRareERC1155} from "../token/ERC1155/IRareERC1155.sol";
-import {IRareERC1155Marketplace} from "./IRareERC1155Marketplace.sol";
+import {IRareERC1155Listings} from "./IRareERC1155Listings.sol";
 import {IERC1155ApprovalManager} from "../v2/approver/ERC1155/IERC1155ApprovalManager.sol";
 
 /// @author SuperRare Labs Inc.
-/// @title RareERC1155Marketplace
+/// @title RareERC1155Listings
 /// @notice Primary mint sales for RARE Protocol ERC1155 tokens and fixed-price resale listings for ERC1155 tokens.
 /// @dev UUPS-upgradeable marketplace that keeps ERC1155 sale semantics separate from ERC721 marketplace logic.
-contract RareERC1155Marketplace is
+contract RareERC1155Listings is
     Initializable,
-    IRareERC1155Marketplace,
+    IRareERC1155Listings,
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
     UUPSUpgradeable
 {
     using SafeERC20 for IERC20;
     using MarketConfigV2 for MarketConfigV2.Config;
-
-    /// @notice RARE Protocol marketplace dependency bundle.
-    MarketConfigV2.Config private marketConfig;
-
-    /// @notice ERC1155 transfer manager approved by sellers and callable by this marketplace.
-    IERC1155ApprovalManager private erc1155ApprovalManager;
 
     /// @notice Market config field label for zero-address validation.
     bytes32 private constant NETWORK_BENEFICIARY_FIELD = "NETWORK_BENEFICIARY";
@@ -68,36 +62,76 @@ contract RareERC1155Marketplace is
     /// @notice Config field label for ERC1155 approval manager updates.
     bytes32 private constant ERC1155_APPROVAL_MANAGER_FIELD = "ERC1155_APPROVAL_MANAGER";
 
-    /// @notice Primary mint sale configuration by collection and token id.
-    mapping(address => mapping(uint256 => IRareERC1155Marketplace.DirectSaleConfig)) private directSaleConfigs;
+    /// @inheritdoc IRareERC1155Listings
+    uint256 public constant MAX_BATCH_SIZE = 100;
 
-    /// @notice Allowlist configuration by collection and token id.
-    mapping(address => mapping(uint256 => IRareERC1155Marketplace.AllowListConfig)) private tokenAllowlistRoots;
+    /// @notice Primary payout data preserved before the external batch mint.
+    struct PrimaryPayoutContext {
+        uint256 tokenId;
+        uint256 grossAmount;
+        uint256 marketplaceFee;
+        address seller;
+        address payable[] splitRecipients;
+        uint8[] splitRatios;
+    }
 
-    /// @notice Per-address mint quantity limit by collection and token id.
-    mapping(address => mapping(uint256 => uint256)) private tokenMintLimit;
+    /// @notice Secondary payout data preserved before listings are decremented or deleted.
+    struct SecondaryPayoutContext {
+        uint256 tokenId;
+        uint256 grossAmount;
+        uint256 marketplaceFee;
+        address payable[] splitRecipients;
+        uint8[] splitRatios;
+    }
 
-    /// @notice Quantity minted per buyer by collection and token id.
-    mapping(address => mapping(uint256 => mapping(address => uint256))) private tokenMintsPerAddress;
+    /// @notice ERC-7201 namespaced storage for the marketplace.
+    /// @dev Pins all contract-owned state to a fixed hashed slot so it cannot collide with inherited
+    /// upgradeable base contracts and can be extended in future upgrades without reserving storage gaps.
+    /// @custom:storage-location erc7201:superrare.storage.RareERC1155Listings
+    struct ListingsStorage {
+        // --- config ---
+        /// @notice RARE Protocol marketplace dependency bundle.
+        MarketConfigV2.Config marketConfig;
+        /// @notice ERC1155 transfer manager approved by sellers and callable by this marketplace.
+        IERC1155ApprovalManager erc1155ApprovalManager;
+        // --- Direct sales state ---
+        /// @notice Primary mint sale configuration by collection and token id.
+        mapping(address => mapping(uint256 => IRareERC1155Listings.DirectSaleConfig)) directSaleConfigs;
+        /// @notice Allowlist configuration by collection and token id.
+        mapping(address => mapping(uint256 => IRareERC1155Listings.AllowListConfig)) tokenAllowlistRoots;
+        /// @notice Per-address mint quantity limit by collection and token id.
+        mapping(address => mapping(uint256 => uint256)) tokenMintLimit;
+        /// @notice Quantity minted per buyer by collection and token id.
+        mapping(address => mapping(uint256 => mapping(address => uint256))) tokenMintsPerAddress;
+        /// @notice Per-address mint transaction limit by collection and token id.
+        mapping(address => mapping(uint256 => uint256)) tokenTxLimit;
+        /// @notice Mint transaction count per buyer by collection and token id.
+        mapping(address => mapping(uint256 => mapping(address => uint256))) tokenTxsPerAddress;
+        // --- Secondary sales state ---
+        /// @notice Secondary fixed-price listings by collection, token id, and seller.
+        /// @dev `expirationTime == 0` means no expiration. Buys revalidate expiration, balance, approval, currency, price,
+        /// and quantity.
+        mapping(address => mapping(uint256 => mapping(address => IRareERC1155Listings.SalePrice))) salePrices;
+        /// @notice Whether marketplace value-moving and listing-creation operations are paused.
+        bool paused;
+    }
 
-    /// @notice Per-address mint transaction limit by collection and token id.
-    mapping(address => mapping(uint256 => uint256)) private tokenTxLimit;
+    /// @dev keccak256(abi.encode(uint256(keccak256("superrare.storage.RareERC1155Listings")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant LISTINGS_STORAGE_LOCATION =
+        0x094ebcede13e570fe473dc3b580b6f2befba2d2420d1e71f35699327bd0e1300;
 
-    /// @notice Mint transaction count per buyer by collection and token id.
-    mapping(address => mapping(uint256 => mapping(address => uint256))) private tokenTxsPerAddress;
-
-    /// @notice Secondary fixed-price listings by collection, token id, and seller.
-    /// @dev Listings intentionally do not carry expiry timestamps or seller-wide nonces.
-    /// Sellers cancel standing offers explicitly, and buys revalidate balance, approval, currency, price, and quantity.
-    mapping(address => mapping(uint256 => mapping(address => IRareERC1155Marketplace.SalePrice))) private salePrices;
-
-    /// @notice Whether marketplace value-moving and listing-creation operations are paused.
-    bool private paused;
+    /// @notice Resolves the ERC-7201 namespaced storage pointer for this contract.
+    /// @return $ Storage pointer to the `ListingsStorage` struct.
+    function _listingsStorage() private pure returns (ListingsStorage storage $) {
+        assembly {
+            $.slot := LISTINGS_STORAGE_LOCATION
+        }
+    }
 
     /// @notice Ensures marketplace actions that create listings or move value are not paused.
     modifier notPaused() {
         // Atomic guard: pause state blocks marketplace writes before any mutation or transfer.
-        if (paused) revert ContractPaused();
+        if (_listingsStorage().paused) revert ContractPaused();
         _;
     }
 
@@ -146,7 +180,8 @@ contract RareERC1155Marketplace is
         _validateApprovalManager(_erc1155ApprovalManager);
 
         // State write: persist all marketplace dependency addresses in the shared config struct.
-        marketConfig = MarketConfigV2.generateMarketConfig(
+        ListingsStorage storage $ = _listingsStorage();
+        $.marketConfig = MarketConfigV2.generateMarketConfig(
             _networkBeneficiary,
             _marketplaceSettings,
             _spaceOperatorRegistry,
@@ -158,7 +193,7 @@ contract RareERC1155Marketplace is
             _erc20ApprovalManager,
             _erc721ApprovalManager
         );
-        erc1155ApprovalManager = IERC1155ApprovalManager(_erc1155ApprovalManager);
+        $.erc1155ApprovalManager = IERC1155ApprovalManager(_erc1155ApprovalManager);
 
         // Initializer calls: set up ownership, reentrancy guard, and UUPS storage for the proxy.
         __Ownable_init();
@@ -174,296 +209,406 @@ contract RareERC1155Marketplace is
         _newImplementation;
     }
 
-    /// @inheritdoc IRareERC1155Marketplace
-    function prepareMintDirectSale(
+    /// @inheritdoc IRareERC1155Listings
+    function prepareMintDirectSales(
         address _contractAddress,
-        uint256 _tokenId,
         address _currencyAddress,
-        uint256 _price,
-        uint256 _startTime,
-        uint256 _maxMints,
+        IRareERC1155Listings.DirectSaleRequest[] calldata _requests,
         address payable[] calldata _splitRecipients,
         uint8[] calldata _splitRatios
-    ) external notPaused {
+    ) external nonReentrant notPaused {
         // Atomic ownership check: only the collection owner can configure primary mint sales.
         if (!_isContractOwner(_contractAddress, msg.sender)) {
             revert NotContractOwner(_contractAddress, msg.sender);
         }
 
-        // Atomic config checks: sale currency and seller split configuration must be valid before storage writes.
+        // Atomic config checks: batch shape, sale currency, and seller split config must be valid before storage writes.
+        _validateDirectSaleRequests(_requests);
         _checkIfCurrencyIsApproved(_currencyAddress);
         _checkSplits(_splitRecipients, _splitRatios);
 
-        _revertIfTokenNotFound(_contractAddress, _tokenId);
+        for (uint256 i = 0; i < _requests.length; i++) {
+            uint256 tokenId = _requests[i].tokenId;
+            _revertIfTokenNotFound(_contractAddress, tokenId);
 
-        // State write: replace the primary sale config for this collection and token id.
-        directSaleConfigs[_contractAddress][_tokenId] = IRareERC1155Marketplace.DirectSaleConfig(
-            msg.sender, _currencyAddress, _price, _startTime, _maxMints, _splitRecipients, _splitRatios
-        );
+            // State write: replace the primary sale config for this collection and token id.
+            _listingsStorage().directSaleConfigs[_contractAddress][tokenId] = IRareERC1155Listings.DirectSaleConfig(
+                msg.sender,
+                _currencyAddress,
+                _requests[i].price,
+                _requests[i].startTime,
+                _requests[i].maxMints,
+                _splitRecipients,
+                _splitRatios
+            );
 
-        emit PrepareMintDirectSale(
-            _contractAddress,
-            _tokenId,
-            msg.sender,
-            _currencyAddress,
-            _price,
-            _startTime,
-            _maxMints,
-            _splitRecipients,
-            _splitRatios
-        );
-    }
-
-    /// @inheritdoc IRareERC1155Marketplace
-    function mintDirectSale(
-        address _contractAddress,
-        uint256 _tokenId,
-        address _currencyAddress,
-        uint256 _price,
-        uint256 _quantity,
-        bytes32[] calldata _proof
-    ) external payable nonReentrant notPaused {
-        // Storage read: copy primary sale config for consistent validation and payout inputs.
-        IRareERC1155Marketplace.DirectSaleConfig memory directSaleConfig = directSaleConfigs[_contractAddress][_tokenId];
-
-        // Atomic guards: ensure sale existence, current seller ownership, allowlist membership, and non-zero quantity.
-        if (directSaleConfig.seller == address(0)) revert DirectSaleNotConfigured(_contractAddress, _tokenId);
-        if (!_isContractOwner(_contractAddress, directSaleConfig.seller)) {
-            revert NotContractOwner(_contractAddress, directSaleConfig.seller);
-        }
-        _enforceTokenAllowList(_contractAddress, _tokenId, msg.sender, _proof);
-
-        if (_quantity == 0) revert QuantityCannotBeZero();
-
-        // Atomic mint-limit check: validate requested quantity against buyer's enabled-period mint count.
-        uint256 mintLimit = tokenMintLimit[_contractAddress][_tokenId];
-        uint256 currentMints = tokenMintsPerAddress[_contractAddress][_tokenId][msg.sender];
-        if (mintLimit != 0 && currentMints + _quantity > mintLimit) {
-            revert MintLimitExceeded(_contractAddress, _tokenId, msg.sender, _quantity, currentMints, mintLimit);
-        }
-
-        // Atomic tx-limit check: validate this transaction against buyer's enabled-period transaction count.
-        uint256 txLimit = tokenTxLimit[_contractAddress][_tokenId];
-        uint256 currentTxs = tokenTxsPerAddress[_contractAddress][_tokenId][msg.sender];
-        if (txLimit != 0 && currentTxs + 1 > txLimit) {
-            revert TransactionLimitExceeded(_contractAddress, _tokenId, msg.sender, currentTxs, txLimit);
-        }
-
-        // Atomic sale-parameter checks: buyer-supplied price and currency must match the stored config.
-        if (directSaleConfig.maxMints != 0 && _quantity > directSaleConfig.maxMints) {
-            revert MaxMintExceeded(_quantity, directSaleConfig.maxMints);
-        }
-        if (directSaleConfig.startTime > block.timestamp) revert SaleNotStarted(directSaleConfig.startTime);
-        if (_price != directSaleConfig.price) revert PriceMismatch(_price, directSaleConfig.price);
-        _checkIfCurrencyIsApproved(_currencyAddress);
-        if (directSaleConfig.currencyAddress != _currencyAddress) {
-            revert CurrencyMismatch(_currencyAddress, directSaleConfig.currencyAddress);
-        }
-
-        // Price calculation: unit price multiplied by ERC1155 quantity before fee calculation.
-        uint256 totalPrice = _quantity * _price;
-
-        if (directSaleConfig.price == 0) {
-            // Atomic free-mint guard: free mints must not leave ETH stuck in the marketplace.
-            if (msg.value != 0) revert MsgValueMustBeZero();
-        } else {
-            // Payment pull: collect sale amount plus marketplace fee before minting.
-            _checkAmountAndTransfer(
-                _currencyAddress, totalPrice + marketConfig.marketplaceSettings.calculateMarketplaceFee(totalPrice)
+            emit PrepareMintDirectSale(
+                _contractAddress,
+                tokenId,
+                msg.sender,
+                _currencyAddress,
+                _requests[i].price,
+                _requests[i].startTime,
+                _requests[i].maxMints,
+                _splitRecipients,
+                _splitRatios
             );
         }
+    }
 
-        if (tokenMintLimit[_contractAddress][_tokenId] > 0) {
-            // State write: record quantity minted while this token's mint limit is enabled.
-            tokenMintsPerAddress[_contractAddress][_tokenId][msg.sender] += _quantity;
+    /// @inheritdoc IRareERC1155Listings
+    function mintDirectSaleBatch(
+        address _contractAddress,
+        address _currencyAddress,
+        IRareERC1155Listings.MintRequest[] calldata _requests
+    ) external payable nonReentrant notPaused {
+        _validateMintRequests(_requests);
+        _checkIfCurrencyIsApproved(_currencyAddress);
+
+        ListingsStorage storage $ = _listingsStorage();
+        uint256 requestCount = _requests.length;
+        uint256[] memory tokenIds = new uint256[](requestCount);
+        uint256[] memory amounts = new uint256[](requestCount);
+        PrimaryPayoutContext[] memory payoutContexts = new PrimaryPayoutContext[](requestCount);
+        uint256 buyerTotal = 0;
+
+        for (uint256 i = 0; i < requestCount;) {
+            payoutContexts[i] =
+                _validateMintDirectSaleRequest(_contractAddress, _currencyAddress, msg.sender, _requests[i]);
+            if (payoutContexts[i].grossAmount != 0) {
+                payoutContexts[i].marketplaceFee =
+                    $.marketConfig.marketplaceSettings.calculateMarketplaceFee(payoutContexts[i].grossAmount);
+                buyerTotal += payoutContexts[i].grossAmount + payoutContexts[i].marketplaceFee;
+            }
+
+            tokenIds[i] = payoutContexts[i].tokenId;
+            amounts[i] = _requests[i].quantity;
+
+            unchecked {
+                ++i;
+            }
         }
 
-        if (tokenTxLimit[_contractAddress][_tokenId] > 0) {
-            // State write: record this mint transaction while this token's tx limit is enabled.
-            tokenTxsPerAddress[_contractAddress][_tokenId][msg.sender] += 1;
+        // Payment pull: collect aggregate sale amount plus per-line marketplace fees before minting.
+        _checkBatchPayment(_currencyAddress, buyerTotal);
+
+        for (uint256 i = 0; i < requestCount;) {
+            uint256 tokenId = _requests[i].tokenId;
+
+            if ($.tokenMintLimit[_contractAddress][tokenId] > 0) {
+                // State write: record quantity minted while this token's mint limit is enabled.
+                $.tokenMintsPerAddress[_contractAddress][tokenId][msg.sender] += _requests[i].quantity;
+            }
+
+            if ($.tokenTxLimit[_contractAddress][tokenId] > 0) {
+                // State write: record this token id as one transaction while its tx limit is enabled.
+                $.tokenTxsPerAddress[_contractAddress][tokenId][msg.sender] += 1;
+            }
+
+            unchecked {
+                ++i;
+            }
         }
 
         // External mint: collection must have approved this marketplace as minter.
-        IRareERC1155(_contractAddress).mintTo(msg.sender, _tokenId, _quantity);
+        IRareERC1155(_contractAddress).mintBatchTo(msg.sender, tokenIds, amounts);
 
-        if (directSaleConfig.price != 0) {
+        for (uint256 i = 0; i < requestCount;) {
             // Payout fan-out: distribute collected primary sale funds after successful mint.
-            _payoutPrimary(
-                _contractAddress,
-                _currencyAddress,
-                totalPrice,
-                directSaleConfig.seller,
-                directSaleConfig.splitRecipients,
-                directSaleConfig.splitRatios
-            );
-        }
+            if (payoutContexts[i].grossAmount != 0) {
+                _payoutPrimary(
+                    _contractAddress,
+                    _currencyAddress,
+                    payoutContexts[i].grossAmount,
+                    payoutContexts[i].marketplaceFee,
+                    payoutContexts[i].seller,
+                    payoutContexts[i].splitRecipients,
+                    payoutContexts[i].splitRatios
+                );
+            }
 
-        emit MintDirectSale(
-            _contractAddress, _tokenId, msg.sender, directSaleConfig.seller, _quantity, _currencyAddress, _price
-        );
+            emit MintDirectSale(
+                _contractAddress,
+                payoutContexts[i].tokenId,
+                msg.sender,
+                payoutContexts[i].seller,
+                _requests[i].quantity,
+                _currencyAddress,
+                _requests[i].price
+            );
+
+            unchecked {
+                ++i;
+            }
+        }
     }
 
-    /// @inheritdoc IRareERC1155Marketplace
-    function setTokenAllowListConfig(bytes32 _root, uint256 _endTimestamp, address _contractAddress, uint256 _tokenId)
-        external
-    {
+    /// @inheritdoc IRareERC1155Listings
+    function setTokenAllowListConfigs(
+        address _contractAddress,
+        IRareERC1155Listings.AllowListConfigRequest[] calldata _requests
+    ) external nonReentrant {
         // Atomic ownership check: only the collection owner can change token allowlist settings.
         if (!_isContractOwner(_contractAddress, msg.sender)) revert NotContractOwner(_contractAddress, msg.sender);
-        _revertIfTokenNotFound(_contractAddress, _tokenId);
+        _validateAllowListConfigRequests(_requests);
 
-        // State write: replace allowlist root and expiry for the token id.
-        tokenAllowlistRoots[_contractAddress][_tokenId] = IRareERC1155Marketplace.AllowListConfig(_root, _endTimestamp);
-        emit SetTokenAllowListConfig(_contractAddress, _tokenId, _root, _endTimestamp);
+        for (uint256 i = 0; i < _requests.length; i++) {
+            uint256 tokenId = _requests[i].tokenId;
+            _revertIfTokenNotFound(_contractAddress, tokenId);
+
+            // State write: replace allowlist root and expiry for the token id.
+            _listingsStorage().tokenAllowlistRoots[_contractAddress][tokenId] =
+                IRareERC1155Listings.AllowListConfig(_requests[i].root, _requests[i].endTimestamp);
+            emit SetTokenAllowListConfig(_contractAddress, tokenId, _requests[i].root, _requests[i].endTimestamp);
+        }
     }
 
-    /// @inheritdoc IRareERC1155Marketplace
-    function setTokenMintLimit(address _contractAddress, uint256 _tokenId, uint256 _limit) external {
+    /// @inheritdoc IRareERC1155Listings
+    function setTokenMintLimits(address _contractAddress, IRareERC1155Listings.TokenLimitRequest[] calldata _requests)
+        external
+        nonReentrant
+    {
         // Atomic ownership check: only the collection owner can change mint limits.
         if (!_isContractOwner(_contractAddress, msg.sender)) revert NotContractOwner(_contractAddress, msg.sender);
-        _revertIfTokenNotFound(_contractAddress, _tokenId);
+        _validateTokenLimitRequests(_requests);
 
-        // State write: replace per-address quantity limit for the token id.
-        tokenMintLimit[_contractAddress][_tokenId] = _limit;
-        emit TokenMintLimitSet(_contractAddress, _tokenId, _limit);
+        for (uint256 i = 0; i < _requests.length; i++) {
+            uint256 tokenId = _requests[i].tokenId;
+            _revertIfTokenNotFound(_contractAddress, tokenId);
+
+            // State write: replace per-address quantity limit for the token id.
+            _listingsStorage().tokenMintLimit[_contractAddress][tokenId] = _requests[i].limit;
+            emit TokenMintLimitSet(_contractAddress, tokenId, _requests[i].limit);
+        }
     }
 
-    /// @inheritdoc IRareERC1155Marketplace
-    function setTokenTxLimit(address _contractAddress, uint256 _tokenId, uint256 _limit) external {
+    /// @inheritdoc IRareERC1155Listings
+    function setTokenTxLimits(address _contractAddress, IRareERC1155Listings.TokenLimitRequest[] calldata _requests)
+        external
+        nonReentrant
+    {
         // Atomic ownership check: only the collection owner can change transaction limits.
         if (!_isContractOwner(_contractAddress, msg.sender)) revert NotContractOwner(_contractAddress, msg.sender);
-        _revertIfTokenNotFound(_contractAddress, _tokenId);
+        _validateTokenLimitRequests(_requests);
 
-        // State write: replace per-address transaction limit for the token id.
-        tokenTxLimit[_contractAddress][_tokenId] = _limit;
-        emit TokenTxLimitSet(_contractAddress, _tokenId, _limit);
+        for (uint256 i = 0; i < _requests.length; i++) {
+            uint256 tokenId = _requests[i].tokenId;
+            _revertIfTokenNotFound(_contractAddress, tokenId);
+
+            // State write: replace per-address transaction limit for the token id.
+            _listingsStorage().tokenTxLimit[_contractAddress][tokenId] = _requests[i].limit;
+            emit TokenTxLimitSet(_contractAddress, tokenId, _requests[i].limit);
+        }
     }
 
-    /// @inheritdoc IRareERC1155Marketplace
-    function setSalePrice(
+    /// @inheritdoc IRareERC1155Listings
+    function setSalePrices(
         address _contractAddress,
-        uint256 _tokenId,
         address _currencyAddress,
-        uint256 _price,
-        uint256 _quantity,
+        IRareERC1155Listings.SalePriceRequest[] calldata _requests,
         address payable[] calldata _splitRecipients,
         uint8[] calldata _splitRatios
-    ) external notPaused {
-        // Atomic config checks: listing currency, split recipients, price, and quantity must be valid.
+    ) external nonReentrant notPaused {
+        // Atomic config checks: batch shape, listing currency, split recipients, price, quantity, and expiration must be valid.
+        _validateSalePriceRequests(_requests);
         _checkIfCurrencyIsApproved(_currencyAddress);
         _checkSplits(_splitRecipients, _splitRatios);
         _validateERC1155Contract(_contractAddress);
-        if (_price == 0) revert SalePriceCannotBeZero();
-        if (_quantity == 0) revert QuantityCannotBeZero();
 
-        // External reads: verify seller balance and transfer approval at list time.
+        // External read: one collection-level transfer approval supports every token id in the batch.
         IERC1155 erc1155 = IERC1155(_contractAddress);
-        uint256 sellerBalance = erc1155.balanceOf(msg.sender, _tokenId);
-        if (sellerBalance < _quantity) {
-            revert InsufficientTokenBalance(msg.sender, _contractAddress, _tokenId, _quantity, sellerBalance);
-        }
-        if (!erc1155.isApprovedForAll(msg.sender, address(erc1155ApprovalManager))) {
+        if (!erc1155.isApprovedForAll(msg.sender, address(_listingsStorage().erc1155ApprovalManager))) {
             revert MarketplaceNotApproved(msg.sender, _contractAddress);
         }
 
-        // State write: create or replace seller's approval-based fixed-price listing.
-        salePrices[_contractAddress][_tokenId][msg.sender] =
-            IRareERC1155Marketplace.SalePrice(_currencyAddress, _price, _quantity, _splitRecipients, _splitRatios);
+        for (uint256 i = 0; i < _requests.length; i++) {
+            uint256 tokenId = _requests[i].tokenId;
+            uint256 price = _requests[i].price;
+            uint256 quantity = _requests[i].quantity;
+            uint256 expirationTime = _requests[i].expirationTime;
 
-        emit SalePriceSet(
-            msg.sender, _contractAddress, _tokenId, _currencyAddress, _price, _quantity, _splitRecipients, _splitRatios
-        );
-    }
+            if (price == 0) revert SalePriceCannotBeZero();
+            if (quantity == 0) revert QuantityCannotBeZero();
+            if (expirationTime != 0 && expirationTime <= block.timestamp) {
+                revert SalePriceExpirationInvalid(expirationTime, block.timestamp);
+            }
 
-    /// @inheritdoc IRareERC1155Marketplace
-    function cancelSalePrice(address _contractAddress, uint256 _tokenId) external {
-        if (salePrices[_contractAddress][_tokenId][msg.sender].quantity == 0) {
-            return;
+            // External reads: verify seller balance at list time.
+            uint256 sellerBalance = erc1155.balanceOf(msg.sender, tokenId);
+            if (sellerBalance < quantity) {
+                revert InsufficientTokenBalance(msg.sender, _contractAddress, tokenId, quantity, sellerBalance);
+            }
+
+            // State write: create or replace seller's approval-based fixed-price listing.
+            _listingsStorage().salePrices[_contractAddress][tokenId][msg.sender] = IRareERC1155Listings.SalePrice(
+                _currencyAddress, price, quantity, expirationTime, _splitRecipients, _splitRatios
+            );
+
+            emit SalePriceSet(
+                msg.sender,
+                _contractAddress,
+                tokenId,
+                _currencyAddress,
+                price,
+                quantity,
+                expirationTime,
+                _splitRecipients,
+                _splitRatios
+            );
         }
-
-        // State delete: remove caller's active listing for this collection and token id.
-        delete salePrices[_contractAddress][_tokenId][msg.sender];
-
-        emit SalePriceCancelled(msg.sender, _contractAddress, _tokenId);
     }
 
-    /// @inheritdoc IRareERC1155Marketplace
-    function buy(
+    /// @inheritdoc IRareERC1155Listings
+    function cancelSalePrices(address _contractAddress, uint256[] calldata _tokenIds) external nonReentrant {
+        _validateTokenIds(_tokenIds);
+
+        for (uint256 i = 0; i < _tokenIds.length; i++) {
+            uint256 tokenId = _tokenIds[i];
+            ListingsStorage storage $ = _listingsStorage();
+            if ($.salePrices[_contractAddress][tokenId][msg.sender].quantity == 0) {
+                continue;
+            }
+
+            // State delete: remove caller's active listing for this collection and token id.
+            delete $.salePrices[_contractAddress][tokenId][msg.sender];
+
+            emit SalePriceCancelled(msg.sender, _contractAddress, tokenId);
+        }
+    }
+
+    /// @inheritdoc IRareERC1155Listings
+    function buyBatch(
         address _contractAddress,
-        uint256 _tokenId,
         address _seller,
         address _currencyAddress,
-        uint256 _price,
-        uint256 _quantity
+        IRareERC1155Listings.BuyRequest[] calldata _requests
     ) external payable nonReentrant notPaused {
-        // Atomic guard: secondary fills must buy at least one token.
-        if (_quantity == 0) revert QuantityCannotBeZero();
+        _validateBuyRequests(_requests);
         if (msg.sender == _seller) revert SelfPurchaseUnsupported(_seller);
 
         // Atomic currency check: rejected currencies cannot be used even for stale listings.
         _checkIfCurrencyIsApproved(_currencyAddress);
         _validateERC1155Contract(_contractAddress);
 
-        // Storage pointer: mutate seller listing quantity only after all buy-time checks pass.
-        IRareERC1155Marketplace.SalePrice storage salePrice = salePrices[_contractAddress][_tokenId][_seller];
-
-        // Atomic listing checks: listing must exist and match buyer-supplied terms.
-        if (salePrice.quantity == 0) revert SalePriceDoesNotExist(_contractAddress, _tokenId, _seller);
-        if (salePrice.currencyAddress != _currencyAddress) {
-            revert CurrencyMismatch(_currencyAddress, salePrice.currencyAddress);
-        }
-        if (salePrice.price != _price) revert PriceMismatch(_price, salePrice.price);
-        if (salePrice.quantity < _quantity) revert QuantityExceedsSalePriceQuantity(_quantity, salePrice.quantity);
-
-        // External reads: recheck seller balance and approval at buy time because listings are not escrowed.
+        // External read: recheck seller approval at buy time because listings are not escrowed.
+        ListingsStorage storage $ = _listingsStorage();
         IERC1155 erc1155 = IERC1155(_contractAddress);
-        uint256 sellerBalance = erc1155.balanceOf(_seller, _tokenId);
-        if (sellerBalance < _quantity) {
-            revert InsufficientTokenBalance(_seller, _contractAddress, _tokenId, _quantity, sellerBalance);
-        }
-        if (!erc1155.isApprovedForAll(_seller, address(erc1155ApprovalManager))) {
+        if (!erc1155.isApprovedForAll(_seller, address($.erc1155ApprovalManager))) {
             revert MarketplaceNotApproved(_seller, _contractAddress);
         }
 
-        // Payment pull: collect sale amount plus marketplace fee before moving the ERC1155.
-        uint256 totalPrice = _quantity * _price;
-        _checkAmountAndTransfer(
-            _currencyAddress, totalPrice + marketConfig.marketplaceSettings.calculateMarketplaceFee(totalPrice)
-        );
+        uint256 requestCount = _requests.length;
+        uint256[] memory tokenIds = new uint256[](requestCount);
+        uint256[] memory amounts = new uint256[](requestCount);
+        address[] memory balanceAccounts = new address[](requestCount * 2);
+        uint256[] memory balanceTokenIds = new uint256[](requestCount * 2);
+        SecondaryPayoutContext[] memory payoutContexts = new SecondaryPayoutContext[](requestCount);
+        uint256 buyerTotal = 0;
 
-        // State write: decrement listed quantity before the external ERC1155 transfer.
-        salePrice.quantity -= _quantity;
+        for (uint256 i = 0; i < requestCount;) {
+            payoutContexts[i] = _validateSecondaryBuyRequest(_contractAddress, _seller, _currencyAddress, _requests[i]);
 
-        // Memory copies: preserve split data before possibly deleting the listing.
-        address payable[] memory splitRecipients = salePrice.splitRecipients;
-        uint8[] memory splitRatios = salePrice.splitRatios;
-        if (salePrice.quantity == 0) {
-            // State delete: clear listing storage once the final listed quantity is sold.
-            delete salePrices[_contractAddress][_tokenId][_seller];
+            tokenIds[i] = _requests[i].tokenId;
+            amounts[i] = _requests[i].quantity;
+
+            uint256 sellerBalance = erc1155.balanceOf(_seller, tokenIds[i]);
+            if (sellerBalance < amounts[i]) {
+                revert InsufficientTokenBalance(_seller, _contractAddress, tokenIds[i], amounts[i], sellerBalance);
+            }
+
+            payoutContexts[i].marketplaceFee =
+                $.marketConfig.marketplaceSettings.calculateMarketplaceFee(payoutContexts[i].grossAmount);
+            buyerTotal += payoutContexts[i].grossAmount + payoutContexts[i].marketplaceFee;
+
+            uint256 balanceIndex = i * 2;
+            balanceAccounts[balanceIndex] = _seller;
+            balanceAccounts[balanceIndex + 1] = msg.sender;
+            balanceTokenIds[balanceIndex] = tokenIds[i];
+            balanceTokenIds[balanceIndex + 1] = tokenIds[i];
+
+            unchecked {
+                ++i;
+            }
         }
 
-        // Balance snapshots: used to reject non-standard ERC1155 transfers that do not move the exact quantity.
-        uint256 sellerBalanceBeforeTransfer = erc1155.balanceOf(_seller, _tokenId);
-        uint256 buyerBalanceBeforeTransfer = erc1155.balanceOf(msg.sender, _tokenId);
-        if (sellerBalanceBeforeTransfer < _quantity) {
-            revert InsufficientTokenBalance(_seller, _contractAddress, _tokenId, _quantity, sellerBalanceBeforeTransfer);
+        // Payment pull: collect aggregate sale amount plus per-line marketplace fees before moving the ERC1155 batch.
+        _checkBatchPayment(_currencyAddress, buyerTotal);
+
+        for (uint256 i = 0; i < requestCount;) {
+            IRareERC1155Listings.SalePrice storage salePrice =
+                $.salePrices[_contractAddress][_requests[i].tokenId][_seller];
+
+            // State write: decrement listed quantity before the external ERC1155 batch transfer.
+            salePrice.quantity -= _requests[i].quantity;
+            if (salePrice.quantity == 0) {
+                // State delete: clear listing storage once the final listed quantity is sold.
+                delete $.salePrices[_contractAddress][_requests[i].tokenId][_seller];
+            }
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        uint256[] memory balancesBeforeTransfer = erc1155.balanceOfBatch(balanceAccounts, balanceTokenIds);
+        for (uint256 i = 0; i < requestCount;) {
+            uint256 sellerBalanceIndex = i * 2;
+            if (balancesBeforeTransfer[sellerBalanceIndex] < amounts[i]) {
+                revert InsufficientTokenBalance(
+                    _seller, _contractAddress, tokenIds[i], amounts[i], balancesBeforeTransfer[sellerBalanceIndex]
+                );
+            }
+
+            unchecked {
+                ++i;
+            }
         }
 
         // External transfer: move ERC1155 tokens through the approved transfer manager.
-        erc1155ApprovalManager.safeTransferFrom(_contractAddress, _seller, msg.sender, _tokenId, _quantity, "");
+        $.erc1155ApprovalManager.safeBatchTransferFrom(_contractAddress, _seller, msg.sender, tokenIds, amounts, "");
 
-        if (
-            erc1155.balanceOf(_seller, _tokenId) != sellerBalanceBeforeTransfer - _quantity
-                || erc1155.balanceOf(msg.sender, _tokenId) != buyerBalanceBeforeTransfer + _quantity
-        ) {
-            revert InvalidERC1155Transfer(_contractAddress, _tokenId, _seller, msg.sender, _quantity);
+        uint256[] memory balancesAfterTransfer = erc1155.balanceOfBatch(balanceAccounts, balanceTokenIds);
+        for (uint256 i = 0; i < requestCount;) {
+            uint256 balanceIndex = i * 2;
+            if (
+                balancesAfterTransfer[balanceIndex] != balancesBeforeTransfer[balanceIndex] - amounts[i]
+                    || balancesAfterTransfer[balanceIndex + 1] != balancesBeforeTransfer[balanceIndex + 1] + amounts[i]
+            ) {
+                revert InvalidERC1155Transfer(_contractAddress, tokenIds[i], _seller, msg.sender, amounts[i]);
+            }
+
+            unchecked {
+                ++i;
+            }
         }
 
-        // Payout fan-out: distribute collected secondary sale funds after token transfer.
-        _payoutSecondary(
-            _contractAddress, _tokenId, _currencyAddress, totalPrice, _seller, splitRecipients, splitRatios
-        );
+        for (uint256 i = 0; i < requestCount;) {
+            // Payout fan-out: distribute collected secondary sale funds after token transfer.
+            _payoutSecondary(
+                _contractAddress,
+                payoutContexts[i].tokenId,
+                _currencyAddress,
+                payoutContexts[i].grossAmount,
+                payoutContexts[i].marketplaceFee,
+                _seller,
+                payoutContexts[i].splitRecipients,
+                payoutContexts[i].splitRatios
+            );
 
-        emit Sold(_seller, msg.sender, _contractAddress, _tokenId, _currencyAddress, _price, _quantity);
+            emit Sold(
+                _seller,
+                msg.sender,
+                _contractAddress,
+                payoutContexts[i].tokenId,
+                _currencyAddress,
+                _requests[i].price,
+                _requests[i].quantity
+            );
+
+            unchecked {
+                ++i;
+            }
+        }
     }
 
     /// @notice Returns the primary mint sale config for a token id.
@@ -473,9 +618,9 @@ contract RareERC1155Marketplace is
     function getDirectSaleConfig(address _contractAddress, uint256 _tokenId)
         external
         view
-        returns (IRareERC1155Marketplace.DirectSaleConfig memory)
+        returns (IRareERC1155Listings.DirectSaleConfig memory)
     {
-        return directSaleConfigs[_contractAddress][_tokenId];
+        return _listingsStorage().directSaleConfigs[_contractAddress][_tokenId];
     }
 
     /// @notice Returns the allowlist config for a token id.
@@ -485,9 +630,9 @@ contract RareERC1155Marketplace is
     function getTokenAllowListConfig(address _contractAddress, uint256 _tokenId)
         external
         view
-        returns (IRareERC1155Marketplace.AllowListConfig memory)
+        returns (IRareERC1155Listings.AllowListConfig memory)
     {
-        return tokenAllowlistRoots[_contractAddress][_tokenId];
+        return _listingsStorage().tokenAllowlistRoots[_contractAddress][_tokenId];
     }
 
     /// @notice Returns the per-address mint quantity limit for a token id.
@@ -495,7 +640,7 @@ contract RareERC1155Marketplace is
     /// @param _tokenId Token id to inspect.
     /// @return Mint quantity limit. Zero means unlimited.
     function getTokenMintLimit(address _contractAddress, uint256 _tokenId) external view returns (uint256) {
-        return tokenMintLimit[_contractAddress][_tokenId];
+        return _listingsStorage().tokenMintLimit[_contractAddress][_tokenId];
     }
 
     /// @notice Returns quantity minted by an address for a token id.
@@ -508,7 +653,7 @@ contract RareERC1155Marketplace is
         view
         returns (uint256)
     {
-        return tokenMintsPerAddress[_contractAddress][_tokenId][_address];
+        return _listingsStorage().tokenMintsPerAddress[_contractAddress][_tokenId][_address];
     }
 
     /// @notice Returns the per-address transaction limit for a token id.
@@ -516,7 +661,7 @@ contract RareERC1155Marketplace is
     /// @param _tokenId Token id to inspect.
     /// @return Transaction limit. Zero means unlimited.
     function getTokenTxLimit(address _contractAddress, uint256 _tokenId) external view returns (uint256) {
-        return tokenTxLimit[_contractAddress][_tokenId];
+        return _listingsStorage().tokenTxLimit[_contractAddress][_tokenId];
     }
 
     /// @notice Returns mint transactions used by an address for a token id.
@@ -529,7 +674,7 @@ contract RareERC1155Marketplace is
         view
         returns (uint256)
     {
-        return tokenTxsPerAddress[_contractAddress][_tokenId][_address];
+        return _listingsStorage().tokenTxsPerAddress[_contractAddress][_tokenId][_address];
     }
 
     /// @notice Returns a seller's secondary fixed-price listing.
@@ -540,27 +685,27 @@ contract RareERC1155Marketplace is
     function getSalePrice(address _contractAddress, uint256 _tokenId, address _seller)
         external
         view
-        returns (IRareERC1155Marketplace.SalePrice memory)
+        returns (IRareERC1155Listings.SalePrice memory)
     {
-        return salePrices[_contractAddress][_tokenId][_seller];
+        return _listingsStorage().salePrices[_contractAddress][_tokenId][_seller];
     }
 
     /// @notice Returns the marketplace dependency configuration.
     /// @return Current market config struct.
     function getMarketConfig() external view returns (MarketConfigV2.Config memory) {
-        return marketConfig;
+        return _listingsStorage().marketConfig;
     }
 
     /// @notice Returns the ERC1155 approval manager used for secondary transfers.
     /// @return Current ERC1155 approval manager address.
     function getERC1155ApprovalManager() external view returns (address) {
-        return address(erc1155ApprovalManager);
+        return address(_listingsStorage().erc1155ApprovalManager);
     }
 
     /// @notice Returns whether marketplace writes are paused.
     /// @return True when paused.
     function isPaused() external view returns (bool) {
-        return paused;
+        return _listingsStorage().paused;
     }
 
     /// @notice Updates the network beneficiary address.
@@ -570,7 +715,7 @@ contract RareERC1155Marketplace is
         _validateMarketConfigAddress(_networkBeneficiary, NETWORK_BENEFICIARY_FIELD);
 
         // State write: delegate config mutation to the shared MarketConfig library.
-        marketConfig.updateNetworkBeneficiary(_networkBeneficiary);
+        _listingsStorage().marketConfig.updateNetworkBeneficiary(_networkBeneficiary);
 
         emit MarketplaceDependencyUpdated(NETWORK_BENEFICIARY_FIELD, _networkBeneficiary);
     }
@@ -582,7 +727,7 @@ contract RareERC1155Marketplace is
         _validateMarketConfigAddress(_marketplaceSettings, MARKETPLACE_SETTINGS_FIELD);
 
         // State write: delegate config mutation to the shared MarketConfig library.
-        marketConfig.updateMarketplaceSettings(_marketplaceSettings);
+        _listingsStorage().marketConfig.updateMarketplaceSettings(_marketplaceSettings);
 
         emit MarketplaceDependencyUpdated(MARKETPLACE_SETTINGS_FIELD, _marketplaceSettings);
     }
@@ -594,7 +739,7 @@ contract RareERC1155Marketplace is
         _validateMarketConfigAddress(_spaceOperatorRegistry, SPACE_OPERATOR_REGISTRY_FIELD);
 
         // State write: delegate config mutation to the shared MarketConfig library.
-        marketConfig.updateSpaceOperatorRegistry(_spaceOperatorRegistry);
+        _listingsStorage().marketConfig.updateSpaceOperatorRegistry(_spaceOperatorRegistry);
 
         emit MarketplaceDependencyUpdated(SPACE_OPERATOR_REGISTRY_FIELD, _spaceOperatorRegistry);
     }
@@ -606,7 +751,7 @@ contract RareERC1155Marketplace is
         _validateMarketConfigAddress(_royaltyEngine, ROYALTY_ENGINE_FIELD);
 
         // State write: delegate config mutation to the shared MarketConfig library.
-        marketConfig.updateRoyaltyEngine(_royaltyEngine);
+        _listingsStorage().marketConfig.updateRoyaltyEngine(_royaltyEngine);
 
         emit MarketplaceDependencyUpdated(ROYALTY_ENGINE_FIELD, _royaltyEngine);
     }
@@ -618,7 +763,7 @@ contract RareERC1155Marketplace is
         _validateMarketConfigAddress(_payments, PAYMENTS_FIELD);
 
         // State write: delegate config mutation to the shared MarketConfig library.
-        marketConfig.updatePayments(_payments);
+        _listingsStorage().marketConfig.updatePayments(_payments);
 
         emit MarketplaceDependencyUpdated(PAYMENTS_FIELD, _payments);
     }
@@ -630,7 +775,7 @@ contract RareERC1155Marketplace is
         _validateMarketConfigAddress(_approvedTokenRegistry, APPROVED_TOKEN_REGISTRY_FIELD);
 
         // State write: delegate config mutation to the shared MarketConfig library.
-        marketConfig.updateApprovedTokenRegistry(_approvedTokenRegistry);
+        _listingsStorage().marketConfig.updateApprovedTokenRegistry(_approvedTokenRegistry);
 
         emit MarketplaceDependencyUpdated(APPROVED_TOKEN_REGISTRY_FIELD, _approvedTokenRegistry);
     }
@@ -642,7 +787,7 @@ contract RareERC1155Marketplace is
         _validateMarketConfigAddress(_stakingSettings, STAKING_SETTINGS_FIELD);
 
         // State write: delegate config mutation to the shared MarketConfig library.
-        marketConfig.updateStakingSettings(_stakingSettings);
+        _listingsStorage().marketConfig.updateStakingSettings(_stakingSettings);
 
         emit MarketplaceDependencyUpdated(STAKING_SETTINGS_FIELD, _stakingSettings);
     }
@@ -654,7 +799,7 @@ contract RareERC1155Marketplace is
         _validateMarketConfigAddress(_stakingRegistry, STAKING_REGISTRY_FIELD);
 
         // State write: delegate config mutation to the shared MarketConfig library.
-        marketConfig.updateStakingRegistry(_stakingRegistry);
+        _listingsStorage().marketConfig.updateStakingRegistry(_stakingRegistry);
 
         emit MarketplaceDependencyUpdated(STAKING_REGISTRY_FIELD, _stakingRegistry);
     }
@@ -666,7 +811,7 @@ contract RareERC1155Marketplace is
         _validateApprovalManager(_erc20ApprovalManager);
 
         // State write: delegate config mutation to the shared MarketConfig library.
-        marketConfig.updateERC20ApprovalManager(_erc20ApprovalManager);
+        _listingsStorage().marketConfig.updateERC20ApprovalManager(_erc20ApprovalManager);
 
         emit MarketplaceDependencyUpdated(ERC20_APPROVAL_MANAGER_FIELD, _erc20ApprovalManager);
     }
@@ -678,7 +823,7 @@ contract RareERC1155Marketplace is
         _validateApprovalManager(_erc721ApprovalManager);
 
         // State write: delegate config mutation to the shared MarketConfig library.
-        marketConfig.updateERC721ApprovalManager(_erc721ApprovalManager);
+        _listingsStorage().marketConfig.updateERC721ApprovalManager(_erc721ApprovalManager);
 
         emit MarketplaceDependencyUpdated(ERC721_APPROVAL_MANAGER_FIELD, _erc721ApprovalManager);
     }
@@ -690,7 +835,7 @@ contract RareERC1155Marketplace is
         _validateApprovalManager(_erc1155ApprovalManager);
 
         // State write: replace the manager used for seller approval checks and transfers.
-        erc1155ApprovalManager = IERC1155ApprovalManager(_erc1155ApprovalManager);
+        _listingsStorage().erc1155ApprovalManager = IERC1155ApprovalManager(_erc1155ApprovalManager);
 
         emit MarketplaceDependencyUpdated(ERC1155_APPROVAL_MANAGER_FIELD, _erc1155ApprovalManager);
     }
@@ -699,7 +844,7 @@ contract RareERC1155Marketplace is
     /// @param _isPaused New pause state.
     function setContractPaused(bool _isPaused) external onlyOwner {
         // State write: set pause flag consumed by the notPaused modifier.
-        paused = _isPaused;
+        _listingsStorage().paused = _isPaused;
 
         emit ContractPausedUpdated(_isPaused);
     }
@@ -709,6 +854,7 @@ contract RareERC1155Marketplace is
     /// @param _contractAddress ERC1155 collection address.
     /// @param _currencyAddress Currency being paid. Zero address indicates ETH.
     /// @param _amount Gross sale amount before platform fee.
+    /// @param _marketplaceFee Buyer-paid marketplace fee already calculated for `_amount`.
     /// @param _seller Primary sale seller.
     /// @param _splitRecipients Seller proceed recipients.
     /// @param _splitRatios Seller proceed split ratios.
@@ -716,20 +862,22 @@ contract RareERC1155Marketplace is
         address _contractAddress,
         address _currencyAddress,
         uint256 _amount,
+        uint256 _marketplaceFee,
         address _seller,
         address payable[] memory _splitRecipients,
         uint8[] memory _splitRatios
     ) internal {
         // Accounting state: track seller proceeds remaining after primary platform commission.
+        ListingsStorage storage $ = _listingsStorage();
         uint256 remainingAmount = _amount;
 
         // Payout operation: distribute the buyer-paid marketplace fee through the configured fee split.
-        _payoutMarketplaceFee(_currencyAddress, _amount, _seller);
+        _payoutMarketplaceFee(_currencyAddress, _amount, _marketplaceFee, _seller);
 
         // External reads: choose primary commission from approved space operator or marketplace settings.
-        uint256 platformCommission = marketConfig.spaceOperatorRegistry.isApprovedSpaceOperator(_seller)
-            ? marketConfig.spaceOperatorRegistry.getPlatformCommission(_seller)
-            : marketConfig.marketplaceSettings.getERC721ContractPrimarySaleFeePercentage(_contractAddress);
+        uint256 platformCommission = $.marketConfig.spaceOperatorRegistry.isApprovedSpaceOperator(_seller)
+            ? $.marketConfig.spaceOperatorRegistry.getPlatformCommission(_seller)
+            : $.marketConfig.marketplaceSettings.getERC721ContractPrimarySaleFeePercentage(_contractAddress);
         if (platformCommission > 100) {
             revert PlatformCommissionExceeded(platformCommission, 100);
         }
@@ -742,7 +890,7 @@ contract RareERC1155Marketplace is
 
             // Memory setup: represent single-recipient platform fee as a payout batch.
             address payable[] memory platformRecipients = new address payable[](1);
-            platformRecipients[0] = payable(marketConfig.networkBeneficiary);
+            platformRecipients[0] = payable($.marketConfig.networkBeneficiary);
             uint256[] memory platformAmounts = new uint256[](1);
             platformAmounts[0] = platformFee;
 
@@ -760,6 +908,7 @@ contract RareERC1155Marketplace is
     /// @param _tokenId Sold token id.
     /// @param _currencyAddress Currency being paid. Zero address indicates ETH.
     /// @param _amount Gross sale amount before royalty deduction.
+    /// @param _marketplaceFee Buyer-paid marketplace fee already calculated for `_amount`.
     /// @param _seller Secondary seller.
     /// @param _splitRecipients Seller proceed recipients.
     /// @param _splitRatios Seller proceed split ratios.
@@ -768,6 +917,7 @@ contract RareERC1155Marketplace is
         uint256 _tokenId,
         address _currencyAddress,
         uint256 _amount,
+        uint256 _marketplaceFee,
         address _seller,
         address payable[] memory _splitRecipients,
         uint8[] memory _splitRatios
@@ -776,11 +926,11 @@ contract RareERC1155Marketplace is
         uint256 remainingAmount = _amount;
 
         // Payout operation: distribute the buyer-paid marketplace fee through the configured fee split.
-        _payoutMarketplaceFee(_currencyAddress, _amount, _seller);
+        _payoutMarketplaceFee(_currencyAddress, _amount, _marketplaceFee, _seller);
 
         // External read: resolve royalties through the configured royalty engine.
         (address payable[] memory receivers, uint256[] memory royalties) =
-            marketConfig.royaltyEngine.getRoyalty(_contractAddress, _tokenId, _amount);
+            _listingsStorage().marketConfig.royaltyEngine.getRoyalty(_contractAddress, _tokenId, _amount);
 
         // Accounting operation: aggregate royalty amounts before paying them.
         uint256 totalRoyalties = 0;
@@ -806,41 +956,45 @@ contract RareERC1155Marketplace is
     /// @notice Distributes marketplace fee between network beneficiary and seller staking rewards.
     /// @param _currencyAddress Currency being paid. Zero address indicates ETH.
     /// @param _amount Gross sale amount used for fee calculation.
+    /// @param _marketplaceFee Buyer-paid marketplace fee already calculated for `_amount`.
     /// @param _seller Seller whose staking reward accumulator may receive staking fees.
-    function _payoutMarketplaceFee(address _currencyAddress, uint256 _amount, address _seller) internal {
-        // External read: calculate buyer-paid marketplace fee for the sale amount.
-        uint256 marketplaceFee = marketConfig.marketplaceSettings.calculateMarketplaceFee(_amount);
-
+    function _payoutMarketplaceFee(address _currencyAddress, uint256 _amount, uint256 _marketplaceFee, address _seller)
+        internal
+    {
         // External read: calculate staking fee from staking settings and send the collected remainder to network.
-        uint256 stakingFee = marketConfig.stakingSettings.calculateStakingFee(_amount);
-        if (stakingFee > marketplaceFee) {
-            revert StakingFeeExceedsMarketplaceFee(marketplaceFee, stakingFee);
+        ListingsStorage storage $ = _listingsStorage();
+        uint256 stakingFee = $.marketConfig.stakingSettings.calculateStakingFee(_amount);
+        if (stakingFee > _marketplaceFee) {
+            revert StakingFeeExceedsMarketplaceFee(_marketplaceFee, stakingFee);
         }
 
-        if (marketplaceFee == 0) {
+        if (_marketplaceFee == 0) {
             return;
         }
 
         // Memory setup: recipient 0 is network, recipient 1 is seller staking reward accumulator or network fallback.
         address payable[] memory recipients = new address payable[](2);
-        recipients[0] = payable(marketConfig.networkBeneficiary);
-        recipients[1] = payable(marketConfig.stakingRegistry.getRewardAccumulatorAddressForUser(_seller));
-        recipients[1] = recipients[1] == address(0) ? payable(marketConfig.networkBeneficiary) : recipients[1];
+        recipients[0] = payable($.marketConfig.networkBeneficiary);
+        recipients[1] = payable($.marketConfig.stakingRegistry.getRewardAccumulatorAddressForUser(_seller));
+        recipients[1] = recipients[1] == address(0) ? payable($.marketConfig.networkBeneficiary) : recipients[1];
 
         // Memory setup: distribute the buyer-paid marketplace fee between network and staking recipients.
         uint256[] memory amounts = new uint256[](2);
-        amounts[0] = marketplaceFee - stakingFee;
+        amounts[0] = _marketplaceFee - stakingFee;
         amounts[1] = stakingFee;
 
         // Payout operation: distribute the marketplace fee batch.
-        _performPayouts(_currencyAddress, marketplaceFee, recipients, amounts);
+        _performPayouts(_currencyAddress, _marketplaceFee, recipients, amounts);
     }
 
     /// @notice Validates that a currency is ETH or an approved ERC20.
     /// @param _currencyAddress Currency to validate. Zero address indicates ETH.
     function _checkIfCurrencyIsApproved(address _currencyAddress) internal view {
         // External read: non-ETH currencies must be approved by the token registry.
-        if (_currencyAddress != address(0) && !marketConfig.approvedTokenRegistry.isApprovedToken(_currencyAddress)) {
+        if (
+            _currencyAddress != address(0)
+                && !_listingsStorage().marketConfig.approvedTokenRegistry.isApprovedToken(_currencyAddress)
+        ) {
             revert CurrencyNotApproved(_currencyAddress);
         }
     }
@@ -866,6 +1020,201 @@ contract RareERC1155Marketplace is
         }
     }
 
+    /// @notice Validates one primary mint request and snapshots payout state.
+    /// @param _contractAddress ERC1155 collection address.
+    /// @param _currencyAddress Currency expected by the buyer.
+    /// @param _buyer Buyer executing the batch.
+    /// @param _request Mint request to validate.
+    /// @return payoutContext Payout data copied before the external batch mint.
+    function _validateMintDirectSaleRequest(
+        address _contractAddress,
+        address _currencyAddress,
+        address _buyer,
+        IRareERC1155Listings.MintRequest calldata _request
+    ) internal view returns (PrimaryPayoutContext memory payoutContext) {
+        ListingsStorage storage $ = _listingsStorage();
+        uint256 tokenId = _request.tokenId;
+        uint256 quantity = _request.quantity;
+        IRareERC1155Listings.DirectSaleConfig memory directSaleConfig = $.directSaleConfigs[_contractAddress][tokenId];
+
+        // Atomic guards: ensure sale existence, current seller ownership, allowlist membership, and non-zero quantity.
+        if (directSaleConfig.seller == address(0)) revert DirectSaleNotConfigured(_contractAddress, tokenId);
+        if (!_isContractOwner(_contractAddress, directSaleConfig.seller)) {
+            revert NotContractOwner(_contractAddress, directSaleConfig.seller);
+        }
+        _enforceTokenAllowList(_contractAddress, tokenId, _buyer, _request.proof);
+        if (quantity == 0) revert QuantityCannotBeZero();
+
+        // Atomic mint-limit check: validate requested quantity against buyer's enabled-period mint count.
+        uint256 mintLimit = $.tokenMintLimit[_contractAddress][tokenId];
+        uint256 currentMints = $.tokenMintsPerAddress[_contractAddress][tokenId][_buyer];
+        if (mintLimit != 0 && currentMints + quantity > mintLimit) {
+            revert MintLimitExceeded(_contractAddress, tokenId, _buyer, quantity, currentMints, mintLimit);
+        }
+
+        // Atomic tx-limit check: each touched token id consumes one transaction when its tx limit is enabled.
+        uint256 txLimit = $.tokenTxLimit[_contractAddress][tokenId];
+        uint256 currentTxs = $.tokenTxsPerAddress[_contractAddress][tokenId][_buyer];
+        if (txLimit != 0 && currentTxs + 1 > txLimit) {
+            revert TransactionLimitExceeded(_contractAddress, tokenId, _buyer, currentTxs, txLimit);
+        }
+
+        // Atomic sale-parameter checks: buyer-supplied price and currency must match the stored config.
+        if (directSaleConfig.maxMints != 0 && quantity > directSaleConfig.maxMints) {
+            revert MaxMintExceeded(quantity, directSaleConfig.maxMints);
+        }
+        if (directSaleConfig.startTime > block.timestamp) revert SaleNotStarted(directSaleConfig.startTime);
+        if (_request.price != directSaleConfig.price) revert PriceMismatch(_request.price, directSaleConfig.price);
+        if (directSaleConfig.currencyAddress != _currencyAddress) {
+            revert CurrencyMismatch(_currencyAddress, directSaleConfig.currencyAddress);
+        }
+
+        payoutContext = PrimaryPayoutContext(
+            tokenId,
+            quantity * _request.price,
+            0,
+            directSaleConfig.seller,
+            directSaleConfig.splitRecipients,
+            directSaleConfig.splitRatios
+        );
+    }
+
+    /// @notice Validates one secondary buy request and snapshots payout state.
+    /// @param _contractAddress ERC1155 collection address.
+    /// @param _seller Seller whose listing is being filled.
+    /// @param _currencyAddress Currency expected by the buyer.
+    /// @param _request Buy request to validate.
+    /// @return payoutContext Payout data copied before listings may be decremented or deleted.
+    function _validateSecondaryBuyRequest(
+        address _contractAddress,
+        address _seller,
+        address _currencyAddress,
+        IRareERC1155Listings.BuyRequest calldata _request
+    ) internal view returns (SecondaryPayoutContext memory payoutContext) {
+        uint256 tokenId = _request.tokenId;
+        uint256 quantity = _request.quantity;
+        if (quantity == 0) revert QuantityCannotBeZero();
+
+        // Storage pointer: mutate seller listing quantity only after all buy-time checks pass.
+        IRareERC1155Listings.SalePrice storage salePrice =
+            _listingsStorage().salePrices[_contractAddress][tokenId][_seller];
+
+        // Atomic listing checks: listing must exist and match buyer-supplied terms.
+        if (salePrice.quantity == 0) revert SalePriceDoesNotExist(_contractAddress, tokenId, _seller);
+        if (salePrice.expirationTime != 0 && salePrice.expirationTime <= block.timestamp) {
+            revert SalePriceExpired(_contractAddress, tokenId, _seller, salePrice.expirationTime);
+        }
+        if (salePrice.currencyAddress != _currencyAddress) {
+            revert CurrencyMismatch(_currencyAddress, salePrice.currencyAddress);
+        }
+        if (salePrice.price != _request.price) revert PriceMismatch(_request.price, salePrice.price);
+        if (salePrice.quantity < quantity) revert QuantityExceedsSalePriceQuantity(quantity, salePrice.quantity);
+
+        payoutContext = SecondaryPayoutContext(
+            tokenId, quantity * _request.price, 0, salePrice.splitRecipients, salePrice.splitRatios
+        );
+    }
+
+    /// @notice Validates plain token id batch shape and ordering.
+    /// @param _tokenIds Token ids supplied by the caller.
+    function _validateTokenIds(uint256[] calldata _tokenIds) internal pure {
+        _validateBatchSize(_tokenIds.length);
+        for (uint256 i = 1; i < _tokenIds.length; i++) {
+            if (_tokenIds[i] <= _tokenIds[i - 1]) {
+                revert TokenIdsNotStrictlyAscending(i, _tokenIds[i - 1], _tokenIds[i]);
+            }
+        }
+    }
+
+    /// @notice Validates primary sale config request batch shape and ordering.
+    /// @param _requests Requests supplied by the caller.
+    function _validateDirectSaleRequests(IRareERC1155Listings.DirectSaleRequest[] calldata _requests) internal pure {
+        _validateBatchSize(_requests.length);
+        for (uint256 i = 1; i < _requests.length; i++) {
+            if (_requests[i].tokenId <= _requests[i - 1].tokenId) {
+                revert TokenIdsNotStrictlyAscending(i, _requests[i - 1].tokenId, _requests[i].tokenId);
+            }
+        }
+    }
+
+    /// @notice Validates primary mint request batch shape and ordering.
+    /// @param _requests Requests supplied by the caller.
+    function _validateMintRequests(IRareERC1155Listings.MintRequest[] calldata _requests) internal pure {
+        _validateBatchSize(_requests.length);
+        for (uint256 i = 1; i < _requests.length; i++) {
+            if (_requests[i].tokenId <= _requests[i - 1].tokenId) {
+                revert TokenIdsNotStrictlyAscending(i, _requests[i - 1].tokenId, _requests[i].tokenId);
+            }
+        }
+    }
+
+    /// @notice Validates allowlist config request batch shape and ordering.
+    /// @param _requests Requests supplied by the caller.
+    function _validateAllowListConfigRequests(IRareERC1155Listings.AllowListConfigRequest[] calldata _requests)
+        internal
+        pure
+    {
+        _validateBatchSize(_requests.length);
+        for (uint256 i = 1; i < _requests.length; i++) {
+            if (_requests[i].tokenId <= _requests[i - 1].tokenId) {
+                revert TokenIdsNotStrictlyAscending(i, _requests[i - 1].tokenId, _requests[i].tokenId);
+            }
+        }
+    }
+
+    /// @notice Validates token limit request batch shape and ordering.
+    /// @param _requests Requests supplied by the caller.
+    function _validateTokenLimitRequests(IRareERC1155Listings.TokenLimitRequest[] calldata _requests) internal pure {
+        _validateBatchSize(_requests.length);
+        for (uint256 i = 1; i < _requests.length; i++) {
+            if (_requests[i].tokenId <= _requests[i - 1].tokenId) {
+                revert TokenIdsNotStrictlyAscending(i, _requests[i - 1].tokenId, _requests[i].tokenId);
+            }
+        }
+    }
+
+    /// @notice Validates secondary listing request batch shape and ordering.
+    /// @param _requests Requests supplied by the caller.
+    function _validateSalePriceRequests(IRareERC1155Listings.SalePriceRequest[] calldata _requests) internal pure {
+        _validateBatchSize(_requests.length);
+        for (uint256 i = 1; i < _requests.length; i++) {
+            if (_requests[i].tokenId <= _requests[i - 1].tokenId) {
+                revert TokenIdsNotStrictlyAscending(i, _requests[i - 1].tokenId, _requests[i].tokenId);
+            }
+        }
+    }
+
+    /// @notice Validates secondary buy request batch shape and ordering.
+    /// @param _requests Requests supplied by the caller.
+    function _validateBuyRequests(IRareERC1155Listings.BuyRequest[] calldata _requests) internal pure {
+        _validateBatchSize(_requests.length);
+        for (uint256 i = 1; i < _requests.length; i++) {
+            if (_requests[i].tokenId <= _requests[i - 1].tokenId) {
+                revert TokenIdsNotStrictlyAscending(i, _requests[i - 1].tokenId, _requests[i].tokenId);
+            }
+        }
+    }
+
+    /// @notice Validates common batch size constraints.
+    /// @param _length Number of batch items supplied by the caller.
+    function _validateBatchSize(uint256 _length) internal pure {
+        if (_length == 0) revert EmptyBatch();
+        if (_length > MAX_BATCH_SIZE) revert BatchSizeExceeded(_length, MAX_BATCH_SIZE);
+    }
+
+    /// @notice Validates aggregate payment amount and pulls ERC20 funds when needed.
+    /// @param _currencyAddress Currency to collect. Zero address indicates ETH.
+    /// @param _amount Total amount to collect, including all buyer-paid marketplace fees.
+    function _checkBatchPayment(address _currencyAddress, uint256 _amount) internal {
+        if (_amount == 0) {
+            // Atomic free-batch guard: free batches must not leave ETH stuck in the marketplace.
+            if (msg.value != 0) revert MsgValueMustBeZero();
+            return;
+        }
+
+        _checkAmountAndTransfer(_currencyAddress, _amount);
+    }
+
     /// @notice Validates payment amount and pulls ERC20 funds when needed.
     /// @dev For ETH payments, funds are already present in `msg.value`; for ERC20 payments, this function transfers tokens in.
     /// @param _currencyAddress Currency to collect. Zero address indicates ETH.
@@ -886,7 +1235,8 @@ contract RareERC1155Marketplace is
         uint256 balanceBefore = erc20.balanceOf(address(this));
 
         // External transfer: pull exact payment amount through the approved ERC20 transfer manager.
-        marketConfig.erc20ApprovalManager.transferFrom(_currencyAddress, msg.sender, address(this), _amount);
+        _listingsStorage().marketConfig.erc20ApprovalManager
+            .transferFrom(_currencyAddress, msg.sender, address(this), _amount);
 
         // Atomic transfer check: marketplace must receive the exact amount requested.
         uint256 receivedAmount = erc20.balanceOf(address(this)) - balanceBefore;
@@ -978,6 +1328,7 @@ contract RareERC1155Marketplace is
 
         if (_currencyAddress == address(0)) {
             // External call: send ETH to Payments so it can fan out to each recipient.
+            MarketConfigV2.Config storage marketConfig = _listingsStorage().marketConfig;
             (bool success, bytes memory data) = address(marketConfig.payments).call{value: _amount}(
                 abi.encodeWithSelector(marketConfig.payments.payout.selector, _recipients, _amounts)
             );
@@ -1021,7 +1372,8 @@ contract RareERC1155Marketplace is
         bytes32[] calldata _proof
     ) internal view {
         // Storage read: load allowlist config for the token id.
-        IRareERC1155Marketplace.AllowListConfig memory allowListConfig = tokenAllowlistRoots[_contractAddress][_tokenId];
+        IRareERC1155Listings.AllowListConfig memory allowListConfig =
+            _listingsStorage().tokenAllowlistRoots[_contractAddress][_tokenId];
 
         if (allowListConfig.root == bytes32(0) || block.timestamp >= allowListConfig.endTimestamp) {
             return;
