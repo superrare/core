@@ -7,8 +7,41 @@ import {MarketConfigV2} from "../v2/utils/MarketConfigV2.sol";
 /// @title IRareERC1155Listings
 /// @notice Interface for RARE Protocol ERC1155 primary mint sales and ERC1155 fixed-price secondary sales.
 /// @dev Primary sales are configured per `(collection, tokenId)`. Secondary listings are approval-based and keyed by `(collection, tokenId, seller)`.
-/// Secondary listings intentionally do not expire on-chain; they remain fillable until sold, cancelled, or made invalid by seller balance, ERC1155 approval, or currency policy.
+/// Secondary listings remain fillable until sold, cancelled, expired, or made invalid by seller balance,
+/// ERC1155 approval, or currency policy.
 interface IRareERC1155Listings {
+    /// @notice Primary payout data captured before an external collection mint.
+    /// @dev Used by implementations to preserve payout inputs across external calls.
+    struct PrimaryPayoutContext {
+        /// @notice Token id being minted.
+        uint256 tokenId;
+        /// @notice Gross sale amount before marketplace fee or platform commission.
+        uint256 grossAmount;
+        /// @notice Buyer-paid marketplace fee calculated for `grossAmount`.
+        uint256 marketplaceFee;
+        /// @notice Primary seller that receives proceeds after marketplace and platform fees.
+        address seller;
+        /// @notice Recipients that split seller proceeds.
+        address payable[] splitRecipients;
+        /// @notice Percentages corresponding to `splitRecipients`.
+        uint8[] splitRatios;
+    }
+
+    /// @notice Secondary payout data captured before a listing is decremented or deleted.
+    /// @dev Used by implementations to preserve payout inputs across external calls and storage mutation.
+    struct SecondaryPayoutContext {
+        /// @notice Token id being purchased.
+        uint256 tokenId;
+        /// @notice Gross sale amount before marketplace fee or royalties.
+        uint256 grossAmount;
+        /// @notice Buyer-paid marketplace fee calculated for `grossAmount`.
+        uint256 marketplaceFee;
+        /// @notice Recipients that split seller proceeds.
+        address payable[] splitRecipients;
+        /// @notice Percentages corresponding to `splitRecipients`.
+        uint8[] splitRatios;
+    }
+
     /// @notice Primary mint sale configuration for a collection token id.
     struct DirectSaleConfig {
         /// @notice Seller/creator that owns the primary sale and receives sale proceeds.

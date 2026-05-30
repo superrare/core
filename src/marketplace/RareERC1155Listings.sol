@@ -65,25 +65,6 @@ contract RareERC1155Listings is
     /// @inheritdoc IRareERC1155Listings
     uint256 public constant MAX_BATCH_SIZE = 100;
 
-    /// @notice Primary payout data preserved before the external batch mint.
-    struct PrimaryPayoutContext {
-        uint256 tokenId;
-        uint256 grossAmount;
-        uint256 marketplaceFee;
-        address seller;
-        address payable[] splitRecipients;
-        uint8[] splitRatios;
-    }
-
-    /// @notice Secondary payout data preserved before listings are decremented or deleted.
-    struct SecondaryPayoutContext {
-        uint256 tokenId;
-        uint256 grossAmount;
-        uint256 marketplaceFee;
-        address payable[] splitRecipients;
-        uint8[] splitRatios;
-    }
-
     /// @notice ERC-7201 namespaced storage for the marketplace.
     /// @dev Pins all contract-owned state to a fixed hashed slot so it cannot collide with inherited
     /// upgradeable base contracts and can be extended in future upgrades without reserving storage gaps.
@@ -140,19 +121,7 @@ contract RareERC1155Listings is
         _disableInitializers();
     }
 
-    /// @notice Initializes the UUPS marketplace implementation behind a proxy.
-    /// @dev Stores the market config dependency bundle and initializes inherited upgradeability modules.
-    /// @param _networkBeneficiary Address receiving network marketplace fees.
-    /// @param _marketplaceSettings Marketplace settings contract.
-    /// @param _spaceOperatorRegistry Space operator registry contract.
-    /// @param _royaltyEngine Royalty engine contract.
-    /// @param _payments Payments contract used for ETH fan-out.
-    /// @param _approvedTokenRegistry Registry of approved ERC20 currencies.
-    /// @param _stakingSettings Staking fee settings contract.
-    /// @param _stakingRegistry Staking registry contract.
-    /// @param _erc20ApprovalManager ERC20 transfer manager for buyer currency approvals.
-    /// @param _erc721ApprovalManager ERC721 transfer manager kept in shared V2 market config.
-    /// @param _erc1155ApprovalManager ERC1155 transfer manager for seller token approvals.
+    /// @inheritdoc IRareERC1155Listings
     function initialize(
         address _networkBeneficiary,
         address _marketplaceSettings,
@@ -269,7 +238,8 @@ contract RareERC1155Listings is
         uint256 requestCount = _requests.length;
         uint256[] memory tokenIds = new uint256[](requestCount);
         uint256[] memory amounts = new uint256[](requestCount);
-        PrimaryPayoutContext[] memory payoutContexts = new PrimaryPayoutContext[](requestCount);
+        IRareERC1155Listings.PrimaryPayoutContext[] memory payoutContexts =
+            new IRareERC1155Listings.PrimaryPayoutContext[](requestCount);
         uint256 buyerTotal = 0;
 
         for (uint256 i = 0; i < requestCount;) {
@@ -502,7 +472,8 @@ contract RareERC1155Listings is
         uint256[] memory amounts = new uint256[](requestCount);
         address[] memory balanceAccounts = new address[](requestCount * 2);
         uint256[] memory balanceTokenIds = new uint256[](requestCount * 2);
-        SecondaryPayoutContext[] memory payoutContexts = new SecondaryPayoutContext[](requestCount);
+        IRareERC1155Listings.SecondaryPayoutContext[] memory payoutContexts =
+            new IRareERC1155Listings.SecondaryPayoutContext[](requestCount);
         uint256 buyerTotal = 0;
 
         for (uint256 i = 0; i < requestCount;) {
@@ -611,10 +582,7 @@ contract RareERC1155Listings is
         }
     }
 
-    /// @notice Returns the primary mint sale config for a token id.
-    /// @param _contractAddress ERC1155 collection address.
-    /// @param _tokenId Token id to inspect.
-    /// @return Primary sale config for the token id.
+    /// @inheritdoc IRareERC1155Listings
     function getDirectSaleConfig(address _contractAddress, uint256 _tokenId)
         external
         view
@@ -623,10 +591,7 @@ contract RareERC1155Listings is
         return _listingsStorage().directSaleConfigs[_contractAddress][_tokenId];
     }
 
-    /// @notice Returns the allowlist config for a token id.
-    /// @param _contractAddress ERC1155 collection address.
-    /// @param _tokenId Token id to inspect.
-    /// @return Allowlist config for the token id.
+    /// @inheritdoc IRareERC1155Listings
     function getTokenAllowListConfig(address _contractAddress, uint256 _tokenId)
         external
         view
@@ -635,19 +600,12 @@ contract RareERC1155Listings is
         return _listingsStorage().tokenAllowlistRoots[_contractAddress][_tokenId];
     }
 
-    /// @notice Returns the per-address mint quantity limit for a token id.
-    /// @param _contractAddress ERC1155 collection address.
-    /// @param _tokenId Token id to inspect.
-    /// @return Mint quantity limit. Zero means unlimited.
+    /// @inheritdoc IRareERC1155Listings
     function getTokenMintLimit(address _contractAddress, uint256 _tokenId) external view returns (uint256) {
         return _listingsStorage().tokenMintLimit[_contractAddress][_tokenId];
     }
 
-    /// @notice Returns quantity minted by an address for a token id.
-    /// @param _contractAddress ERC1155 collection address.
-    /// @param _tokenId Token id to inspect.
-    /// @param _address Address whose minted quantity is returned.
-    /// @return Quantity minted by `_address`.
+    /// @inheritdoc IRareERC1155Listings
     function getTokenMintsPerAddress(address _contractAddress, uint256 _tokenId, address _address)
         external
         view
@@ -656,19 +614,12 @@ contract RareERC1155Listings is
         return _listingsStorage().tokenMintsPerAddress[_contractAddress][_tokenId][_address];
     }
 
-    /// @notice Returns the per-address transaction limit for a token id.
-    /// @param _contractAddress ERC1155 collection address.
-    /// @param _tokenId Token id to inspect.
-    /// @return Transaction limit. Zero means unlimited.
+    /// @inheritdoc IRareERC1155Listings
     function getTokenTxLimit(address _contractAddress, uint256 _tokenId) external view returns (uint256) {
         return _listingsStorage().tokenTxLimit[_contractAddress][_tokenId];
     }
 
-    /// @notice Returns mint transactions used by an address for a token id.
-    /// @param _contractAddress ERC1155 collection address.
-    /// @param _tokenId Token id to inspect.
-    /// @param _address Address whose transaction count is returned.
-    /// @return Number of mint transactions used by `_address`.
+    /// @inheritdoc IRareERC1155Listings
     function getTokenTxsPerAddress(address _contractAddress, uint256 _tokenId, address _address)
         external
         view
@@ -677,11 +628,7 @@ contract RareERC1155Listings is
         return _listingsStorage().tokenTxsPerAddress[_contractAddress][_tokenId][_address];
     }
 
-    /// @notice Returns a seller's secondary fixed-price listing.
-    /// @param _contractAddress ERC1155 collection address.
-    /// @param _tokenId Token id to inspect.
-    /// @param _seller Seller whose listing is returned.
-    /// @return Secondary fixed-price listing for the seller and token id.
+    /// @inheritdoc IRareERC1155Listings
     function getSalePrice(address _contractAddress, uint256 _tokenId, address _seller)
         external
         view
@@ -690,26 +637,22 @@ contract RareERC1155Listings is
         return _listingsStorage().salePrices[_contractAddress][_tokenId][_seller];
     }
 
-    /// @notice Returns the marketplace dependency configuration.
-    /// @return Current market config struct.
+    /// @inheritdoc IRareERC1155Listings
     function getMarketConfig() external view returns (MarketConfigV2.Config memory) {
         return _listingsStorage().marketConfig;
     }
 
-    /// @notice Returns the ERC1155 approval manager used for secondary transfers.
-    /// @return Current ERC1155 approval manager address.
+    /// @inheritdoc IRareERC1155Listings
     function getERC1155ApprovalManager() external view returns (address) {
         return address(_listingsStorage().erc1155ApprovalManager);
     }
 
-    /// @notice Returns whether marketplace writes are paused.
-    /// @return True when paused.
+    /// @inheritdoc IRareERC1155Listings
     function isPaused() external view returns (bool) {
         return _listingsStorage().paused;
     }
 
-    /// @notice Updates the network beneficiary address.
-    /// @param _networkBeneficiary New network beneficiary.
+    /// @inheritdoc IRareERC1155Listings
     function setNetworkBeneficiary(address _networkBeneficiary) external onlyOwner {
         // Atomic guard: network beneficiary must remain payable by marketplace fee flows.
         _validateMarketConfigAddress(_networkBeneficiary, NETWORK_BENEFICIARY_FIELD);
@@ -720,8 +663,7 @@ contract RareERC1155Listings is
         emit MarketplaceDependencyUpdated(NETWORK_BENEFICIARY_FIELD, _networkBeneficiary);
     }
 
-    /// @notice Updates the marketplace settings contract address.
-    /// @param _marketplaceSettings New marketplace settings contract.
+    /// @inheritdoc IRareERC1155Listings
     function setMarketplaceSettings(address _marketplaceSettings) external onlyOwner {
         // Atomic guard: marketplace fee calculations must retain a concrete settings contract.
         _validateMarketConfigAddress(_marketplaceSettings, MARKETPLACE_SETTINGS_FIELD);
@@ -732,8 +674,7 @@ contract RareERC1155Listings is
         emit MarketplaceDependencyUpdated(MARKETPLACE_SETTINGS_FIELD, _marketplaceSettings);
     }
 
-    /// @notice Updates the space operator registry address.
-    /// @param _spaceOperatorRegistry New space operator registry contract.
+    /// @inheritdoc IRareERC1155Listings
     function setSpaceOperatorRegistry(address _spaceOperatorRegistry) external onlyOwner {
         // Atomic guard: primary platform-fee resolution must retain a concrete registry.
         _validateMarketConfigAddress(_spaceOperatorRegistry, SPACE_OPERATOR_REGISTRY_FIELD);
@@ -744,8 +685,7 @@ contract RareERC1155Listings is
         emit MarketplaceDependencyUpdated(SPACE_OPERATOR_REGISTRY_FIELD, _spaceOperatorRegistry);
     }
 
-    /// @notice Updates the royalty engine address.
-    /// @param _royaltyEngine New royalty engine contract.
+    /// @inheritdoc IRareERC1155Listings
     function setRoyaltyEngine(address _royaltyEngine) external onlyOwner {
         // Atomic guard: secondary royalty resolution must retain a concrete engine.
         _validateMarketConfigAddress(_royaltyEngine, ROYALTY_ENGINE_FIELD);
@@ -756,8 +696,7 @@ contract RareERC1155Listings is
         emit MarketplaceDependencyUpdated(ROYALTY_ENGINE_FIELD, _royaltyEngine);
     }
 
-    /// @notice Updates the Payments contract address used for ETH fan-out.
-    /// @param _payments New payments contract.
+    /// @inheritdoc IRareERC1155Listings
     function setPayments(address _payments) external onlyOwner {
         // Atomic guard: ETH payout fan-out must retain a concrete Payments contract.
         _validateMarketConfigAddress(_payments, PAYMENTS_FIELD);
@@ -768,8 +707,7 @@ contract RareERC1155Listings is
         emit MarketplaceDependencyUpdated(PAYMENTS_FIELD, _payments);
     }
 
-    /// @notice Updates the approved token registry address.
-    /// @param _approvedTokenRegistry New approved token registry contract.
+    /// @inheritdoc IRareERC1155Listings
     function setApprovedTokenRegistry(address _approvedTokenRegistry) external onlyOwner {
         // Atomic guard: currency approval checks must retain a concrete registry.
         _validateMarketConfigAddress(_approvedTokenRegistry, APPROVED_TOKEN_REGISTRY_FIELD);
@@ -780,8 +718,7 @@ contract RareERC1155Listings is
         emit MarketplaceDependencyUpdated(APPROVED_TOKEN_REGISTRY_FIELD, _approvedTokenRegistry);
     }
 
-    /// @notice Updates the staking settings address.
-    /// @param _stakingSettings New staking settings contract.
+    /// @inheritdoc IRareERC1155Listings
     function setStakingSettings(address _stakingSettings) external onlyOwner {
         // Atomic guard: marketplace fee split math must retain concrete settings.
         _validateMarketConfigAddress(_stakingSettings, STAKING_SETTINGS_FIELD);
@@ -792,8 +729,7 @@ contract RareERC1155Listings is
         emit MarketplaceDependencyUpdated(STAKING_SETTINGS_FIELD, _stakingSettings);
     }
 
-    /// @notice Updates the staking registry address.
-    /// @param _stakingRegistry New staking registry contract.
+    /// @inheritdoc IRareERC1155Listings
     function setStakingRegistry(address _stakingRegistry) external onlyOwner {
         // Atomic guard: marketplace fee split recipients must retain a concrete registry.
         _validateMarketConfigAddress(_stakingRegistry, STAKING_REGISTRY_FIELD);
@@ -804,8 +740,7 @@ contract RareERC1155Listings is
         emit MarketplaceDependencyUpdated(STAKING_REGISTRY_FIELD, _stakingRegistry);
     }
 
-    /// @notice Updates the ERC20 approval manager address.
-    /// @param _erc20ApprovalManager New ERC20 approval manager contract.
+    /// @inheritdoc IRareERC1155Listings
     function setERC20ApprovalManager(address _erc20ApprovalManager) external onlyOwner {
         // Atomic guard: ERC20 purchases must retain a concrete transfer manager.
         _validateApprovalManager(_erc20ApprovalManager);
@@ -816,8 +751,7 @@ contract RareERC1155Listings is
         emit MarketplaceDependencyUpdated(ERC20_APPROVAL_MANAGER_FIELD, _erc20ApprovalManager);
     }
 
-    /// @notice Updates the ERC721 approval manager address retained by the shared V2 market config.
-    /// @param _erc721ApprovalManager New ERC721 approval manager contract.
+    /// @inheritdoc IRareERC1155Listings
     function setERC721ApprovalManager(address _erc721ApprovalManager) external onlyOwner {
         // Atomic guard: shared V2 config must retain a concrete ERC721 approval manager.
         _validateApprovalManager(_erc721ApprovalManager);
@@ -828,8 +762,7 @@ contract RareERC1155Listings is
         emit MarketplaceDependencyUpdated(ERC721_APPROVAL_MANAGER_FIELD, _erc721ApprovalManager);
     }
 
-    /// @notice Updates the ERC1155 approval manager address.
-    /// @param _erc1155ApprovalManager New ERC1155 approval manager contract.
+    /// @inheritdoc IRareERC1155Listings
     function setERC1155ApprovalManager(address _erc1155ApprovalManager) external onlyOwner {
         // Atomic guard: secondary ERC1155 transfers must retain a concrete approval manager.
         _validateApprovalManager(_erc1155ApprovalManager);
@@ -840,8 +773,7 @@ contract RareERC1155Listings is
         emit MarketplaceDependencyUpdated(ERC1155_APPROVAL_MANAGER_FIELD, _erc1155ApprovalManager);
     }
 
-    /// @notice Pauses or unpauses marketplace write operations.
-    /// @param _isPaused New pause state.
+    /// @inheritdoc IRareERC1155Listings
     function setContractPaused(bool _isPaused) external onlyOwner {
         // State write: set pause flag consumed by the notPaused modifier.
         _listingsStorage().paused = _isPaused;
@@ -1031,7 +963,7 @@ contract RareERC1155Listings is
         address _currencyAddress,
         address _buyer,
         IRareERC1155Listings.MintRequest calldata _request
-    ) internal view returns (PrimaryPayoutContext memory payoutContext) {
+    ) internal view returns (IRareERC1155Listings.PrimaryPayoutContext memory payoutContext) {
         ListingsStorage storage $ = _listingsStorage();
         uint256 tokenId = _request.tokenId;
         uint256 quantity = _request.quantity;
@@ -1069,7 +1001,7 @@ contract RareERC1155Listings is
             revert CurrencyMismatch(_currencyAddress, directSaleConfig.currencyAddress);
         }
 
-        payoutContext = PrimaryPayoutContext(
+        payoutContext = IRareERC1155Listings.PrimaryPayoutContext(
             tokenId,
             quantity * _request.price,
             0,
@@ -1090,7 +1022,7 @@ contract RareERC1155Listings is
         address _seller,
         address _currencyAddress,
         IRareERC1155Listings.BuyRequest calldata _request
-    ) internal view returns (SecondaryPayoutContext memory payoutContext) {
+    ) internal view returns (IRareERC1155Listings.SecondaryPayoutContext memory payoutContext) {
         uint256 tokenId = _request.tokenId;
         uint256 quantity = _request.quantity;
         if (quantity == 0) revert QuantityCannotBeZero();
@@ -1110,7 +1042,7 @@ contract RareERC1155Listings is
         if (salePrice.price != _request.price) revert PriceMismatch(_request.price, salePrice.price);
         if (salePrice.quantity < quantity) revert QuantityExceedsSalePriceQuantity(quantity, salePrice.quantity);
 
-        payoutContext = SecondaryPayoutContext(
+        payoutContext = IRareERC1155Listings.SecondaryPayoutContext(
             tokenId, quantity * _request.price, 0, salePrice.splitRecipients, salePrice.splitRatios
         );
     }
