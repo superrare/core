@@ -93,7 +93,8 @@ interface IRareERC1155MarketplaceTypes {
     }
 
     /// @notice Buyer cart item for primary mint sales and secondary fixed-price listings.
-    /// @dev `itemKind` uses `CheckoutItemKind` values and is kept as uint8 so unknown future kinds can be skipped.
+    /// @dev `seller` is only used for `LISTING_BUY`; `DIRECT_SALE_MINT` resolves the seller from its sale config.
+    /// `itemKind` uses `CheckoutItemKind` values and is kept as uint8 so unknown future kinds can be skipped.
     struct CheckoutItem {
         uint8 itemKind;
         address contractAddress;

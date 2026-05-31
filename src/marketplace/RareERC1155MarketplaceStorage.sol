@@ -15,7 +15,8 @@ import {IRareERC1155MarketplaceTypes} from "./IRareERC1155MarketplaceTypes.sol";
 /// @dev This is not a deployable marketplace. `RareERC1155Marketplace` owns this storage behind the proxy, and
 /// `RareERC1155Settlement` uses the same namespace when executed through delegatecall from the marketplace.
 abstract contract RareERC1155MarketplaceStorage is IRareERC1155MarketplaceTypes {
-    uint256 public constant MAX_BATCH_SIZE = 100;
+    uint256 public constant MAX_BATCH_SIZE = 75;
+    uint256 public constant MAX_CHECKOUT_SIZE = 50;
 
     bytes32 internal constant NETWORK_BENEFICIARY_FIELD = "NETWORK_BENEFICIARY";
     bytes32 internal constant MARKETPLACE_SETTINGS_FIELD = "MARKETPLACE_SETTINGS";
@@ -115,6 +116,11 @@ abstract contract RareERC1155MarketplaceStorage is IRareERC1155MarketplaceTypes 
     function _validateBatchSize(uint256 _length) internal pure {
         if (_length == 0) revert EmptyBatch();
         if (_length > MAX_BATCH_SIZE) revert BatchSizeExceeded(_length, MAX_BATCH_SIZE);
+    }
+
+    function _validateCheckoutSize(uint256 _length) internal pure {
+        if (_length == 0) revert EmptyBatch();
+        if (_length > MAX_CHECKOUT_SIZE) revert BatchSizeExceeded(_length, MAX_CHECKOUT_SIZE);
     }
 
     function _validateStrictAscending(uint256 _index, uint256 _previousTokenId, uint256 _tokenId) internal pure {

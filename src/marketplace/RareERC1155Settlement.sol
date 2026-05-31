@@ -171,7 +171,8 @@ contract RareERC1155Settlement is IRareERC1155Settlement, RareERC1155Marketplace
         uint256 buyerTotal = 0;
 
         for (uint256 i = 0; i < requestCount;) {
-            payoutContexts[i] = _validateSecondaryBuyRequest(_contractAddress, _seller, _currencyAddress, _requests[i]);
+            payoutContexts[i] =
+                _validateSecondaryBuyRequest($, _contractAddress, _seller, _currencyAddress, _requests[i]);
 
             tokenIds[i] = _requests[i].tokenId;
             amounts[i] = _requests[i].quantity;
@@ -262,7 +263,7 @@ contract RareERC1155Settlement is IRareERC1155Settlement, RareERC1155Marketplace
         onlyDelegateCall
         returns (CheckoutSummary memory summary)
     {
-        _validateBatchSize(_items.length);
+        _validateCheckoutSize(_items.length);
 
         uint256 remainingEth = msg.value;
         for (uint256 i = 0; i < _items.length;) {
@@ -368,9 +369,30 @@ contract RareERC1155Settlement is IRareERC1155Settlement, RareERC1155Marketplace
             return (false, CurrencyNotApproved.selector, 0, _remainingEth);
         }
 
-        (bool valid, bytes4 skipReason, CheckoutFillContext memory context) = _validateCheckoutDirectSaleMint($, _item);
+        (bool valid, bytes4 skipReason, PrimaryPayoutContext memory payoutContext) = _checkMintDirectSaleRequest(
+            $,
+            _item.contractAddress,
+            _item.currencyAddress,
+            msg.sender,
+            _item.tokenId,
+            _item.price,
+            _item.quantity,
+            _item.proof,
+            NotContractOwner.selector
+        );
         if (!valid) {
             return (false, skipReason, 0, _remainingEth);
+        }
+
+        CheckoutFillContext memory context = CheckoutFillContext({
+            seller: payoutContext.seller,
+            grossAmount: payoutContext.grossAmount,
+            marketplaceFee: 0,
+            splitRecipients: payoutContext.splitRecipients,
+            splitRatios: payoutContext.splitRatios
+        });
+        if (context.grossAmount != 0) {
+            context.marketplaceFee = $.marketConfig.marketplaceSettings.calculateMarketplaceFee(context.grossAmount);
         }
 
         totalPaid = context.grossAmount + context.marketplaceFee;
@@ -379,21 +401,32 @@ contract RareERC1155Settlement is IRareERC1155Settlement, RareERC1155Marketplace
             return (false, reason, 0, _remainingEth);
         }
 
+        bool mintLimitEnabled = $.tokenMintLimit[_item.contractAddress][_item.tokenId] > 0;
+        bool txLimitEnabled = $.tokenTxLimit[_item.contractAddress][_item.tokenId] > 0;
+        if (mintLimitEnabled) {
+            $.tokenMintsPerAddress[_item.contractAddress][_item.tokenId][msg.sender] += _item.quantity;
+        }
+        if (txLimitEnabled) {
+            $.tokenTxsPerAddress[_item.contractAddress][_item.tokenId][msg.sender] += 1;
+        }
+
+        try IRareERC1155(_item.contractAddress)
+            .mintBatchTo(msg.sender, _singleUintArray(_item.tokenId), _singleUintArray(_item.quantity)) {}
+        catch (bytes memory revertData) {
+            if (mintLimitEnabled) {
+                $.tokenMintsPerAddress[_item.contractAddress][_item.tokenId][msg.sender] -= _item.quantity;
+            }
+            if (txLimitEnabled) {
+                $.tokenTxsPerAddress[_item.contractAddress][_item.tokenId][msg.sender] -= 1;
+            }
+            return (false, _revertSelector(revertData), 0, _remainingEth);
+        }
+
         if (_item.currencyAddress == address(0)) {
             newRemainingEth = _remainingEth - totalPaid;
         } else {
             _collectCheckoutErc20($.marketConfig, _item.currencyAddress, totalPaid);
         }
-
-        if ($.tokenMintLimit[_item.contractAddress][_item.tokenId] > 0) {
-            $.tokenMintsPerAddress[_item.contractAddress][_item.tokenId][msg.sender] += _item.quantity;
-        }
-        if ($.tokenTxLimit[_item.contractAddress][_item.tokenId] > 0) {
-            $.tokenTxsPerAddress[_item.contractAddress][_item.tokenId][msg.sender] += 1;
-        }
-
-        IRareERC1155(_item.contractAddress)
-            .mintBatchTo(msg.sender, _singleUintArray(_item.tokenId), _singleUintArray(_item.quantity));
 
         if (context.grossAmount != 0) {
             $.marketConfig
@@ -504,57 +537,6 @@ contract RareERC1155Settlement is IRareERC1155Settlement, RareERC1155Marketplace
         return (true, bytes4(0), totalPaid, newRemainingEth);
     }
 
-    function _validateCheckoutDirectSaleMint(MarketplaceStorage storage $, CheckoutItem calldata _item)
-        internal
-        view
-        returns (bool valid, bytes4 reason, CheckoutFillContext memory context)
-    {
-        DirectSaleConfig memory directSaleConfig = $.directSaleConfigs[_item.contractAddress][_item.tokenId];
-        if (directSaleConfig.seller == address(0)) return (false, DirectSaleNotConfigured.selector, context);
-        if (_item.seller != directSaleConfig.seller) return (false, CheckoutSellerMismatch.selector, context);
-        if (!_checkoutIsContractOwner(_item.contractAddress, directSaleConfig.seller)) {
-            return (false, NotContractOwner.selector, context);
-        }
-        if (!_checkoutAllowlisted(_item.contractAddress, _item.tokenId, msg.sender, _item.proof)) {
-            return (false, AddressNotAllowlisted.selector, context);
-        }
-        if (_item.quantity == 0) return (false, QuantityCannotBeZero.selector, context);
-
-        uint256 mintLimit = $.tokenMintLimit[_item.contractAddress][_item.tokenId];
-        uint256 currentMints = $.tokenMintsPerAddress[_item.contractAddress][_item.tokenId][msg.sender];
-        if (mintLimit != 0 && currentMints + _item.quantity > mintLimit) {
-            return (false, MintLimitExceeded.selector, context);
-        }
-
-        uint256 txLimit = $.tokenTxLimit[_item.contractAddress][_item.tokenId];
-        uint256 currentTxs = $.tokenTxsPerAddress[_item.contractAddress][_item.tokenId][msg.sender];
-        if (txLimit != 0 && currentTxs + 1 > txLimit) {
-            return (false, TransactionLimitExceeded.selector, context);
-        }
-
-        if (directSaleConfig.maxMints != 0 && _item.quantity > directSaleConfig.maxMints) {
-            return (false, MaxMintExceeded.selector, context);
-        }
-        if (directSaleConfig.startTime > block.timestamp) return (false, SaleNotStarted.selector, context);
-        if (_item.price != directSaleConfig.price) return (false, PriceMismatch.selector, context);
-        if (directSaleConfig.currencyAddress != _item.currencyAddress) {
-            return (false, CurrencyMismatch.selector, context);
-        }
-
-        context = CheckoutFillContext({
-            seller: directSaleConfig.seller,
-            grossAmount: _item.quantity * _item.price,
-            marketplaceFee: 0,
-            splitRecipients: directSaleConfig.splitRecipients,
-            splitRatios: directSaleConfig.splitRatios
-        });
-        if (context.grossAmount != 0) {
-            context.marketplaceFee = $.marketConfig.marketplaceSettings.calculateMarketplaceFee(context.grossAmount);
-        }
-
-        return (true, bytes4(0), context);
-    }
-
     function _validateCheckoutListingBuy(MarketplaceStorage storage $, CheckoutItem calldata _item)
         internal
         view
@@ -564,16 +546,12 @@ contract RareERC1155Settlement is IRareERC1155Settlement, RareERC1155Marketplace
         if (!_checkoutValidErc1155Contract(_item.contractAddress)) {
             return (false, InvalidERC1155Contract.selector, context);
         }
-        if (_item.quantity == 0) return (false, QuantityCannotBeZero.selector, context);
 
-        SalePrice storage salePrice = $.salePrices[_item.contractAddress][_item.tokenId][_item.seller];
-        if (salePrice.quantity == 0) return (false, SalePriceDoesNotExist.selector, context);
-        if (salePrice.expirationTime != 0 && salePrice.expirationTime <= block.timestamp) {
-            return (false, SalePriceExpired.selector, context);
-        }
-        if (salePrice.currencyAddress != _item.currencyAddress) return (false, CurrencyMismatch.selector, context);
-        if (salePrice.price != _item.price) return (false, PriceMismatch.selector, context);
-        if (salePrice.quantity < _item.quantity) return (false, QuantityExceedsSalePriceQuantity.selector, context);
+        SecondaryPayoutContext memory payoutContext;
+        (valid, reason, payoutContext) = _checkSecondaryBuyRequest(
+            $, _item.contractAddress, _item.seller, _item.currencyAddress, _item.tokenId, _item.price, _item.quantity
+        );
+        if (!valid) return (false, reason, context);
 
         IERC1155 erc1155 = IERC1155(_item.contractAddress);
         try erc1155.isApprovedForAll(_item.seller, address($.erc1155ApprovalManager)) returns (bool isApproved) {
@@ -590,10 +568,10 @@ contract RareERC1155Settlement is IRareERC1155Settlement, RareERC1155Marketplace
 
         context = CheckoutFillContext({
             seller: _item.seller,
-            grossAmount: _item.quantity * _item.price,
-            marketplaceFee: $.marketConfig.marketplaceSettings.calculateMarketplaceFee(_item.quantity * _item.price),
-            splitRecipients: salePrice.splitRecipients,
-            splitRatios: salePrice.splitRatios
+            grossAmount: payoutContext.grossAmount,
+            marketplaceFee: $.marketConfig.marketplaceSettings.calculateMarketplaceFee(payoutContext.grossAmount),
+            splitRecipients: payoutContext.splitRecipients,
+            splitRatios: payoutContext.splitRatios
         });
 
         return (true, bytes4(0), context);
@@ -661,18 +639,24 @@ contract RareERC1155Settlement is IRareERC1155Settlement, RareERC1155Marketplace
             && ERC165Checker.supportsInterface(_contractAddress, type(IERC1155).interfaceId);
     }
 
-    function _checkoutIsContractOwner(address _contractAddress, address _account) internal view returns (bool) {
+    function _checkContractOwner(address _contractAddress, address _account)
+        internal
+        view
+        returns (bool readable, bool isOwner)
+    {
         (bool success, bytes memory data) = _contractAddress.staticcall(abi.encodeWithSignature("owner()"));
-        return success && data.length >= 32 && abi.decode(data, (address)) == _account;
+        if (!success || data.length < 32) return (false, false);
+        return (true, abi.decode(data, (address)) == _account);
     }
 
-    function _checkoutAllowlisted(
+    function _checkTokenAllowList(
+        MarketplaceStorage storage $,
         address _contractAddress,
         uint256 _tokenId,
         address _account,
         bytes32[] calldata _proof
     ) internal view returns (bool) {
-        AllowListConfig memory allowListConfig = _marketplaceStorage().tokenAllowlistRoots[_contractAddress][_tokenId];
+        AllowListConfig memory allowListConfig = $.tokenAllowlistRoots[_contractAddress][_tokenId];
         if (allowListConfig.root == bytes32(0) || block.timestamp >= allowListConfig.endTimestamp) return true;
         return _verifyProof(keccak256(abi.encodePacked(_account)), allowListConfig.root, _proof);
     }
@@ -682,6 +666,14 @@ contract RareERC1155Settlement is IRareERC1155Settlement, RareERC1155Marketplace
         values[0] = _value;
     }
 
+    function _revertSelector(bytes memory _revertData) internal pure returns (bytes4 selector) {
+        if (_revertData.length < 4) return bytes4(0);
+
+        assembly {
+            selector := mload(add(_revertData, 32))
+        }
+    }
+
     function _validateMintDirectSaleRequest(
         address _contractAddress,
         address _currencyAddress,
@@ -689,76 +681,181 @@ contract RareERC1155Settlement is IRareERC1155Settlement, RareERC1155Marketplace
         MintRequest calldata _request
     ) internal view returns (PrimaryPayoutContext memory payoutContext) {
         MarketplaceStorage storage $ = _marketplaceStorage();
-        uint256 tokenId = _request.tokenId;
-        uint256 quantity = _request.quantity;
-        DirectSaleConfig memory directSaleConfig = $.directSaleConfigs[_contractAddress][tokenId];
-
-        if (directSaleConfig.seller == address(0)) revert DirectSaleNotConfigured(_contractAddress, tokenId);
-        if (!_isContractOwner(_contractAddress, directSaleConfig.seller)) {
-            revert NotContractOwner(_contractAddress, directSaleConfig.seller);
-        }
-        _enforceTokenAllowList(_contractAddress, tokenId, _buyer, _request.proof);
-        if (quantity == 0) revert QuantityCannotBeZero();
-
-        uint256 mintLimit = $.tokenMintLimit[_contractAddress][tokenId];
-        uint256 currentMints = $.tokenMintsPerAddress[_contractAddress][tokenId][_buyer];
-        if (mintLimit != 0 && currentMints + quantity > mintLimit) {
-            revert MintLimitExceeded(_contractAddress, tokenId, _buyer, quantity, currentMints, mintLimit);
-        }
-
-        uint256 txLimit = $.tokenTxLimit[_contractAddress][tokenId];
-        uint256 currentTxs = $.tokenTxsPerAddress[_contractAddress][tokenId][_buyer];
-        if (txLimit != 0 && currentTxs + 1 > txLimit) {
-            revert TransactionLimitExceeded(_contractAddress, tokenId, _buyer, currentTxs, txLimit);
-        }
-
-        if (directSaleConfig.maxMints != 0 && quantity > directSaleConfig.maxMints) {
-            revert MaxMintExceeded(quantity, directSaleConfig.maxMints);
-        }
-        if (directSaleConfig.startTime > block.timestamp) revert SaleNotStarted(directSaleConfig.startTime);
-        if (_request.price != directSaleConfig.price) revert PriceMismatch(_request.price, directSaleConfig.price);
-        if (directSaleConfig.currencyAddress != _currencyAddress) {
-            revert CurrencyMismatch(_currencyAddress, directSaleConfig.currencyAddress);
-        }
-
-        payoutContext = PrimaryPayoutContext({
-            tokenId: tokenId,
-            grossAmount: quantity * _request.price,
-            marketplaceFee: 0,
-            seller: directSaleConfig.seller,
-            splitRecipients: directSaleConfig.splitRecipients,
-            splitRatios: directSaleConfig.splitRatios
-        });
+        (bool valid, bytes4 reason, PrimaryPayoutContext memory checkedContext) = _checkMintDirectSaleRequest(
+            $,
+            _contractAddress,
+            _currencyAddress,
+            _buyer,
+            _request.tokenId,
+            _request.price,
+            _request.quantity,
+            _request.proof,
+            ContractHasNoOwner.selector
+        );
+        if (!valid) _revertMintDirectSaleRequest(reason, $, _contractAddress, _currencyAddress, _buyer, _request);
+        return checkedContext;
     }
 
     function _validateSecondaryBuyRequest(
+        MarketplaceStorage storage $,
         address _contractAddress,
         address _seller,
         address _currencyAddress,
         BuyRequest calldata _request
     ) internal view returns (SecondaryPayoutContext memory payoutContext) {
+        (bool valid, bytes4 reason, SecondaryPayoutContext memory checkedContext) = _checkSecondaryBuyRequest(
+            $, _contractAddress, _seller, _currencyAddress, _request.tokenId, _request.price, _request.quantity
+        );
+        if (!valid) _revertSecondaryBuyRequest(reason, $, _contractAddress, _seller, _currencyAddress, _request);
+        return checkedContext;
+    }
+
+    function _checkMintDirectSaleRequest(
+        MarketplaceStorage storage $,
+        address _contractAddress,
+        address _currencyAddress,
+        address _buyer,
+        uint256 _tokenId,
+        uint256 _price,
+        uint256 _quantity,
+        bytes32[] calldata _proof,
+        bytes4 _ownerLookupFailureReason
+    ) internal view returns (bool valid, bytes4 reason, PrimaryPayoutContext memory payoutContext) {
+        DirectSaleConfig memory directSaleConfig = $.directSaleConfigs[_contractAddress][_tokenId];
+        payoutContext.tokenId = _tokenId;
+        payoutContext.seller = directSaleConfig.seller;
+
+        if (directSaleConfig.seller == address(0)) return (false, DirectSaleNotConfigured.selector, payoutContext);
+
+        (bool ownerReadable, bool isOwner) = _checkContractOwner(_contractAddress, directSaleConfig.seller);
+        if (!ownerReadable) return (false, _ownerLookupFailureReason, payoutContext);
+        if (!isOwner) return (false, NotContractOwner.selector, payoutContext);
+        if (!_checkTokenAllowList($, _contractAddress, _tokenId, _buyer, _proof)) {
+            return (false, AddressNotAllowlisted.selector, payoutContext);
+        }
+        if (_quantity == 0) return (false, QuantityCannotBeZero.selector, payoutContext);
+
+        uint256 mintLimit = $.tokenMintLimit[_contractAddress][_tokenId];
+        uint256 currentMints = $.tokenMintsPerAddress[_contractAddress][_tokenId][_buyer];
+        if (mintLimit != 0 && currentMints + _quantity > mintLimit) {
+            return (false, MintLimitExceeded.selector, payoutContext);
+        }
+
+        uint256 txLimit = $.tokenTxLimit[_contractAddress][_tokenId];
+        uint256 currentTxs = $.tokenTxsPerAddress[_contractAddress][_tokenId][_buyer];
+        if (txLimit != 0 && currentTxs + 1 > txLimit) {
+            return (false, TransactionLimitExceeded.selector, payoutContext);
+        }
+
+        if (directSaleConfig.maxMints != 0 && _quantity > directSaleConfig.maxMints) {
+            return (false, MaxMintExceeded.selector, payoutContext);
+        }
+        if (directSaleConfig.startTime > block.timestamp) return (false, SaleNotStarted.selector, payoutContext);
+        if (_price != directSaleConfig.price) return (false, PriceMismatch.selector, payoutContext);
+        if (directSaleConfig.currencyAddress != _currencyAddress) {
+            return (false, CurrencyMismatch.selector, payoutContext);
+        }
+
+        payoutContext.grossAmount = _quantity * _price;
+        payoutContext.splitRecipients = directSaleConfig.splitRecipients;
+        payoutContext.splitRatios = directSaleConfig.splitRatios;
+
+        return (true, bytes4(0), payoutContext);
+    }
+
+    function _checkSecondaryBuyRequest(
+        MarketplaceStorage storage $,
+        address _contractAddress,
+        address _seller,
+        address _currencyAddress,
+        uint256 _tokenId,
+        uint256 _price,
+        uint256 _quantity
+    ) internal view returns (bool valid, bytes4 reason, SecondaryPayoutContext memory payoutContext) {
+        payoutContext.tokenId = _tokenId;
+        if (_quantity == 0) return (false, QuantityCannotBeZero.selector, payoutContext);
+
+        SalePrice storage salePrice = $.salePrices[_contractAddress][_tokenId][_seller];
+        if (salePrice.quantity == 0) return (false, SalePriceDoesNotExist.selector, payoutContext);
+        if (salePrice.expirationTime != 0 && salePrice.expirationTime <= block.timestamp) {
+            return (false, SalePriceExpired.selector, payoutContext);
+        }
+        if (salePrice.currencyAddress != _currencyAddress) return (false, CurrencyMismatch.selector, payoutContext);
+        if (salePrice.price != _price) return (false, PriceMismatch.selector, payoutContext);
+        if (salePrice.quantity < _quantity) {
+            return (false, QuantityExceedsSalePriceQuantity.selector, payoutContext);
+        }
+
+        payoutContext.grossAmount = _quantity * _price;
+        payoutContext.splitRecipients = salePrice.splitRecipients;
+        payoutContext.splitRatios = salePrice.splitRatios;
+
+        return (true, bytes4(0), payoutContext);
+    }
+
+    function _revertMintDirectSaleRequest(
+        bytes4 _reason,
+        MarketplaceStorage storage $,
+        address _contractAddress,
+        address _currencyAddress,
+        address _buyer,
+        MintRequest calldata _request
+    ) internal view {
         uint256 tokenId = _request.tokenId;
         uint256 quantity = _request.quantity;
-        if (quantity == 0) revert QuantityCannotBeZero();
+        DirectSaleConfig storage directSaleConfig = $.directSaleConfigs[_contractAddress][tokenId];
 
-        SalePrice storage salePrice = _marketplaceStorage().salePrices[_contractAddress][tokenId][_seller];
-        if (salePrice.quantity == 0) revert SalePriceDoesNotExist(_contractAddress, tokenId, _seller);
-        if (salePrice.expirationTime != 0 && salePrice.expirationTime <= block.timestamp) {
+        if (_reason == DirectSaleNotConfigured.selector) revert DirectSaleNotConfigured(_contractAddress, tokenId);
+        if (_reason == ContractHasNoOwner.selector) revert ContractHasNoOwner(_contractAddress);
+        if (_reason == NotContractOwner.selector) revert NotContractOwner(_contractAddress, directSaleConfig.seller);
+        if (_reason == AddressNotAllowlisted.selector) revert AddressNotAllowlisted(_buyer);
+        if (_reason == QuantityCannotBeZero.selector) revert QuantityCannotBeZero();
+        if (_reason == MintLimitExceeded.selector) {
+            uint256 mintLimit = $.tokenMintLimit[_contractAddress][tokenId];
+            uint256 currentMints = $.tokenMintsPerAddress[_contractAddress][tokenId][_buyer];
+            revert MintLimitExceeded(_contractAddress, tokenId, _buyer, quantity, currentMints, mintLimit);
+        }
+        if (_reason == TransactionLimitExceeded.selector) {
+            uint256 txLimit = $.tokenTxLimit[_contractAddress][tokenId];
+            uint256 currentTxs = $.tokenTxsPerAddress[_contractAddress][tokenId][_buyer];
+            revert TransactionLimitExceeded(_contractAddress, tokenId, _buyer, currentTxs, txLimit);
+        }
+        if (_reason == MaxMintExceeded.selector) revert MaxMintExceeded(quantity, directSaleConfig.maxMints);
+        if (_reason == SaleNotStarted.selector) revert SaleNotStarted(directSaleConfig.startTime);
+        if (_reason == PriceMismatch.selector) revert PriceMismatch(_request.price, directSaleConfig.price);
+        if (_reason == CurrencyMismatch.selector) {
+            revert CurrencyMismatch(_currencyAddress, directSaleConfig.currencyAddress);
+        }
+
+        revert();
+    }
+
+    function _revertSecondaryBuyRequest(
+        bytes4 _reason,
+        MarketplaceStorage storage $,
+        address _contractAddress,
+        address _seller,
+        address _currencyAddress,
+        BuyRequest calldata _request
+    ) internal view {
+        uint256 tokenId = _request.tokenId;
+        uint256 quantity = _request.quantity;
+        SalePrice storage salePrice = $.salePrices[_contractAddress][tokenId][_seller];
+
+        if (_reason == QuantityCannotBeZero.selector) revert QuantityCannotBeZero();
+        if (_reason == SalePriceDoesNotExist.selector) {
+            revert SalePriceDoesNotExist(_contractAddress, tokenId, _seller);
+        }
+        if (_reason == SalePriceExpired.selector) {
             revert SalePriceExpired(_contractAddress, tokenId, _seller, salePrice.expirationTime);
         }
-        if (salePrice.currencyAddress != _currencyAddress) {
-            revert CurrencyMismatch(_currencyAddress, salePrice.currencyAddress);
+        if (_reason == CurrencyMismatch.selector) revert CurrencyMismatch(_currencyAddress, salePrice.currencyAddress);
+        if (_reason == PriceMismatch.selector) revert PriceMismatch(_request.price, salePrice.price);
+        if (_reason == QuantityExceedsSalePriceQuantity.selector) {
+            revert QuantityExceedsSalePriceQuantity(quantity, salePrice.quantity);
         }
-        if (salePrice.price != _request.price) revert PriceMismatch(_request.price, salePrice.price);
-        if (salePrice.quantity < quantity) revert QuantityExceedsSalePriceQuantity(quantity, salePrice.quantity);
 
-        payoutContext = SecondaryPayoutContext({
-            tokenId: tokenId,
-            grossAmount: quantity * _request.price,
-            marketplaceFee: 0,
-            splitRecipients: salePrice.splitRecipients,
-            splitRatios: salePrice.splitRatios
-        });
+        revert();
     }
 
     function _validateAndApplyOfferFill(AcceptOfferInput memory _input)
@@ -884,20 +981,6 @@ contract RareERC1155Settlement is IRareERC1155Settlement, RareERC1155Marketplace
             unchecked {
                 ++i;
             }
-        }
-    }
-
-    function _enforceTokenAllowList(
-        address _contractAddress,
-        uint256 _tokenId,
-        address _address,
-        bytes32[] calldata _proof
-    ) internal view {
-        AllowListConfig memory allowListConfig = _marketplaceStorage().tokenAllowlistRoots[_contractAddress][_tokenId];
-        if (allowListConfig.root == bytes32(0) || block.timestamp >= allowListConfig.endTimestamp) return;
-
-        if (!_verifyProof(keccak256(abi.encodePacked(_address)), allowListConfig.root, _proof)) {
-            revert AddressNotAllowlisted(_address);
         }
     }
 
