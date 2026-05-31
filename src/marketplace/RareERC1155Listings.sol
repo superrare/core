@@ -5,7 +5,6 @@ import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {IERC1155} from "openzeppelin-contracts/token/ERC1155/IERC1155.sol";
 import {ERC165Checker} from "openzeppelin-contracts/utils/introspection/ERC165Checker.sol";
 import {OwnableUpgradeable} from "openzeppelin-contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {Initializable} from "openzeppelin-contracts-upgradeable/proxy/utils/Initializable.sol";
 import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import {UUPSUpgradeable} from "openzeppelin-contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
@@ -19,13 +18,7 @@ import {IERC1155ApprovalManager} from "../v2/approver/ERC1155/IERC1155ApprovalMa
 /// @title RareERC1155Listings
 /// @notice Primary mint sales for RARE Protocol ERC1155 tokens and fixed-price resale listings for ERC1155 tokens.
 /// @dev UUPS-upgradeable marketplace that keeps ERC1155 sale semantics separate from ERC721 marketplace logic.
-contract RareERC1155Listings is
-    Initializable,
-    IRareERC1155Listings,
-    OwnableUpgradeable,
-    ReentrancyGuardUpgradeable,
-    UUPSUpgradeable
-{
+contract RareERC1155Listings is IRareERC1155Listings, OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPSUpgradeable {
     using SafeERC20 for IERC20;
     using MarketConfigV2 for MarketConfigV2.Config;
 

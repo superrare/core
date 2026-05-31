@@ -163,7 +163,7 @@ contract RareERC1155 is
         if (msg.sender != owner() && !minterAddresses[msg.sender]) revert CallerCannotMint(msg.sender);
         _validateMintBatch(_tokenIds, _amounts);
 
-        for (uint256 i = 0; i < _tokenIds.length; i++) {
+        for (uint256 i = 0; i < _tokenIds.length;) {
             uint256 tokenId = _tokenIds[i];
             if (!tokenConfigs[tokenId].exists) revert TokenDoesNotExist(tokenId);
             if (_amounts[i] == 0) revert AmountCannotBeZero();
@@ -175,6 +175,10 @@ contract RareERC1155 is
 
             // State write: record lifetime minted supply before the ERC1155 receiver hook can run.
             tokenTotalMinted[tokenId] = requestedTotalMinted;
+
+            unchecked {
+                ++i;
+            }
         }
 
         // Token mint: OpenZeppelin ERC1155 updates balances, total supply, and emits TransferBatch.
@@ -331,8 +335,12 @@ contract RareERC1155 is
         if (_tokenIds.length != _amounts.length) revert BatchLengthMismatch();
         if (_tokenIds.length > MAX_BATCH_SIZE) revert BatchSizeExceeded(_tokenIds.length, MAX_BATCH_SIZE);
 
-        for (uint256 i = 1; i < _tokenIds.length; i++) {
+        for (uint256 i = 1; i < _tokenIds.length;) {
             if (_tokenIds[i] <= _tokenIds[i - 1]) revert TokenIdsNotStrictlyAscending(_tokenIds[i]);
+
+            unchecked {
+                ++i;
+            }
         }
     }
 
