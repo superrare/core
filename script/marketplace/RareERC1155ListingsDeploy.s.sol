@@ -37,24 +37,23 @@ contract RareERC1155ListingsDeploy is Script {
         // Deployment operation: deploy UUPS implementation logic.
         RareERC1155Listings marketplace = new RareERC1155Listings();
 
-        // Deployment operation: deploy ERC1967 proxy pointing at the implementation.
-        ERC1967Proxy marketplaceProxy = new ERC1967Proxy(address(marketplace), "");
+        bytes memory initData = abi.encodeWithSelector(
+            RareERC1155Listings.initialize.selector,
+            networkBeneficiary,
+            marketplaceSettings,
+            spaceOperatorRegistry,
+            royaltyEngine,
+            payments,
+            approvedTokenRegistry,
+            stakingSettings,
+            stakingRegistry,
+            erc20ApprovalManager,
+            erc721ApprovalManager,
+            erc1155ApprovalManager
+        );
 
-        // Initialization transaction: configure proxied marketplace dependencies.
-        RareERC1155Listings(address(marketplaceProxy))
-            .initialize(
-                networkBeneficiary,
-                marketplaceSettings,
-                spaceOperatorRegistry,
-                royaltyEngine,
-                payments,
-                approvedTokenRegistry,
-                stakingSettings,
-                stakingRegistry,
-                erc20ApprovalManager,
-                erc721ApprovalManager,
-                erc1155ApprovalManager
-            );
+        // Deployment operation: deploy ERC1967 proxy and initialize it atomically.
+        new ERC1967Proxy(address(marketplace), initData);
 
         // Broadcast boundary: stop submitting transactions.
         vm.stopBroadcast();
