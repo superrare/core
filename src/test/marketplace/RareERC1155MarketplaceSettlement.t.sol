@@ -713,6 +713,36 @@ contract RareERC1155MarketplaceSettlementTest is Test {
         assertEq(marketplace.getSettlement(), address(newSettlement));
     }
 
+    function testSetTokenAllowListConfigsRevertsWhenPaused() public {
+        vm.prank(deployer);
+        marketplace.setContractPaused(true);
+
+        vm.prank(seller);
+        vm.expectRevert(IRareERC1155MarketplaceTypes.ContractPaused.selector);
+        marketplace.setTokenAllowListConfigs(
+            address(token),
+            _singleAllowListConfigRequest(tokenId, keccak256(abi.encodePacked(buyer)), block.timestamp + 1 days)
+        );
+    }
+
+    function testSetTokenMintLimitsRevertsWhenPaused() public {
+        vm.prank(deployer);
+        marketplace.setContractPaused(true);
+
+        vm.prank(seller);
+        vm.expectRevert(IRareERC1155MarketplaceTypes.ContractPaused.selector);
+        marketplace.setTokenMintLimits(address(token), _singleTokenLimitRequest(tokenId, 5));
+    }
+
+    function testSetTokenTxLimitsRevertsWhenPaused() public {
+        vm.prank(deployer);
+        marketplace.setContractPaused(true);
+
+        vm.prank(seller);
+        vm.expectRevert(IRareERC1155MarketplaceTypes.ContractPaused.selector);
+        marketplace.setTokenTxLimits(address(token), _singleTokenLimitRequest(tokenId, 5));
+    }
+
     function _initData(address _payments, address _settlement) private view returns (bytes memory) {
         return abi.encodeWithSelector(
             RareERC1155Marketplace.initialize.selector,

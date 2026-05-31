@@ -135,6 +135,7 @@ contract RareERC1155Marketplace is
     function setTokenAllowListConfigs(address _contractAddress, AllowListConfigRequest[] calldata _requests)
         external
         nonReentrant
+        notPaused
     {
         if (!_isContractOwner(_contractAddress, msg.sender)) {
             revert NotContractOwner(_contractAddress, msg.sender);
@@ -153,6 +154,7 @@ contract RareERC1155Marketplace is
     function setTokenMintLimits(address _contractAddress, TokenLimitRequest[] calldata _requests)
         external
         nonReentrant
+        notPaused
     {
         if (!_isContractOwner(_contractAddress, msg.sender)) {
             revert NotContractOwner(_contractAddress, msg.sender);
@@ -167,8 +169,14 @@ contract RareERC1155Marketplace is
         }
     }
 
-    function setTokenTxLimits(address _contractAddress, TokenLimitRequest[] calldata _requests) external nonReentrant {
-        if (!_isContractOwner(_contractAddress, msg.sender)) revert NotContractOwner(_contractAddress, msg.sender);
+    function setTokenTxLimits(address _contractAddress, TokenLimitRequest[] calldata _requests)
+        external
+        nonReentrant
+        notPaused
+    {
+        if (!_isContractOwner(_contractAddress, msg.sender)) {
+            revert NotContractOwner(_contractAddress, msg.sender);
+        }
         _validateTokenLimitRequests(_requests);
 
         for (uint256 i = 0; i < _requests.length; i++) {

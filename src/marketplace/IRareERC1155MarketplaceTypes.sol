@@ -6,6 +6,7 @@ pragma solidity 0.8.18;
 /// @notice Shared structs, events, and errors for the ERC1155 marketplace.
 interface IRareERC1155MarketplaceTypes {
     /// @notice Primary mint sale configuration for a collection token id.
+    /// @dev `maxMints` caps the quantity minted in a single transaction. Use token mint limits for cumulative per-address caps.
     struct DirectSaleConfig {
         address seller;
         address currencyAddress;
@@ -44,6 +45,7 @@ interface IRareERC1155MarketplaceTypes {
     }
 
     /// @notice Primary sale setup input for one token id in a batch.
+    /// @dev `maxMints` caps the quantity minted in a single transaction. Use token mint limits for cumulative per-address caps.
     struct DirectSaleRequest {
         uint256 tokenId;
         uint256 price;
@@ -274,7 +276,6 @@ interface IRareERC1155MarketplaceTypes {
     error SettlementDelegateCallFailed(bytes _revertData);
     error UnsupportedCheckoutItemKind(uint8 _itemKind);
     error CheckoutRequiresSuccessfulFill();
-    error CheckoutSellerMismatch(address _suppliedSeller, address _configuredSeller);
     error InsufficientCheckoutETH(uint256 _requiredAmount, uint256 _availableAmount);
     error InsufficientCheckoutERC20Balance(address _currencyAddress, uint256 _requiredAmount, uint256 _availableAmount);
     error InsufficientCheckoutERC20Allowance(

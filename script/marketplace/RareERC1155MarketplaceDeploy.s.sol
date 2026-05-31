@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Script, console} from "forge-std/Script.sol";
+import {console} from "forge-std/Script.sol";
 import {ERC1967Proxy} from "openzeppelin-contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 import {ERC20ApprovalManager} from "../../src/v2/approver/ERC20/ERC20ApprovalManager.sol";
 import {ERC1155ApprovalManager} from "../../src/v2/approver/ERC1155/ERC1155ApprovalManager.sol";
 import {RareERC1155Marketplace} from "../../src/marketplace/RareERC1155Marketplace.sol";
 import {RareERC1155Settlement} from "../../src/marketplace/RareERC1155Settlement.sol";
+import {RareERC1155SettlementScriptGuard} from "./RareERC1155SettlementScriptGuard.s.sol";
 
 /// @title RareERC1155MarketplaceDeploy
 /// @notice Deploys the ERC1155 marketplace implementation, settlement module, and ERC1967 marketplace proxy.
-contract RareERC1155MarketplaceDeploy is Script {
+contract RareERC1155MarketplaceDeploy is RareERC1155SettlementScriptGuard {
     function run() external {
         uint256 privateKey = vm.envUint("PRIVATE_KEY");
 
@@ -31,6 +32,7 @@ contract RareERC1155MarketplaceDeploy is Script {
         address erc1155ApprovalManager = vm.envAddress("ERC1155_APPROVAL_MANAGER");
 
         RareERC1155Settlement settlement = new RareERC1155Settlement();
+        _validateSettlementModuleForScript(address(settlement));
         RareERC1155Marketplace marketplaceImplementation = new RareERC1155Marketplace();
 
         bytes memory initData = abi.encodeWithSelector(
