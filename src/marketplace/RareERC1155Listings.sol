@@ -893,15 +893,15 @@ contract RareERC1155Listings is
     function _payoutMarketplaceFee(address _currencyAddress, uint256 _amount, uint256 _marketplaceFee, address _seller)
         internal
     {
+        if (_marketplaceFee == 0) {
+            return;
+        }
+
         // External read: calculate staking fee from staking settings and send the collected remainder to network.
         ListingsStorage storage $ = _listingsStorage();
         uint256 stakingFee = $.marketConfig.stakingSettings.calculateStakingFee(_amount);
         if (stakingFee > _marketplaceFee) {
             revert StakingFeeExceedsMarketplaceFee(_marketplaceFee, stakingFee);
-        }
-
-        if (_marketplaceFee == 0) {
-            return;
         }
 
         // Memory setup: recipient 0 is network, recipient 1 is seller staking reward accumulator or network fallback.

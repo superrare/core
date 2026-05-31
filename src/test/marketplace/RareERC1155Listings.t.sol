@@ -431,6 +431,44 @@ contract RareERC1155ListingsTest is Test {
         assertEq(address(market).balance, 0);
     }
 
+    function testMintDirectSaleSkipsStakingFeeWhenMarketplaceFeeIsZero() public {
+        uint256 price = 100;
+        _prepareDirectSale(address(0), price, block.timestamp, 0);
+        vm.mockCall(
+            marketplaceSettings,
+            abi.encodeWithSelector(IMarketplaceSettings.calculateMarketplaceFee.selector, price),
+            abi.encode(0)
+        );
+        vm.mockCall(
+            spaceOperatorRegistry,
+            abi.encodeWithSelector(ISpaceOperatorRegistry.isApprovedSpaceOperator.selector, seller),
+            abi.encode(false)
+        );
+        vm.mockCall(
+            marketplaceSettings,
+            abi.encodeWithSelector(
+                IMarketplaceSettings.getERC721ContractPrimarySaleFeePercentage.selector, address(token)
+            ),
+            abi.encode(15)
+        );
+        vm.mockCall(
+            stakingSettings, abi.encodeWithSelector(IStakingSettings.calculateStakingFee.selector, price), abi.encode(1)
+        );
+
+        uint256 sellerBalanceBefore = seller.balance;
+        uint256 networkBalanceBefore = networkBeneficiary.balance;
+        uint256 rewardBalanceBefore = rewardAccumulator.balance;
+
+        vm.prank(buyer);
+        _mintDirectSale(tokenId, address(0), price, 1, emptyProof, price);
+
+        assertEq(token.balanceOf(buyer, tokenId), 1);
+        assertEq(seller.balance - sellerBalanceBefore, 85);
+        assertEq(networkBeneficiary.balance - networkBalanceBefore, 15);
+        assertEq(rewardAccumulator.balance - rewardBalanceBefore, 0);
+        assertEq(address(market).balance, 0);
+    }
+
     function testMintDirectSaleRevertsWhenSettingsPlatformCommissionExceedsMax() public {
         uint256 price = 1 ether;
         _prepareDirectSale(address(0), price, block.timestamp, 0);
