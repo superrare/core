@@ -27,9 +27,16 @@ interface IRareERC1155 is ITokenCreator, IERC2981Upgradeable {
     /// @notice Emitted when the owner creates a token type.
     /// @param tokenId Newly created token id.
     /// @param creator RARE creator recorded for the token id.
+    /// @param royaltyReceiver ERC2981 royalty receiver configured for the token id.
     /// @param maxSupply Maximum supply configured for the token id.
     /// @param tokenURI Token-specific metadata URI.
-    event TokenCreated(uint256 indexed tokenId, address indexed creator, uint256 maxSupply, string tokenURI);
+    event TokenCreated(
+        uint256 indexed tokenId,
+        address indexed creator,
+        address indexed royaltyReceiver,
+        uint256 maxSupply,
+        string tokenURI
+    );
 
     /// @notice Emitted when owner changes minter approval.
     /// @param minter Address whose approval changed.
@@ -116,8 +123,11 @@ interface IRareERC1155 is ITokenCreator, IERC2981Upgradeable {
     /// @notice Creates a new token type.
     /// @param _tokenURI Metadata URI returned for the new token id.
     /// @param _maxSupply Maximum supply that may ever be minted for the new token id.
+    /// @param _royaltyReceiver ERC2981 royalty receiver for the new token id.
     /// @return The newly created token id.
-    function createToken(string calldata _tokenURI, uint256 _maxSupply) external returns (uint256);
+    function createToken(string calldata _tokenURI, uint256 _maxSupply, address _royaltyReceiver)
+        external
+        returns (uint256);
 
     /// @notice Mints one existing token id to a receiver.
     /// @dev Callable by the owner or an approved minter only. This is a one-item wrapper over batch minting.
@@ -146,13 +156,21 @@ interface IRareERC1155 is ITokenCreator, IERC2981Upgradeable {
     /// @param _isMinter Whether the address should be allowed to mint.
     function setMinterApproval(address _minter, bool _isMinter) external;
 
-    /// @notice Updates the collection-wide ERC2981 royalty receiver.
+    /// @notice Updates the fallback ERC2981 royalty receiver.
+    /// @dev Token-specific royalty receivers take precedence over this value.
     /// @param _receiver New default royalty receiver.
     function setDefaultRoyaltyReceiver(address _receiver) external;
 
-    /// @notice Updates the collection-wide ERC2981 royalty percentage.
+    /// @notice Updates the fallback ERC2981 royalty percentage.
+    /// @dev Tokens created before this update keep their token-specific royalty percentage.
     /// @param _percentage New royalty percentage, expressed as whole percentage points.
     function setDefaultRoyaltyPercentage(uint256 _percentage) external;
+
+    /// @notice Updates the ERC2981 royalty receiver for one token id.
+    /// @dev The token's existing royalty percentage is preserved.
+    /// @param _tokenId Token id whose royalty receiver is updated.
+    /// @param _receiver New token-specific royalty receiver.
+    function setRoyaltyReceiverForToken(uint256 _tokenId, address _receiver) external;
 
     /// @notice Updates the token-specific metadata URI for an existing token id.
     /// @param _tokenId Token id whose URI is updated.

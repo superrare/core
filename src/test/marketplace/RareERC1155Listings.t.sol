@@ -190,7 +190,7 @@ contract RareERC1155ListingsTest is Test {
         token = RareERC1155(tokenFactory.createRareERC1155Contract("Rare Editions", "RED", "ipfs://base/{id}.json"));
 
         vm.prank(seller);
-        tokenId = token.createToken("ipfs://token/1.json", 20);
+        tokenId = token.createToken("ipfs://token/1.json", 20, seller);
 
         vm.etch(marketplaceSettings, address(market).code);
         vm.etch(stakingSettings, address(market).code);
@@ -631,7 +631,7 @@ contract RareERC1155ListingsTest is Test {
         uint256 otherTokenId;
 
         vm.prank(seller);
-        otherTokenId = token.createToken("ipfs://token/2.json", 20);
+        otherTokenId = token.createToken("ipfs://token/2.json", 20, seller);
 
         _prepareDirectSale(address(0), 0, block.timestamp, 0);
         _prepareDirectSaleForToken(otherTokenId, address(0), 0, block.timestamp, 0);
@@ -731,7 +731,7 @@ contract RareERC1155ListingsTest is Test {
         uint256 price = 1 ether;
 
         vm.prank(seller);
-        paidTokenId = token.createToken("ipfs://token/2.json", 20);
+        paidTokenId = token.createToken("ipfs://token/2.json", 20, seller);
 
         _prepareDirectSale(address(0), 0, block.timestamp, 0);
         _prepareDirectSaleForToken(paidTokenId, address(0), price, block.timestamp, 0);
@@ -773,7 +773,7 @@ contract RareERC1155ListingsTest is Test {
         uint256 price = 33;
 
         vm.prank(seller);
-        otherTokenId = token.createToken("ipfs://token/2.json", 20);
+        otherTokenId = token.createToken("ipfs://token/2.json", 20, seller);
 
         _prepareDirectSale(address(0), price, block.timestamp, 0);
         _prepareDirectSaleForToken(otherTokenId, address(0), price, block.timestamp, 0);
@@ -800,7 +800,7 @@ contract RareERC1155ListingsTest is Test {
         uint256 otherTokenId;
 
         vm.prank(seller);
-        otherTokenId = token.createToken("ipfs://token/2.json", 20);
+        otherTokenId = token.createToken("ipfs://token/2.json", 20, seller);
 
         _prepareDirectSale(address(0), 0, block.timestamp, 0);
         _prepareDirectSaleForToken(otherTokenId, address(0), 0, block.timestamp, 0);
@@ -1015,7 +1015,7 @@ contract RareERC1155ListingsTest is Test {
         uint256 price = 1 ether;
 
         vm.prank(seller);
-        otherTokenId = token.createToken("ipfs://token/2.json", 20);
+        otherTokenId = token.createToken("ipfs://token/2.json", 20, seller);
 
         uint256[] memory tokenIds = new uint256[](2);
         uint256[] memory mintAmounts = new uint256[](2);

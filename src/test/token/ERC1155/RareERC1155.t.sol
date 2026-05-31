@@ -53,7 +53,7 @@ contract RareERC1155Test is Test {
 
     function testCreateTokenMintAndRoyalty() public {
         vm.prank(owner);
-        uint256 tokenId = token.createToken("ipfs://token/1.json", 10);
+        uint256 tokenId = token.createToken("ipfs://token/1.json", 10, royaltyReceiver);
 
         assertEq(tokenId, 1);
         assertEq(token.uri(tokenId), "ipfs://token/1.json");
@@ -71,19 +71,19 @@ contract RareERC1155Test is Test {
         assertEq(token.totalMintedForToken(tokenId), 4);
 
         (address receiver, uint256 royaltyAmount) = token.royaltyInfo(tokenId, 1 ether);
-        assertEq(receiver, owner);
+        assertEq(receiver, royaltyReceiver);
         assertEq(royaltyAmount, 0.1 ether);
     }
 
-    function testOwnerCanUpdateDefaultRoyaltyReceiverAndPercentage() public {
+    function testDefaultRoyaltyUpdatesDoNotOverrideExistingTokenRoyalty() public {
         vm.prank(owner);
-        uint256 tokenId = token.createToken("ipfs://token/1.json", 10);
+        uint256 tokenId = token.createToken("ipfs://token/1.json", 10, owner);
 
         vm.prank(owner);
         token.setDefaultRoyaltyReceiver(royaltyReceiver);
 
         (address receiverAfterReceiverUpdate, uint256 amountAfterReceiverUpdate) = token.royaltyInfo(tokenId, 1 ether);
-        assertEq(receiverAfterReceiverUpdate, royaltyReceiver);
+        assertEq(receiverAfterReceiverUpdate, owner);
         assertEq(amountAfterReceiverUpdate, 0.1 ether);
 
         vm.prank(owner);
@@ -91,8 +91,34 @@ contract RareERC1155Test is Test {
 
         (address receiverAfterPercentageUpdate, uint256 amountAfterPercentageUpdate) =
             token.royaltyInfo(tokenId, 1 ether);
-        assertEq(receiverAfterPercentageUpdate, royaltyReceiver);
-        assertEq(amountAfterPercentageUpdate, 0.15 ether);
+        assertEq(receiverAfterPercentageUpdate, owner);
+        assertEq(amountAfterPercentageUpdate, 0.1 ether);
+
+        (address fallbackReceiver, uint256 fallbackAmount) = token.royaltyInfo(999, 1 ether);
+        assertEq(fallbackReceiver, royaltyReceiver);
+        assertEq(fallbackAmount, 0.15 ether);
+
+        vm.prank(owner);
+        uint256 secondTokenId = token.createToken("ipfs://token/2.json", 10, owner);
+
+        (address secondTokenReceiver, uint256 secondTokenAmount) = token.royaltyInfo(secondTokenId, 1 ether);
+        assertEq(secondTokenReceiver, owner);
+        assertEq(secondTokenAmount, 0.15 ether);
+    }
+
+    function testOwnerCanUpdateTokenRoyaltyReceiver() public {
+        vm.prank(owner);
+        uint256 tokenId = token.createToken("ipfs://token/1.json", 10, owner);
+
+        vm.prank(owner);
+        token.setDefaultRoyaltyPercentage(15);
+
+        vm.prank(owner);
+        token.setRoyaltyReceiverForToken(tokenId, royaltyReceiver);
+
+        (address receiver, uint256 royaltyAmount) = token.royaltyInfo(tokenId, 1 ether);
+        assertEq(receiver, royaltyReceiver);
+        assertEq(royaltyAmount, 0.1 ether);
     }
 
     function testSetDefaultRoyaltyRejectsInvalidConfig() public {
@@ -105,9 +131,28 @@ contract RareERC1155Test is Test {
         token.setDefaultRoyaltyPercentage(101);
     }
 
+    function testCreateTokenRejectsZeroRoyaltyReceiver() public {
+        vm.prank(owner);
+        vm.expectRevert(IRareERC1155.ZeroAddressUnsupported.selector);
+        token.createToken("ipfs://token/1.json", 10, address(0));
+    }
+
+    function testSetTokenRoyaltyReceiverRejectsInvalidConfig() public {
+        vm.prank(owner);
+        uint256 tokenId = token.createToken("ipfs://token/1.json", 10, owner);
+
+        vm.prank(owner);
+        vm.expectRevert(IRareERC1155.ZeroAddressUnsupported.selector);
+        token.setRoyaltyReceiverForToken(tokenId, address(0));
+
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(IRareERC1155.TokenDoesNotExist.selector, tokenId + 1));
+        token.setRoyaltyReceiverForToken(tokenId + 1, royaltyReceiver);
+    }
+
     function testMaxSupplyEnforced() public {
         vm.prank(owner);
-        uint256 tokenId = token.createToken("ipfs://token/1.json", 2);
+        uint256 tokenId = token.createToken("ipfs://token/1.json", 2, owner);
 
         vm.prank(minter);
         _mintBatchTo(collector, tokenId, 2);
@@ -119,7 +164,7 @@ contract RareERC1155Test is Test {
 
     function testBurnDoesNotResetMaxSupply() public {
         vm.prank(owner);
-        uint256 tokenId = token.createToken("ipfs://token/1.json", 2);
+        uint256 tokenId = token.createToken("ipfs://token/1.json", 2, owner);
 
         vm.prank(minter);
         _mintBatchTo(collector, tokenId, 2);
@@ -138,7 +183,7 @@ contract RareERC1155Test is Test {
 
     function testOnlyOwnerOrApprovedMinterCanMint() public {
         vm.prank(owner);
-        uint256 tokenId = token.createToken("ipfs://token/1.json", 5);
+        uint256 tokenId = token.createToken("ipfs://token/1.json", 5, owner);
 
         vm.prank(collector);
         vm.expectRevert(abi.encodeWithSelector(IRareERC1155.CallerCannotMint.selector, collector));
@@ -155,7 +200,7 @@ contract RareERC1155Test is Test {
 
     function testBurnAndDisable() public {
         vm.prank(owner);
-        uint256 tokenId = token.createToken("ipfs://token/1.json", 5);
+        uint256 tokenId = token.createToken("ipfs://token/1.json", 5, owner);
 
         vm.prank(minter);
         _mintBatchTo(collector, tokenId, 3);
@@ -176,7 +221,7 @@ contract RareERC1155Test is Test {
 
     function testDisableFreezesOwnerManagedWrites() public {
         vm.prank(owner);
-        uint256 tokenId = token.createToken("ipfs://token/1.json", 5);
+        uint256 tokenId = token.createToken("ipfs://token/1.json", 5, owner);
 
         vm.prank(owner);
         token.disableContract();
@@ -195,13 +240,17 @@ contract RareERC1155Test is Test {
 
         vm.prank(owner);
         vm.expectRevert(IRareERC1155.ContractIsDisabled.selector);
+        token.setRoyaltyReceiverForToken(tokenId, royaltyReceiver);
+
+        vm.prank(owner);
+        vm.expectRevert(IRareERC1155.ContractIsDisabled.selector);
         token.updateTokenURI(tokenId, "ipfs://token/updated.json");
     }
 
     function testMintBatchToMultipleTokenIds() public {
         vm.startPrank(owner);
-        uint256 tokenIdA = token.createToken("ipfs://token/1.json", 10);
-        uint256 tokenIdB = token.createToken("ipfs://token/2.json", 10);
+        uint256 tokenIdA = token.createToken("ipfs://token/1.json", 10, owner);
+        uint256 tokenIdB = token.createToken("ipfs://token/2.json", 10, owner);
         vm.stopPrank();
 
         uint256[] memory tokenIds = new uint256[](2);
@@ -222,7 +271,7 @@ contract RareERC1155Test is Test {
 
     function testMintToWrapsBatchMinting() public {
         vm.prank(owner);
-        uint256 tokenId = token.createToken("ipfs://token/1.json", 10);
+        uint256 tokenId = token.createToken("ipfs://token/1.json", 10, owner);
 
         vm.prank(minter);
         uint256 mintedTokenId = token.mintTo(collector, tokenId, 4);

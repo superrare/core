@@ -58,11 +58,14 @@ contract RareERC1155 is
     /// @notice Lifetime minted quantity by token id.
     mapping(uint256 => uint256) private tokenTotalMinted;
 
-    /// @notice Collection-wide ERC2981 royalty receiver.
+    /// @notice Fallback ERC2981 royalty receiver.
     address private defaultRoyaltyReceiver;
 
-    /// @notice Collection-wide ERC2981 royalty percentage, expressed as whole percentage points.
+    /// @notice Fallback ERC2981 royalty percentage, expressed as whole percentage points.
     uint256 private defaultRoyaltyPercentage;
+
+    /// @notice Token-specific ERC2981 royalty percentage, expressed as whole percentage points.
+    mapping(uint256 => uint256) private tokenRoyaltyPercentages;
 
     /// @notice Ensures the collection has not been disabled.
     modifier ifNotDisabled() {
@@ -121,13 +124,13 @@ contract RareERC1155 is
     }
 
     /// @inheritdoc IRareERC1155
-    function createToken(string calldata _tokenURI, uint256 _maxSupply)
+    function createToken(string calldata _tokenURI, uint256 _maxSupply, address _royaltyReceiver)
         external
         onlyOwner
         ifNotDisabled
         returns (uint256)
     {
-        return _createToken(_tokenURI, _maxSupply, msg.sender);
+        return _createToken(_tokenURI, _maxSupply, msg.sender, _royaltyReceiver);
     }
 
     /// @inheritdoc IRareERC1155
@@ -199,6 +202,16 @@ contract RareERC1155 is
     }
 
     /// @inheritdoc IRareERC1155
+    function setRoyaltyReceiverForToken(uint256 _tokenId, address _receiver)
+        external
+        onlyOwner
+        ifNotDisabled
+        tokenExists(_tokenId)
+    {
+        _setTokenRoyaltyReceiver(_tokenId, _receiver);
+    }
+
+    /// @inheritdoc IRareERC1155
     function updateTokenURI(uint256 _tokenId, string calldata _tokenURI)
         external
         onlyOwner
@@ -260,10 +273,15 @@ contract RareERC1155 is
     /// @param _tokenURI Token-specific metadata URI.
     /// @param _maxSupply Maximum supply for the token id.
     /// @param _creator RARE creator recorded for the token id.
+    /// @param _royaltyReceiver ERC2981 royalty receiver for the token id.
     /// @return tokenId Newly created token id.
-    function _createToken(string calldata _tokenURI, uint256 _maxSupply, address _creator) internal returns (uint256) {
+    function _createToken(string calldata _tokenURI, uint256 _maxSupply, address _creator, address _royaltyReceiver)
+        internal
+        returns (uint256)
+    {
         // Atomic guard: token ids must be mintable.
         if (_maxSupply == 0) revert MaxSupplyCannotBeZero();
+        if (_royaltyReceiver == address(0)) revert ZeroAddressUnsupported();
 
         // State write: advance the monotonically increasing token id counter.
         tokenIdCounter++;
@@ -272,15 +290,17 @@ contract RareERC1155 is
         // State writes: register token constraints and creator lookup.
         tokenConfigs[tokenId] = TokenConfig(_maxSupply, _tokenURI, true);
         tokenCreators[tokenId] = _creator;
+        tokenRoyaltyPercentages[tokenId] = defaultRoyaltyPercentage;
+        _setTokenRoyalty(tokenId, _royaltyReceiver, uint96(defaultRoyaltyPercentage * BASIS_POINTS_PER_PERCENT));
 
         // Metadata and domain events: expose the new URI and token config to indexers.
         emit URI(_tokenURI, tokenId);
-        emit TokenCreated(tokenId, _creator, _maxSupply, _tokenURI);
+        emit TokenCreated(tokenId, _creator, _royaltyReceiver, _maxSupply, _tokenURI);
 
         return tokenId;
     }
 
-    /// @notice Updates collection-wide default ERC2981 royalty config.
+    /// @notice Updates fallback ERC2981 royalty config.
     /// @param _receiver Royalty receiver address.
     /// @param _percentage Royalty percentage, expressed as whole percentage points.
     function _setDefaultRoyaltyConfig(address _receiver, uint256 _percentage) internal {
@@ -292,6 +312,15 @@ contract RareERC1155 is
         defaultRoyaltyReceiver = _receiver;
         defaultRoyaltyPercentage = _percentage;
         _setDefaultRoyalty(_receiver, uint96(_percentage * BASIS_POINTS_PER_PERCENT));
+    }
+
+    /// @notice Updates a token-specific ERC2981 royalty receiver.
+    /// @param _tokenId Token id whose receiver should be updated.
+    /// @param _receiver Royalty receiver address.
+    function _setTokenRoyaltyReceiver(uint256 _tokenId, address _receiver) internal {
+        if (_receiver == address(0)) revert ZeroAddressUnsupported();
+
+        _setTokenRoyalty(_tokenId, _receiver, uint96(tokenRoyaltyPercentages[_tokenId] * BASIS_POINTS_PER_PERCENT));
     }
 
     /// @notice Validates batch mint input shape and token id ordering.
