@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 
-import "../../../src/token/ERC1155/RareERC1155ContractFactory.sol";
+import {RareERC1155ContractFactory} from "../../../src/token/ERC1155/RareERC1155ContractFactory.sol";
 
 /// @title RareERC1155FactoryDeploy
 /// @notice Forge deployment script for the ERC1155 clone factory.
@@ -26,6 +26,11 @@ contract RareERC1155FactoryDeploy is Script {
             // State write transaction: configure default minter when provided.
             factory.setDefaultMinter(defaultMinter);
         }
+
+        console.log("RareERC1155ContractFactory deployed at:", address(factory));
+        console.log("RareERC1155 implementation deployed at:", factory.rareERC1155());
+        console.log("RareERC1155ContractFactory owner:", factory.owner());
+        console.log("RareERC1155ContractFactory default minter:", factory.defaultMinter());
 
         // Broadcast boundary: stop submitting transactions.
         vm.stopBroadcast();
