@@ -40,7 +40,9 @@ interface IRareERC1155MarketplaceTypes {
         address currencyAddress;
         uint256 price;
         uint256 quantity;
+        uint256 initialQuantity;
         uint256 marketplaceFeeRemaining;
+        uint256 marketplaceFeeTotal;
         uint256 expirationTime;
     }
 
@@ -94,6 +96,15 @@ interface IRareERC1155MarketplaceTypes {
         LISTING_BUY
     }
 
+    enum CheckoutFailureStage {
+        NONE,
+        VALIDATION,
+        PAYMENT_COLLECTION,
+        MINT,
+        TRANSFER,
+        PAYOUT
+    }
+
     /// @notice Buyer cart item for primary mint sales and secondary fixed-price listings.
     /// @dev `seller` is only used for `LISTING_BUY`; `DIRECT_SALE_MINT` resolves the seller from its sale config.
     /// `itemKind` uses `CheckoutItemKind` values and is kept as uint8 so unknown future kinds can be skipped.
@@ -113,6 +124,27 @@ interface IRareERC1155MarketplaceTypes {
         uint256 skippedCount;
         uint256 ethSpent;
         uint256 ethRefunded;
+    }
+
+    struct CheckoutItemResult {
+        uint256 itemIndex;
+        uint8 itemKind;
+        address contractAddress;
+        uint256 tokenId;
+        address seller;
+        address currencyAddress;
+        uint256 price;
+        uint256 quantity;
+        bool filled;
+        CheckoutFailureStage failureStage;
+        bytes4 reason;
+        bytes failureData;
+        uint256 totalPaid;
+    }
+
+    struct CheckoutExecution {
+        CheckoutSummary summary;
+        CheckoutItemResult[] items;
     }
 
     event MarketplaceDependencyUpdated(bytes32 indexed field, address indexed dependency);
@@ -202,24 +234,20 @@ interface IRareERC1155MarketplaceTypes {
         uint256 quantity
     );
 
-    event CheckoutItemFilled(
+    event CheckoutItemProcessed(
         uint256 indexed itemIndex,
         uint8 indexed itemKind,
         address indexed contractAddress,
         uint256 tokenId,
         address seller,
-        address currency,
+        address currencyAddress,
         uint256 price,
         uint256 quantity,
+        bool filled,
+        CheckoutFailureStage failureStage,
+        bytes4 reason,
+        bytes failureData,
         uint256 totalPaid
-    );
-
-    event CheckoutItemSkipped(
-        uint256 indexed itemIndex,
-        uint8 indexed itemKind,
-        address indexed contractAddress,
-        uint256 tokenId,
-        bytes4 reason
     );
 
     event CheckoutCompleted(
@@ -251,6 +279,7 @@ interface IRareERC1155MarketplaceTypes {
     error CurrencyMismatch(address _suppliedCurrency, address _configuredCurrency);
     error SalePriceCannotBeZero();
     error SalePriceExpirationInvalid(uint256 _expirationTime, uint256 _currentTime);
+    error AllowListEndTimestampInvalid(uint256 _endTimestamp, uint256 _currentTime);
     error InvalidERC1155Contract(address _contractAddress);
     error SelfPurchaseUnsupported(address _seller);
     error InsufficientTokenBalance(
@@ -267,6 +296,7 @@ interface IRareERC1155MarketplaceTypes {
     error InvalidERC1155Transfer(
         address _contractAddress, uint256 _tokenId, address _seller, address _buyer, uint256 _quantity
     );
+    error InvalidERC1155Mint(address _contractAddress, uint256 _tokenId, address _buyer, uint256 _quantity);
     error AddressNotAllowlisted(address _account);
     error ContractHasNoOwner(address _contractAddress);
     error ApprovalManagerCannotBeZero();
@@ -275,7 +305,7 @@ interface IRareERC1155MarketplaceTypes {
     error DirectSettlementCallUnsupported();
     error SettlementDelegateCallFailed(bytes _revertData);
     error UnsupportedCheckoutItemKind(uint8 _itemKind);
-    error CheckoutRequiresSuccessfulFill();
+    error CheckoutItemExecutionFailed(CheckoutFailureStage _stage, bytes _failureData);
     error InsufficientCheckoutETH(uint256 _requiredAmount, uint256 _availableAmount);
     error InsufficientCheckoutERC20Balance(address _currencyAddress, uint256 _requiredAmount, uint256 _availableAmount);
     error InsufficientCheckoutERC20Allowance(

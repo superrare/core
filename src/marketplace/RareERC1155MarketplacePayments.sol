@@ -168,6 +168,24 @@ library RareERC1155MarketplacePayments {
         amounts[0] = _marketplaceFee - stakingFee;
         amounts[1] = stakingFee;
 
+        if (amounts[0] == 0) {
+            address payable[] memory stakingRecipients = new address payable[](1);
+            stakingRecipients[0] = recipients[1];
+            uint256[] memory stakingAmounts = new uint256[](1);
+            stakingAmounts[0] = amounts[1];
+            performPayouts(_config, _currencyAddress, _marketplaceFee, stakingRecipients, stakingAmounts);
+            return;
+        }
+
+        if (amounts[1] == 0) {
+            address payable[] memory marketplaceRecipients = new address payable[](1);
+            marketplaceRecipients[0] = recipients[0];
+            uint256[] memory marketplaceAmounts = new uint256[](1);
+            marketplaceAmounts[0] = amounts[0];
+            performPayouts(_config, _currencyAddress, _marketplaceFee, marketplaceRecipients, marketplaceAmounts);
+            return;
+        }
+
         performPayouts(_config, _currencyAddress, _marketplaceFee, recipients, amounts);
     }
 
@@ -250,6 +268,10 @@ library RareERC1155MarketplacePayments {
         }
         if (totalAmount != _amount) revert IRareERC1155MarketplaceTypes.PayoutTotalMismatch(_amount, totalAmount);
 
+        if (_amount == 0) {
+            return;
+        }
+
         if (_currencyAddress == address(0)) {
             (bool success, bytes memory data) = address(_config.payments).call{value: _amount}(
                 abi.encodeWithSelector(_config.payments.payout.selector, _recipients, _amounts)
@@ -260,6 +282,9 @@ library RareERC1155MarketplacePayments {
 
         IERC20 erc20 = IERC20(_currencyAddress);
         for (uint256 i = 0; i < _recipients.length; i++) {
+            if (_amounts[i] == 0) {
+                continue;
+            }
             erc20.safeTransfer(_recipients[i], _amounts[i]);
         }
     }

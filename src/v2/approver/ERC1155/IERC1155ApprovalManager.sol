@@ -4,10 +4,6 @@ pragma solidity ^0.8.18;
 /// @title IERC1155ApprovalManager
 /// @notice Interface for managing ERC1155 token approvals and transfers.
 interface IERC1155ApprovalManager {
-    /// @notice Error thrown when caller is not a manager.
-    /// @param caller The account that attempted a manager-only operation.
-    error NotManager(address caller);
-
     /// @notice Error thrown when caller is not an operator.
     error NotOperator();
 

@@ -17,6 +17,7 @@ contract RareERC1155Test is Test {
     address private minter = address(0x2222);
     address private collector = address(0x3333);
     address private royaltyReceiver = address(0x4444);
+    address private newOwner = address(0x5555);
 
     function setUp() public {
         factory = new RareERC1155ContractFactory();
@@ -73,6 +74,35 @@ contract RareERC1155Test is Test {
         (address receiver, uint256 royaltyAmount) = token.royaltyInfo(tokenId, 1 ether);
         assertEq(receiver, royaltyReceiver);
         assertEq(royaltyAmount, 0.1 ether);
+    }
+
+    function testTokenCreatorTracksCollectionOwner() public {
+        vm.prank(owner);
+        uint256 tokenId = token.createToken("ipfs://token/1.json", 10, royaltyReceiver);
+        assertEq(token.tokenCreator(tokenId), owner);
+
+        vm.prank(owner);
+        token.transferOwnership(newOwner);
+
+        assertEq(token.owner(), newOwner);
+        assertEq(token.tokenCreator(tokenId), newOwner);
+
+        vm.prank(newOwner);
+        uint256 secondTokenId = token.createToken("ipfs://token/2.json", 10, royaltyReceiver);
+        assertEq(token.tokenCreator(secondTokenId), newOwner);
+    }
+
+    function testOwnershipCannotBecomeZeroAddress() public {
+        vm.prank(owner);
+        vm.expectRevert("Ownable: new owner is the zero address");
+        token.transferOwnership(address(0));
+
+        vm.prank(owner);
+        vm.expectRevert(IRareERC1155.ZeroAddressUnsupported.selector);
+        token.renounceOwnership();
+
+        assertEq(token.owner(), owner);
+        assertEq(token.tokenCreator(1), owner);
     }
 
     function testDefaultRoyaltyUpdatesDoNotOverrideExistingTokenRoyalty() public {

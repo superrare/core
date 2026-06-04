@@ -49,9 +49,6 @@ contract RareERC1155 is
     /// @notice Token configuration by token id.
     mapping(uint256 => TokenConfig) private tokenConfigs;
 
-    /// @notice RARE creator address by token id.
-    mapping(uint256 => address) private tokenCreators;
-
     /// @notice Approved minter status by account.
     mapping(address => bool) private minterAddresses;
 
@@ -130,7 +127,7 @@ contract RareERC1155 is
         ifNotDisabled
         returns (uint256)
     {
-        return _createToken(_tokenURI, _maxSupply, msg.sender, _royaltyReceiver);
+        return _createToken(_tokenURI, _maxSupply, _royaltyReceiver);
     }
 
     /// @inheritdoc IRareERC1155
@@ -237,8 +234,13 @@ contract RareERC1155 is
     }
 
     /// @inheritdoc ITokenCreator
-    function tokenCreator(uint256 _tokenId) public view override(ITokenCreator) returns (address payable) {
-        return payable(tokenCreators[_tokenId]);
+    function tokenCreator(uint256) public view override(ITokenCreator) returns (address payable) {
+        return payable(owner());
+    }
+
+    /// @notice Prevents the collection owner, and therefore creator proxy, from becoming the zero address.
+    function renounceOwnership() public view override onlyOwner {
+        revert ZeroAddressUnsupported();
     }
 
     /// @inheritdoc IRareERC1155
@@ -273,13 +275,12 @@ contract RareERC1155 is
             || super.supportsInterface(_interfaceId);
     }
 
-    /// @notice Creates a token id and configures creator state.
+    /// @notice Creates a token id and configures token state.
     /// @param _tokenURI Token-specific metadata URI.
     /// @param _maxSupply Maximum supply for the token id.
-    /// @param _creator RARE creator recorded for the token id.
     /// @param _royaltyReceiver ERC2981 royalty receiver for the token id.
     /// @return tokenId Newly created token id.
-    function _createToken(string calldata _tokenURI, uint256 _maxSupply, address _creator, address _royaltyReceiver)
+    function _createToken(string calldata _tokenURI, uint256 _maxSupply, address _royaltyReceiver)
         internal
         returns (uint256)
     {
@@ -291,15 +292,14 @@ contract RareERC1155 is
         tokenIdCounter++;
         uint256 tokenId = tokenIdCounter;
 
-        // State writes: register token constraints and creator lookup.
+        // State writes: register token constraints and royalty configuration.
         tokenConfigs[tokenId] = TokenConfig(_maxSupply, _tokenURI, true);
-        tokenCreators[tokenId] = _creator;
         tokenRoyaltyPercentages[tokenId] = defaultRoyaltyPercentage;
         _setTokenRoyalty(tokenId, _royaltyReceiver, uint96(defaultRoyaltyPercentage * BASIS_POINTS_PER_PERCENT));
 
         // Metadata and domain events: expose the new URI and token config to indexers.
         emit URI(_tokenURI, tokenId);
-        emit TokenCreated(tokenId, _creator, _royaltyReceiver, _maxSupply, _tokenURI);
+        emit TokenCreated(tokenId, owner(), _royaltyReceiver, _maxSupply, _tokenURI);
 
         return tokenId;
     }

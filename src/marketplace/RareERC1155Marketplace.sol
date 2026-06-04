@@ -97,6 +97,7 @@ contract RareERC1155Marketplace is
         address payable[] calldata _splitRecipients,
         uint8[] calldata _splitRatios
     ) external nonReentrant notPaused {
+        _validateERC1155Contract(_contractAddress);
         if (!_isContractOwner(_contractAddress, msg.sender)) {
             revert NotContractOwner(_contractAddress, msg.sender);
         }
@@ -144,10 +145,17 @@ contract RareERC1155Marketplace is
 
         for (uint256 i = 0; i < _requests.length; i++) {
             uint256 tokenId = _requests[i].tokenId;
+            bytes32 root = _requests[i].root;
+            uint256 endTimestamp = _requests[i].endTimestamp;
+
             _revertIfTokenNotFound(_contractAddress, tokenId);
+            if (root != bytes32(0) && endTimestamp <= block.timestamp) {
+                revert AllowListEndTimestampInvalid(endTimestamp, block.timestamp);
+            }
+
             _marketplaceStorage().tokenAllowlistRoots[_contractAddress][tokenId] =
-                AllowListConfig({root: _requests[i].root, endTimestamp: _requests[i].endTimestamp});
-            emit SetTokenAllowListConfig(_contractAddress, tokenId, _requests[i].root, _requests[i].endTimestamp);
+                AllowListConfig({root: root, endTimestamp: endTimestamp});
+            emit SetTokenAllowListConfig(_contractAddress, tokenId, root, endTimestamp);
         }
     }
 
@@ -284,7 +292,9 @@ contract RareERC1155Marketplace is
             currencyAddress: _currencyAddress,
             price: _price,
             quantity: _quantity,
+            initialQuantity: _quantity,
             marketplaceFeeRemaining: marketplaceFee,
+            marketplaceFeeTotal: marketplaceFee,
             expirationTime: _expirationTime
         });
 
@@ -381,11 +391,11 @@ contract RareERC1155Marketplace is
         payable
         nonReentrant
         notPaused
-        returns (CheckoutSummary memory)
+        returns (CheckoutExecution memory)
     {
         return abi.decode(
             _delegateToSettlement(abi.encodeWithSelector(IRareERC1155Settlement.checkout.selector, _items)),
-            (CheckoutSummary)
+            (CheckoutExecution)
         );
     }
 

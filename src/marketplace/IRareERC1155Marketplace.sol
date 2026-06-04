@@ -99,8 +99,8 @@ interface IRareERC1155Marketplace is IRareERC1155MarketplaceTypes {
     ) external;
 
     /// @notice Executes a buyer cart of direct-sale mints and secondary fixed-price listing purchases.
-    /// @dev Validation-only failures skip individual items. At least one item must fill.
-    function checkout(CheckoutItem[] calldata _items) external payable returns (CheckoutSummary memory);
+    /// @dev Best-effort execution returns one result per item. All-skipped checkouts complete successfully.
+    function checkout(CheckoutItem[] calldata _items) external payable returns (CheckoutExecution memory);
 
     function getDirectSaleConfig(address _contractAddress, uint256 _tokenId)
         external

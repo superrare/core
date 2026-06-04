@@ -38,34 +38,27 @@ contract ERC1155ApprovalManager is IERC1155ApprovalManager, AccessControl {
         _;
     }
 
-    /// @notice Modifier to check if caller has manager authority.
-    modifier onlyManager() {
-        // Atomic guard: manager-only calls reject unauthorized callers before any role or state writes.
-        if (!hasRole(MANAGER_ROLE, msg.sender)) revert NotManager(msg.sender);
-        _;
-    }
-
     /// @inheritdoc IERC1155ApprovalManager
-    function disable() external onlyManager {
+    function disable() external onlyRole(MANAGER_ROLE) {
         // State write: permanently disable future transfer execution.
         disabled = true;
         emit ContractDisabled(msg.sender);
     }
 
     /// @inheritdoc IERC1155ApprovalManager
-    function grantOperatorRole(address operator) external onlyManager {
+    function grantOperatorRole(address operator) external onlyRole(MANAGER_ROLE) {
         // Role write: authorize one marketplace/operator contract to execute ERC1155 transfers.
         _grantRole(OPERATOR_ROLE, operator);
     }
 
     /// @inheritdoc IERC1155ApprovalManager
-    function revokeOperatorRole(address operator) external onlyManager {
+    function revokeOperatorRole(address operator) external onlyRole(MANAGER_ROLE) {
         // Role write: remove ERC1155 transfer authority from one operator contract.
         _revokeRole(OPERATOR_ROLE, operator);
     }
 
     /// @inheritdoc IERC1155ApprovalManager
-    function batchGrantOperatorRole(address[] calldata operators) external onlyManager {
+    function batchGrantOperatorRole(address[] calldata operators) external onlyRole(MANAGER_ROLE) {
         for (uint256 i = 0; i < operators.length; i++) {
             // Role write: authorize the current operator address in the batch.
             _grantRole(OPERATOR_ROLE, operators[i]);
@@ -73,7 +66,7 @@ contract ERC1155ApprovalManager is IERC1155ApprovalManager, AccessControl {
     }
 
     /// @inheritdoc IERC1155ApprovalManager
-    function batchRevokeOperatorRole(address[] calldata operators) external onlyManager {
+    function batchRevokeOperatorRole(address[] calldata operators) external onlyRole(MANAGER_ROLE) {
         for (uint256 i = 0; i < operators.length; i++) {
             // Role write: revoke the current operator address in the batch.
             _revokeRole(OPERATOR_ROLE, operators[i]);
@@ -84,10 +77,8 @@ contract ERC1155ApprovalManager is IERC1155ApprovalManager, AccessControl {
     function safeTransferFrom(address token, address from, address to, uint256 id, uint256 amount, bytes calldata data)
         external
         whenNotDisabled
+        onlyRole(OPERATOR_ROLE)
     {
-        // Atomic guard: only approved operator contracts may execute user-authorized ERC1155 transfers.
-        if (!hasRole(OPERATOR_ROLE, msg.sender)) revert NotOperator();
-
         // External token call: token contract enforces holder approval, balance, and receiver acceptance.
         IERC1155 erc1155 = IERC1155(token);
         erc1155.safeTransferFrom(from, to, id, amount, data);
@@ -101,10 +92,7 @@ contract ERC1155ApprovalManager is IERC1155ApprovalManager, AccessControl {
         uint256[] calldata ids,
         uint256[] calldata amounts,
         bytes calldata data
-    ) external whenNotDisabled {
-        // Atomic guard: only approved operator contracts may execute user-authorized ERC1155 batch transfers.
-        if (!hasRole(OPERATOR_ROLE, msg.sender)) revert NotOperator();
-
+    ) external whenNotDisabled onlyRole(OPERATOR_ROLE) {
         // External token call: token contract enforces holder approval, balances, and receiver acceptance.
         IERC1155 erc1155 = IERC1155(token);
         erc1155.safeBatchTransferFrom(from, to, ids, amounts, data);

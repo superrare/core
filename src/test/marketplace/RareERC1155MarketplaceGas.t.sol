@@ -380,7 +380,8 @@ contract RareERC1155MarketplaceGasTest is Test {
     ) private {
         vm.prank(buyer);
         uint256 gasBefore = gasleft();
-        IRareERC1155MarketplaceTypes.CheckoutSummary memory summary = marketplace.checkout{value: _value}(_items);
+        IRareERC1155MarketplaceTypes.CheckoutExecution memory execution = marketplace.checkout{value: _value}(_items);
+        IRareERC1155MarketplaceTypes.CheckoutSummary memory summary = execution.summary;
         uint256 gasUsed = gasBefore - gasleft();
 
         assertEq(summary.filledCount, _expectedFilled);

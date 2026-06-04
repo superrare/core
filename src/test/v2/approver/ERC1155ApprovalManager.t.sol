@@ -156,7 +156,11 @@ contract ERC1155ApprovalManagerTest is Test {
         vm.stopPrank();
 
         vm.prank(address(0x6));
-        vm.expectRevert(IERC1155ApprovalManager.NotOperator.selector);
+        vm.expectRevert(
+            abi.encodePacked(
+                "AccessControl: account ", vm.toString(address(0x6)), " is missing role ", vm.toString(OPERATOR_ROLE)
+            )
+        );
         approvalManager.safeTransferFrom(address(token), TOKEN_OWNER, TOKEN_RECIPIENT, TOKEN_ID, TRANSFER_AMOUNT, "");
     }
 
@@ -172,7 +176,11 @@ contract ERC1155ApprovalManagerTest is Test {
 
     function test_OnlyManagerCanGrantRole() public {
         vm.prank(OPERATOR);
-        vm.expectRevert(abi.encodeWithSelector(IERC1155ApprovalManager.NotManager.selector, OPERATOR));
+        vm.expectRevert(
+            abi.encodePacked(
+                "AccessControl: account ", vm.toString(OPERATOR), " is missing role ", vm.toString(MANAGER_ROLE)
+            )
+        );
         approvalManager.grantOperatorRole(address(0x6));
     }
 

@@ -8,7 +8,7 @@ import {ITokenCreator} from "../extensions/ITokenCreator.sol";
 /// @author SuperRare Labs Inc.
 /// @title IRareERC1155
 /// @notice Interface for the RARE Protocol ERC1155 token.
-/// @dev Extends the RARE `ITokenCreator` interface so marketplace and royalty infrastructure can resolve creators per token id.
+/// @dev Extends the RARE `ITokenCreator` interface so marketplace and royalty infrastructure can resolve the collection creator.
 interface IRareERC1155 is ITokenCreator, IERC2981Upgradeable {
     /// @notice Per-token configuration for an ERC1155 edition.
     struct TokenConfig {
@@ -26,7 +26,7 @@ interface IRareERC1155 is ITokenCreator, IERC2981Upgradeable {
 
     /// @notice Emitted when the owner creates a token type.
     /// @param tokenId Newly created token id.
-    /// @param creator RARE creator recorded for the token id.
+    /// @param creator Collection owner reported as creator when the token id is created.
     /// @param royaltyReceiver ERC2981 royalty receiver configured for the token id.
     /// @param maxSupply Maximum supply configured for the token id.
     /// @param tokenURI Token-specific metadata URI.
