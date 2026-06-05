@@ -10,6 +10,7 @@ import {
     ERC1155SupplyUpgradeable
 } from "openzeppelin-contracts-upgradeable/token/ERC1155/extensions/ERC1155SupplyUpgradeable.sol";
 import {ERC2981Upgradeable} from "openzeppelin-contracts-upgradeable/token/common/ERC2981Upgradeable.sol";
+import {IERC2981Upgradeable} from "openzeppelin-contracts-upgradeable/interfaces/IERC2981Upgradeable.sol";
 import {IERC165Upgradeable} from "openzeppelin-contracts-upgradeable/utils/introspection/IERC165Upgradeable.sol";
 
 import {ITokenCreator} from "../extensions/ITokenCreator.sol";
@@ -55,7 +56,7 @@ contract RareERC1155 is
     /// @notice Lifetime minted quantity by token id.
     mapping(uint256 => uint256) private tokenTotalMinted;
 
-    /// @notice Fallback ERC2981 royalty receiver.
+    /// @notice Collection-wide ERC2981 royalty receiver and fallback receiver for unknown token ids.
     address private defaultRoyaltyReceiver;
 
     /// @notice Fallback ERC2981 royalty percentage, expressed as whole percentage points.
@@ -63,6 +64,15 @@ contract RareERC1155 is
 
     /// @notice Token-specific ERC2981 royalty percentage, expressed as whole percentage points.
     mapping(uint256 => uint256) private tokenRoyaltyPercentages;
+
+    /// @notice Token-specific ERC2981 royalty receiver override by token id.
+    mapping(uint256 => address) private tokenRoyaltyReceivers;
+
+    /// @notice Receiver revision when the token-specific receiver was last set.
+    mapping(uint256 => uint256) private tokenRoyaltyReceiverRevisions;
+
+    /// @notice Collection-wide receiver revision, incremented whenever the default receiver changes.
+    uint256 private royaltyReceiverRevision;
 
     /// @notice Ensures the collection has not been disabled.
     modifier ifNotDisabled() {
@@ -195,6 +205,9 @@ contract RareERC1155 is
     /// @inheritdoc IRareERC1155
     function setDefaultRoyaltyReceiver(address _receiver) external onlyOwner ifNotDisabled {
         _setDefaultRoyaltyConfig(_receiver, defaultRoyaltyPercentage);
+        unchecked {
+            ++royaltyReceiverRevision;
+        }
     }
 
     /// @inheritdoc IRareERC1155
@@ -264,6 +277,26 @@ contract RareERC1155 is
         return bytes(tokenURI).length > 0 ? tokenURI : super.uri(_tokenId);
     }
 
+    /// @inheritdoc IERC2981Upgradeable
+    function royaltyInfo(uint256 _tokenId, uint256 _salePrice)
+        public
+        view
+        override(ERC2981Upgradeable, IERC2981Upgradeable)
+        returns (address, uint256)
+    {
+        uint256 royaltyPercentage =
+            tokenConfigs[_tokenId].exists ? tokenRoyaltyPercentages[_tokenId] : defaultRoyaltyPercentage;
+        address royaltyReceiver = defaultRoyaltyReceiver;
+        address tokenRoyaltyReceiver = tokenRoyaltyReceivers[_tokenId];
+
+        if (tokenRoyaltyReceiverRevisions[_tokenId] == royaltyReceiverRevision && tokenRoyaltyReceiver != address(0)) {
+            royaltyReceiver = tokenRoyaltyReceiver;
+        }
+
+        uint256 royaltyAmount = (_salePrice * royaltyPercentage * BASIS_POINTS_PER_PERCENT) / _feeDenominator();
+        return (royaltyReceiver, royaltyAmount);
+    }
+
     /// @inheritdoc IERC165Upgradeable
     function supportsInterface(bytes4 _interfaceId)
         public
@@ -295,7 +328,8 @@ contract RareERC1155 is
         // State writes: register token constraints and royalty configuration.
         tokenConfigs[tokenId] = TokenConfig(_maxSupply, _tokenURI, true);
         tokenRoyaltyPercentages[tokenId] = defaultRoyaltyPercentage;
-        _setTokenRoyalty(tokenId, _royaltyReceiver, uint96(defaultRoyaltyPercentage * BASIS_POINTS_PER_PERCENT));
+        tokenRoyaltyReceivers[tokenId] = _royaltyReceiver;
+        tokenRoyaltyReceiverRevisions[tokenId] = royaltyReceiverRevision;
 
         // Metadata and domain events: expose the new URI and token config to indexers.
         emit URI(_tokenURI, tokenId);
@@ -304,7 +338,7 @@ contract RareERC1155 is
         return tokenId;
     }
 
-    /// @notice Updates fallback ERC2981 royalty config.
+    /// @notice Updates fallback ERC2981 royalty config used for future percentage and receiver changes.
     /// @param _receiver Royalty receiver address.
     /// @param _percentage Royalty percentage, expressed as whole percentage points.
     function _setDefaultRoyaltyConfig(address _receiver, uint256 _percentage) internal {
@@ -324,7 +358,8 @@ contract RareERC1155 is
     function _setTokenRoyaltyReceiver(uint256 _tokenId, address _receiver) internal {
         if (_receiver == address(0)) revert ZeroAddressUnsupported();
 
-        _setTokenRoyalty(_tokenId, _receiver, uint96(tokenRoyaltyPercentages[_tokenId] * BASIS_POINTS_PER_PERCENT));
+        tokenRoyaltyReceivers[_tokenId] = _receiver;
+        tokenRoyaltyReceiverRevisions[_tokenId] = royaltyReceiverRevision;
     }
 
     /// @notice Validates batch mint input shape and token id ordering.

@@ -156,9 +156,9 @@ interface IRareERC1155 is ITokenCreator, IERC2981Upgradeable {
     /// @param _isMinter Whether the address should be allowed to mint.
     function setMinterApproval(address _minter, bool _isMinter) external;
 
-    /// @notice Updates the fallback ERC2981 royalty receiver.
-    /// @dev Token-specific royalty receivers take precedence over this value.
-    /// @param _receiver New default royalty receiver.
+    /// @notice Updates the ERC2981 royalty receiver for the fallback config and all existing token ids.
+    /// @dev Existing token-specific royalty percentages are preserved.
+    /// @param _receiver New collection-wide royalty receiver.
     function setDefaultRoyaltyReceiver(address _receiver) external;
 
     /// @notice Updates the fallback ERC2981 royalty percentage.
@@ -167,7 +167,7 @@ interface IRareERC1155 is ITokenCreator, IERC2981Upgradeable {
     function setDefaultRoyaltyPercentage(uint256 _percentage) external;
 
     /// @notice Updates the ERC2981 royalty receiver for one token id.
-    /// @dev The token's existing royalty percentage is preserved.
+    /// @dev The token's existing royalty percentage is preserved until a later collection-wide receiver update.
     /// @param _tokenId Token id whose royalty receiver is updated.
     /// @param _receiver New token-specific royalty receiver.
     function setRoyaltyReceiverForToken(uint256 _tokenId, address _receiver) external;

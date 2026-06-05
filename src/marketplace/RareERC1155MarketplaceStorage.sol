@@ -13,7 +13,7 @@ import {IRareERC1155MarketplaceTypes} from "./IRareERC1155MarketplaceTypes.sol";
 /// @title RareERC1155MarketplaceStorage
 /// @notice ERC-7201 storage namespace and validation helpers for the ERC1155 marketplace.
 /// @dev This is not a deployable marketplace. `RareERC1155Marketplace` owns this storage behind the proxy, and
-/// `RareERC1155Settlement` uses the same namespace when executed through delegatecall from the marketplace.
+/// execution modules use the same namespace when executed through delegatecall from the marketplace.
 abstract contract RareERC1155MarketplaceStorage is IRareERC1155MarketplaceTypes {
     uint256 public constant MAX_BATCH_SIZE = 75;
     uint256 public constant MAX_CHECKOUT_SIZE = 50;
@@ -29,18 +29,22 @@ abstract contract RareERC1155MarketplaceStorage is IRareERC1155MarketplaceTypes 
     bytes32 internal constant ERC20_APPROVAL_MANAGER_FIELD = "ERC20_APPROVAL_MANAGER";
     bytes32 internal constant ERC721_APPROVAL_MANAGER_FIELD = "ERC721_APPROVAL_MANAGER";
     bytes32 internal constant ERC1155_APPROVAL_MANAGER_FIELD = "ERC1155_APPROVAL_MANAGER";
-    bytes32 internal constant SETTLEMENT_FIELD = "SETTLEMENT";
+    bytes32 internal constant TRADE_EXECUTION_MODULE_FIELD = "TRADE_EXECUTION_MODULE";
+    bytes32 internal constant CHECKOUT_EXECUTION_MODULE_FIELD = "CHECKOUT_EXECUTION_MODULE";
 
     /// @custom:storage-location erc7201:superrare.storage.RareERC1155Marketplace
-    /// @dev Append new fields to the end. Marketplace and settlement implementations must share this exact layout because
-    /// settlement runs against marketplace proxy storage through delegatecall.
+    /// @dev Append new persistent marketplace fields to this struct only. Marketplace and execution modules must share
+    /// this exact layout because modules run against marketplace proxy storage through delegatecall. Do not add ordinary
+    /// contract-level state variables to the marketplace or execution modules; use this namespace instead.
     struct MarketplaceStorage {
         /// @notice Shared V2 marketplace dependency bundle.
         MarketConfigV2.Config marketConfig;
         /// @notice ERC1155 approval manager used for seller token transfers.
         IERC1155ApprovalManager erc1155ApprovalManager;
-        /// @notice Delegatecall target used for settlement entrypoints.
-        address settlement;
+        /// @notice Delegatecall target used for direct sale mint, listing buy, and offer acceptance.
+        address tradeExecutionModule;
+        /// @notice Delegatecall target used for multi-item checkout.
+        address checkoutExecutionModule;
         /// @notice Primary mint sale configs keyed by collection and token id.
         mapping(address => mapping(uint256 => DirectSaleConfig)) directSaleConfigs;
         /// @notice Active mint allowlist configs keyed by collection and token id.
@@ -57,7 +61,7 @@ abstract contract RareERC1155MarketplaceStorage is IRareERC1155MarketplaceTypes 
         mapping(address => mapping(uint256 => mapping(address => SalePrice))) salePrices;
         /// @notice Escrowed offers keyed by collection, token id, buyer, and currency.
         mapping(address => mapping(uint256 => mapping(address => mapping(address => Offer)))) offers;
-        /// @notice Pauses marketplace writes and settlement entrypoints.
+        /// @notice Pauses marketplace writes and execution module entrypoints.
         bool paused;
     }
 
@@ -79,8 +83,8 @@ abstract contract RareERC1155MarketplaceStorage is IRareERC1155MarketplaceTypes 
         if (_approvalManager == address(0)) revert ApprovalManagerCannotBeZero();
     }
 
-    function _validateSettlement(address _settlement) internal pure {
-        if (_settlement == address(0)) revert SettlementCannotBeZero();
+    function _validateExecutionModule(address _module) internal view {
+        if (_module == address(0) || _module.code.length == 0) revert InvalidExecutionModule();
     }
 
     function _validateERC1155Contract(address _contractAddress) internal view {

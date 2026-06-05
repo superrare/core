@@ -43,6 +43,8 @@ interface IRareERC1155MarketplaceTypes {
         uint256 initialQuantity;
         uint256 marketplaceFeeRemaining;
         uint256 marketplaceFeeTotal;
+        uint256 stakingFeeRemaining;
+        uint256 stakingFeeTotal;
         uint256 expirationTime;
     }
 
@@ -102,7 +104,8 @@ interface IRareERC1155MarketplaceTypes {
         PAYMENT_COLLECTION,
         MINT,
         TRANSFER,
-        PAYOUT
+        PAYOUT,
+        UNKNOWN
     }
 
     /// @notice Buyer cart item for primary mint sales and secondary fixed-price listings.
@@ -171,6 +174,8 @@ interface IRareERC1155MarketplaceTypes {
         address currency,
         uint256 price
     );
+
+    event MintDirectSaleCancelled(address indexed contractAddress, uint256 indexed tokenId);
 
     event SetTokenAllowListConfig(
         address indexed contractAddress, uint256 indexed tokenId, bytes32 root, uint256 endTimestamp
@@ -301,9 +306,9 @@ interface IRareERC1155MarketplaceTypes {
     error ContractHasNoOwner(address _contractAddress);
     error ApprovalManagerCannotBeZero();
     error MarketConfigAddressCannotBeZero(bytes32 _field);
-    error SettlementCannotBeZero();
-    error DirectSettlementCallUnsupported();
-    error SettlementDelegateCallFailed(bytes _revertData);
+    error InvalidExecutionModule();
+    error DirectModuleCallUnsupported();
+    error ExecutionModuleDelegateCallFailed(bytes _revertData);
     error UnsupportedCheckoutItemKind(uint8 _itemKind);
     error CheckoutItemExecutionFailed(CheckoutFailureStage _stage, bytes _failureData);
     error InsufficientCheckoutETH(uint256 _requiredAmount, uint256 _availableAmount);
@@ -326,6 +331,7 @@ interface IRareERC1155MarketplaceTypes {
     error ERC20FeeOnTransferUnsupported(address _currencyAddress, uint256 _expectedAmount, uint256 _receivedAmount);
     error MsgValueMustBeZero();
     error RoyaltiesExceedSaleAmount(uint256 _royalties, uint256 _saleAmount);
+    error RoyaltyRecipientCannotBeZero(uint256 _index);
     error StakingFeeExceedsMarketplaceFee(uint256 _marketplaceFee, uint256 _stakingFee);
     error PlatformCommissionExceeded(uint256 _platformCommission, uint256 _maxPlatformCommission);
     error SplitRecipientsRequired();

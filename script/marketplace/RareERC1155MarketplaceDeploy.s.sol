@@ -6,15 +6,18 @@ import {ERC1967Proxy} from "openzeppelin-contracts/proxy/ERC1967/ERC1967Proxy.so
 
 import {ERC20ApprovalManager} from "../../src/v2/approver/ERC20/ERC20ApprovalManager.sol";
 import {ERC1155ApprovalManager} from "../../src/v2/approver/ERC1155/ERC1155ApprovalManager.sol";
+import {RareERC1155CheckoutExecutionModule} from "../../src/marketplace/RareERC1155CheckoutExecutionModule.sol";
 import {RareERC1155Marketplace} from "../../src/marketplace/RareERC1155Marketplace.sol";
-import {RareERC1155Settlement} from "../../src/marketplace/RareERC1155Settlement.sol";
-import {RareERC1155SettlementScriptGuard} from "./RareERC1155SettlementScriptGuard.s.sol";
+import {RareERC1155TradeExecutionModule} from "../../src/marketplace/RareERC1155TradeExecutionModule.sol";
+import {RareERC1155ExecutionModuleScriptGuard} from "./RareERC1155ExecutionModuleScriptGuard.s.sol";
 import {NetworkConfig} from "../NetworkConfig.s.sol";
 
 /// @title RareERC1155MarketplaceDeploy
-/// @notice Deploys the ERC1155 marketplace implementation, settlement module, and ERC1967 marketplace proxy.
-contract RareERC1155MarketplaceDeploy is RareERC1155SettlementScriptGuard {
+/// @notice Deploys the ERC1155 marketplace implementation, execution modules, and ERC1967 marketplace proxy.
+contract RareERC1155MarketplaceDeploy is RareERC1155ExecutionModuleScriptGuard {
     error NetworkAddressNotConfigured(string name, uint256 chainId);
+    error ApprovalManagerOperatorGrantUnauthorized(string name, address manager, address deployer, address operator);
+    error ApprovalManagerOperatorRoleMissing(string name, address manager, address operator);
 
     function run() external {
         uint256 privateKey = vm.envUint("PRIVATE_KEY");
@@ -35,8 +38,10 @@ contract RareERC1155MarketplaceDeploy is RareERC1155SettlementScriptGuard {
         address erc721ApprovalManager = _required(config.erc721ApprovalManager, "erc721ApprovalManager");
         address erc1155ApprovalManager = _required(config.erc1155ApprovalManager, "erc1155ApprovalManager");
 
-        RareERC1155Settlement settlement = new RareERC1155Settlement();
-        _validateSettlementModuleForScript(address(settlement));
+        RareERC1155TradeExecutionModule tradeExecutionModule = new RareERC1155TradeExecutionModule();
+        _validateExecutionModuleForScript(address(tradeExecutionModule));
+        RareERC1155CheckoutExecutionModule checkoutExecutionModule = new RareERC1155CheckoutExecutionModule();
+        _validateExecutionModuleForScript(address(checkoutExecutionModule));
         RareERC1155Marketplace marketplaceImplementation = new RareERC1155Marketplace();
 
         bytes memory initData = abi.encodeWithSelector(
@@ -52,13 +57,14 @@ contract RareERC1155MarketplaceDeploy is RareERC1155SettlementScriptGuard {
             erc20ApprovalManager,
             erc721ApprovalManager,
             erc1155ApprovalManager,
-            address(settlement)
+            address(tradeExecutionModule),
+            address(checkoutExecutionModule)
         );
 
         ERC1967Proxy marketplaceProxy = new ERC1967Proxy(address(marketplaceImplementation), initData);
 
-        _grantErc20OperatorIfAuthorized(erc20ApprovalManager, address(marketplaceProxy), deployer);
-        _grantErc1155OperatorIfAuthorized(erc1155ApprovalManager, address(marketplaceProxy), deployer);
+        _grantErc20OperatorOrRevert(erc20ApprovalManager, address(marketplaceProxy), deployer);
+        _grantErc1155OperatorOrRevert(erc1155ApprovalManager, address(marketplaceProxy), deployer);
 
         console.log("Network:", NetworkConfig.chainName(block.chainid));
         console.log("Chain ID:", block.chainid);
@@ -73,7 +79,8 @@ contract RareERC1155MarketplaceDeploy is RareERC1155SettlementScriptGuard {
         console.log("ERC20ApprovalManager:", erc20ApprovalManager);
         console.log("ERC721ApprovalManager:", erc721ApprovalManager);
         console.log("ERC1155ApprovalManager:", erc1155ApprovalManager);
-        console.log("RareERC1155Settlement deployed at:", address(settlement));
+        console.log("RareERC1155TradeExecutionModule deployed at:", address(tradeExecutionModule));
+        console.log("RareERC1155CheckoutExecutionModule deployed at:", address(checkoutExecutionModule));
         console.log("RareERC1155Marketplace implementation deployed at:", address(marketplaceImplementation));
         console.log("RareERC1155Marketplace proxy deployed at:", address(marketplaceProxy));
 
@@ -85,7 +92,7 @@ contract RareERC1155MarketplaceDeploy is RareERC1155SettlementScriptGuard {
         return value;
     }
 
-    function _grantErc20OperatorIfAuthorized(address manager, address operator, address deployer) private {
+    function _grantErc20OperatorOrRevert(address manager, address operator, address deployer) private {
         ERC20ApprovalManager approvalManager = ERC20ApprovalManager(manager);
         bytes32 operatorRole = approvalManager.OPERATOR_ROLE();
         if (approvalManager.hasRole(operatorRole, operator)) {
@@ -94,17 +101,17 @@ contract RareERC1155MarketplaceDeploy is RareERC1155SettlementScriptGuard {
         }
 
         if (!approvalManager.hasRole(approvalManager.MANAGER_ROLE(), deployer)) {
-            console.log("ERC20ApprovalManager operator role not granted; deployer lacks MANAGER_ROLE");
-            console.log("ERC20ApprovalManager:", manager);
-            console.log("Missing operator:", operator);
-            return;
+            revert ApprovalManagerOperatorGrantUnauthorized("ERC20ApprovalManager", manager, deployer, operator);
         }
 
         approvalManager.grantOperatorRole(operator);
+        if (!approvalManager.hasRole(operatorRole, operator)) {
+            revert ApprovalManagerOperatorRoleMissing("ERC20ApprovalManager", manager, operator);
+        }
         console.log("ERC20ApprovalManager operator role granted:", operator);
     }
 
-    function _grantErc1155OperatorIfAuthorized(address manager, address operator, address deployer) private {
+    function _grantErc1155OperatorOrRevert(address manager, address operator, address deployer) private {
         ERC1155ApprovalManager approvalManager = ERC1155ApprovalManager(manager);
         bytes32 operatorRole = approvalManager.OPERATOR_ROLE();
         if (approvalManager.hasRole(operatorRole, operator)) {
@@ -113,13 +120,13 @@ contract RareERC1155MarketplaceDeploy is RareERC1155SettlementScriptGuard {
         }
 
         if (!approvalManager.hasRole(approvalManager.MANAGER_ROLE(), deployer)) {
-            console.log("ERC1155ApprovalManager operator role not granted; deployer lacks MANAGER_ROLE");
-            console.log("ERC1155ApprovalManager:", manager);
-            console.log("Missing operator:", operator);
-            return;
+            revert ApprovalManagerOperatorGrantUnauthorized("ERC1155ApprovalManager", manager, deployer, operator);
         }
 
         approvalManager.grantOperatorRole(operator);
+        if (!approvalManager.hasRole(operatorRole, operator)) {
+            revert ApprovalManagerOperatorRoleMissing("ERC1155ApprovalManager", manager, operator);
+        }
         console.log("ERC1155ApprovalManager operator role granted:", operator);
     }
 }

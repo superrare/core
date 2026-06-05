@@ -8,16 +8,17 @@ import {UUPSUpgradeable} from "openzeppelin-contracts-upgradeable/proxy/utils/UU
 
 import {MarketConfigV2} from "../v2/utils/MarketConfigV2.sol";
 import {IERC1155ApprovalManager} from "../v2/approver/ERC1155/IERC1155ApprovalManager.sol";
+import {IRareERC1155CheckoutExecutionModule} from "./IRareERC1155CheckoutExecutionModule.sol";
 import {IRareERC1155Marketplace} from "./IRareERC1155Marketplace.sol";
-import {IRareERC1155Settlement} from "./IRareERC1155Settlement.sol";
+import {IRareERC1155TradeExecutionModule} from "./IRareERC1155TradeExecutionModule.sol";
 import {RareERC1155MarketplacePayments} from "./RareERC1155MarketplacePayments.sol";
 import {RareERC1155MarketplaceStorage} from "./RareERC1155MarketplaceStorage.sol";
 
 /// @author SuperRare Labs Inc.
 /// @title RareERC1155Marketplace
-/// @notice ERC1155 marketplace state, escrow, configuration, and settlement entrypoint.
-/// @dev The marketplace is the UUPS proxy-facing contract and owns all marketplace storage. Settlement execution is
-/// routed through delegatecall so settlement reads and writes the marketplace proxy's ERC-7201 storage namespace.
+/// @notice ERC1155 marketplace state, escrow, configuration, and execution module router.
+/// @dev The marketplace is the UUPS proxy-facing contract and owns all marketplace storage. Trade and checkout
+/// execution are routed through delegatecall so modules read and write the marketplace proxy's ERC-7201 namespace.
 contract RareERC1155Marketplace is
     IRareERC1155Marketplace,
     RareERC1155MarketplaceStorage,
@@ -50,7 +51,8 @@ contract RareERC1155Marketplace is
         address _erc20ApprovalManager,
         address _erc721ApprovalManager,
         address _erc1155ApprovalManager,
-        address _settlement
+        address _tradeExecutionModule,
+        address _checkoutExecutionModule
     ) external initializer {
         _validateMarketConfigAddress(_networkBeneficiary, NETWORK_BENEFICIARY_FIELD);
         _validateMarketConfigAddress(_marketplaceSettings, MARKETPLACE_SETTINGS_FIELD);
@@ -63,7 +65,8 @@ contract RareERC1155Marketplace is
         _validateApprovalManager(_erc20ApprovalManager);
         _validateApprovalManager(_erc721ApprovalManager);
         _validateApprovalManager(_erc1155ApprovalManager);
-        _validateSettlement(_settlement);
+        _validateExecutionModule(_tradeExecutionModule);
+        _validateExecutionModule(_checkoutExecutionModule);
 
         MarketplaceStorage storage $ = _marketplaceStorage();
         $.marketConfig = MarketConfigV2.generateMarketConfig(
@@ -79,7 +82,8 @@ contract RareERC1155Marketplace is
             _erc721ApprovalManager
         );
         $.erc1155ApprovalManager = IERC1155ApprovalManager(_erc1155ApprovalManager);
-        $.settlement = _settlement;
+        $.tradeExecutionModule = _tradeExecutionModule;
+        $.checkoutExecutionModule = _checkoutExecutionModule;
 
         __Ownable_init();
         __ReentrancyGuard_init();
@@ -130,6 +134,24 @@ contract RareERC1155Marketplace is
                 _splitRecipients,
                 _splitRatios
             );
+        }
+    }
+
+    function cancelMintDirectSales(address _contractAddress, uint256[] calldata _tokenIds) external nonReentrant {
+        if (!_isContractOwner(_contractAddress, msg.sender)) {
+            revert NotContractOwner(_contractAddress, msg.sender);
+        }
+        _validateTokenIds(_tokenIds);
+
+        MarketplaceStorage storage $ = _marketplaceStorage();
+        for (uint256 i = 0; i < _tokenIds.length; i++) {
+            uint256 tokenId = _tokenIds[i];
+            if ($.directSaleConfigs[_contractAddress][tokenId].seller == address(0)) {
+                continue;
+            }
+
+            delete $.directSaleConfigs[_contractAddress][tokenId];
+            emit MintDirectSaleCancelled(_contractAddress, tokenId);
         }
     }
 
@@ -285,6 +307,10 @@ contract RareERC1155Marketplace is
 
         uint256 grossAmount = _price * _quantity;
         uint256 marketplaceFee = $.marketConfig.marketplaceSettings.calculateMarketplaceFee(grossAmount);
+        uint256 stakingFee = $.marketConfig.stakingSettings.calculateStakingFee(grossAmount);
+        if (stakingFee > marketplaceFee) {
+            revert StakingFeeExceedsMarketplaceFee(marketplaceFee, stakingFee);
+        }
         $.marketConfig.checkAmountAndTransfer(_currencyAddress, grossAmount + marketplaceFee);
 
         Offer memory previousOffer = $.offers[_contractAddress][_tokenId][msg.sender][_currencyAddress];
@@ -295,6 +321,8 @@ contract RareERC1155Marketplace is
             initialQuantity: _quantity,
             marketplaceFeeRemaining: marketplaceFee,
             marketplaceFeeTotal: marketplaceFee,
+            stakingFeeRemaining: stakingFee,
+            stakingFeeTotal: stakingFee,
             expirationTime: _expirationTime
         });
 
@@ -341,9 +369,13 @@ contract RareERC1155Marketplace is
         nonReentrant
         notPaused
     {
-        _delegateToSettlement(
+        _delegateToModule(
+            _marketplaceStorage().tradeExecutionModule,
             abi.encodeWithSelector(
-                IRareERC1155Settlement.mintDirectSaleBatch.selector, _contractAddress, _currencyAddress, _requests
+                IRareERC1155TradeExecutionModule.mintDirectSaleBatch.selector,
+                _contractAddress,
+                _currencyAddress,
+                _requests
             )
         );
     }
@@ -354,9 +386,14 @@ contract RareERC1155Marketplace is
         address _currencyAddress,
         BuyRequest[] calldata _requests
     ) external payable nonReentrant notPaused {
-        _delegateToSettlement(
+        _delegateToModule(
+            _marketplaceStorage().tradeExecutionModule,
             abi.encodeWithSelector(
-                IRareERC1155Settlement.buyBatch.selector, _contractAddress, _seller, _currencyAddress, _requests
+                IRareERC1155TradeExecutionModule.buyBatch.selector,
+                _contractAddress,
+                _seller,
+                _currencyAddress,
+                _requests
             )
         );
     }
@@ -371,9 +408,10 @@ contract RareERC1155Marketplace is
         address payable[] calldata _splitRecipients,
         uint8[] calldata _splitRatios
     ) external nonReentrant notPaused {
-        _delegateToSettlement(
+        _delegateToModule(
+            _marketplaceStorage().tradeExecutionModule,
             abi.encodeWithSelector(
-                IRareERC1155Settlement.acceptOffer.selector,
+                IRareERC1155TradeExecutionModule.acceptOffer.selector,
                 _contractAddress,
                 _tokenId,
                 _buyer,
@@ -394,7 +432,10 @@ contract RareERC1155Marketplace is
         returns (CheckoutExecution memory)
     {
         return abi.decode(
-            _delegateToSettlement(abi.encodeWithSelector(IRareERC1155Settlement.checkout.selector, _items)),
+            _delegateToModule(
+                _marketplaceStorage().checkoutExecutionModule,
+                abi.encodeWithSelector(IRareERC1155CheckoutExecutionModule.checkout.selector, _items)
+            ),
             (CheckoutExecution)
         );
     }
@@ -463,8 +504,12 @@ contract RareERC1155Marketplace is
         return address(_marketplaceStorage().erc1155ApprovalManager);
     }
 
-    function getSettlement() external view returns (address) {
-        return _marketplaceStorage().settlement;
+    function getTradeExecutionModule() external view returns (address) {
+        return _marketplaceStorage().tradeExecutionModule;
+    }
+
+    function getCheckoutExecutionModule() external view returns (address) {
+        return _marketplaceStorage().checkoutExecutionModule;
     }
 
     function isPaused() external view returns (bool) {
@@ -537,10 +582,16 @@ contract RareERC1155Marketplace is
         emit MarketplaceDependencyUpdated(ERC1155_APPROVAL_MANAGER_FIELD, _erc1155ApprovalManager);
     }
 
-    function setSettlement(address _settlement) external onlyOwner {
-        _validateSettlement(_settlement);
-        _marketplaceStorage().settlement = _settlement;
-        emit MarketplaceDependencyUpdated(SETTLEMENT_FIELD, _settlement);
+    function setTradeExecutionModule(address _tradeExecutionModule) external onlyOwner {
+        _validateExecutionModule(_tradeExecutionModule);
+        _marketplaceStorage().tradeExecutionModule = _tradeExecutionModule;
+        emit MarketplaceDependencyUpdated(TRADE_EXECUTION_MODULE_FIELD, _tradeExecutionModule);
+    }
+
+    function setCheckoutExecutionModule(address _checkoutExecutionModule) external onlyOwner {
+        _validateExecutionModule(_checkoutExecutionModule);
+        _marketplaceStorage().checkoutExecutionModule = _checkoutExecutionModule;
+        emit MarketplaceDependencyUpdated(CHECKOUT_EXECUTION_MODULE_FIELD, _checkoutExecutionModule);
     }
 
     function setContractPaused(bool _isPaused) external onlyOwner {
@@ -548,10 +599,10 @@ contract RareERC1155Marketplace is
         emit ContractPausedUpdated(_isPaused);
     }
 
-    function _delegateToSettlement(bytes memory _callData) private returns (bytes memory) {
-        (bool success, bytes memory data) = _marketplaceStorage().settlement.delegatecall(_callData);
+    function _delegateToModule(address _module, bytes memory _callData) private returns (bytes memory) {
+        (bool success, bytes memory data) = _module.delegatecall(_callData);
         if (!success) {
-            if (data.length == 0) revert SettlementDelegateCallFailed(data);
+            if (data.length == 0) revert ExecutionModuleDelegateCallFailed(data);
             assembly {
                 revert(add(data, 32), mload(data))
             }

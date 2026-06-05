@@ -105,7 +105,7 @@ contract RareERC1155Test is Test {
         assertEq(token.tokenCreator(1), owner);
     }
 
-    function testDefaultRoyaltyUpdatesDoNotOverrideExistingTokenRoyalty() public {
+    function testDefaultRoyaltyReceiverUpdatesExistingTokensButPercentageDoesNot() public {
         vm.prank(owner);
         uint256 tokenId = token.createToken("ipfs://token/1.json", 10, owner);
 
@@ -113,7 +113,7 @@ contract RareERC1155Test is Test {
         token.setDefaultRoyaltyReceiver(royaltyReceiver);
 
         (address receiverAfterReceiverUpdate, uint256 amountAfterReceiverUpdate) = token.royaltyInfo(tokenId, 1 ether);
-        assertEq(receiverAfterReceiverUpdate, owner);
+        assertEq(receiverAfterReceiverUpdate, royaltyReceiver);
         assertEq(amountAfterReceiverUpdate, 0.1 ether);
 
         vm.prank(owner);
@@ -121,7 +121,7 @@ contract RareERC1155Test is Test {
 
         (address receiverAfterPercentageUpdate, uint256 amountAfterPercentageUpdate) =
             token.royaltyInfo(tokenId, 1 ether);
-        assertEq(receiverAfterPercentageUpdate, owner);
+        assertEq(receiverAfterPercentageUpdate, royaltyReceiver);
         assertEq(amountAfterPercentageUpdate, 0.1 ether);
 
         (address fallbackReceiver, uint256 fallbackAmount) = token.royaltyInfo(999, 1 ether);
@@ -134,6 +134,19 @@ contract RareERC1155Test is Test {
         (address secondTokenReceiver, uint256 secondTokenAmount) = token.royaltyInfo(secondTokenId, 1 ether);
         assertEq(secondTokenReceiver, owner);
         assertEq(secondTokenAmount, 0.15 ether);
+
+        vm.prank(owner);
+        token.setDefaultRoyaltyReceiver(collector);
+
+        (address firstTokenReceiverAfterSecondReceiverUpdate, uint256 firstTokenAmountAfterSecondReceiverUpdate) =
+            token.royaltyInfo(tokenId, 1 ether);
+        assertEq(firstTokenReceiverAfterSecondReceiverUpdate, collector);
+        assertEq(firstTokenAmountAfterSecondReceiverUpdate, 0.1 ether);
+
+        (address secondTokenReceiverAfterSecondReceiverUpdate, uint256 secondTokenAmountAfterSecondReceiverUpdate) =
+            token.royaltyInfo(secondTokenId, 1 ether);
+        assertEq(secondTokenReceiverAfterSecondReceiverUpdate, collector);
+        assertEq(secondTokenAmountAfterSecondReceiverUpdate, 0.15 ether);
     }
 
     function testOwnerCanUpdateTokenRoyaltyReceiver() public {

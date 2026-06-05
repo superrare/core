@@ -6,7 +6,7 @@ import {IRareERC1155MarketplaceTypes} from "./IRareERC1155MarketplaceTypes.sol";
 
 /// @author SuperRare Labs Inc.
 /// @title IRareERC1155Marketplace
-/// @notice Interface for ERC1155 marketplace state creation, escrow, configuration, and settlement proxying.
+/// @notice Interface for ERC1155 marketplace state creation, escrow, configuration, and execution module routing.
 interface IRareERC1155Marketplace is IRareERC1155MarketplaceTypes {
     /// @notice Initializes the UUPS marketplace proxy.
     function initialize(
@@ -21,7 +21,8 @@ interface IRareERC1155Marketplace is IRareERC1155MarketplaceTypes {
         address _erc20ApprovalManager,
         address _erc721ApprovalManager,
         address _erc1155ApprovalManager,
-        address _settlement
+        address _tradeExecutionModule,
+        address _checkoutExecutionModule
     ) external;
 
     /// @notice Configures or replaces primary mint sales for token ids.
@@ -33,6 +34,10 @@ interface IRareERC1155Marketplace is IRareERC1155MarketplaceTypes {
         address payable[] calldata _splitRecipients,
         uint8[] calldata _splitRatios
     ) external;
+
+    /// @notice Cancels configured primary mint sales for token ids.
+    /// @dev Token ids must be strictly ascending.
+    function cancelMintDirectSales(address _contractAddress, uint256[] calldata _tokenIds) external;
 
     /// @notice Sets token id allowlist configurations.
     /// @dev Request token ids must be strictly ascending.
@@ -73,12 +78,12 @@ interface IRareERC1155Marketplace is IRareERC1155MarketplaceTypes {
     /// @notice Cancels the caller's offer for one token id and currency.
     function cancelOffer(address _contractAddress, uint256 _tokenId, address _currencyAddress) external;
 
-    /// @notice Mints tokens from configured primary sales through the settlement module.
+    /// @notice Mints tokens from configured primary sales through the trade execution module.
     function mintDirectSaleBatch(address _contractAddress, address _currencyAddress, MintRequest[] calldata _requests)
         external
         payable;
 
-    /// @notice Buys tokens from a seller's secondary fixed-price listings through the settlement module.
+    /// @notice Buys tokens from a seller's secondary fixed-price listings through the trade execution module.
     function buyBatch(
         address _contractAddress,
         address _seller,
@@ -86,7 +91,7 @@ interface IRareERC1155Marketplace is IRareERC1155MarketplaceTypes {
         BuyRequest[] calldata _requests
     ) external payable;
 
-    /// @notice Accepts all or part of an ERC1155 token offer through the settlement module.
+    /// @notice Accepts all or part of an ERC1155 token offer through the trade execution module.
     function acceptOffer(
         address _contractAddress,
         uint256 _tokenId,
@@ -138,7 +143,8 @@ interface IRareERC1155Marketplace is IRareERC1155MarketplaceTypes {
 
     function getMarketConfig() external view returns (MarketConfigV2.Config memory);
     function getERC1155ApprovalManager() external view returns (address);
-    function getSettlement() external view returns (address);
+    function getTradeExecutionModule() external view returns (address);
+    function getCheckoutExecutionModule() external view returns (address);
     function isPaused() external view returns (bool);
 
     function setNetworkBeneficiary(address _networkBeneficiary) external;
@@ -152,6 +158,7 @@ interface IRareERC1155Marketplace is IRareERC1155MarketplaceTypes {
     function setERC20ApprovalManager(address _erc20ApprovalManager) external;
     function setERC721ApprovalManager(address _erc721ApprovalManager) external;
     function setERC1155ApprovalManager(address _erc1155ApprovalManager) external;
-    function setSettlement(address _settlement) external;
+    function setTradeExecutionModule(address _tradeExecutionModule) external;
+    function setCheckoutExecutionModule(address _checkoutExecutionModule) external;
     function setContractPaused(bool _isPaused) external;
 }

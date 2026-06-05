@@ -18,10 +18,11 @@ import {RareERC1155ContractFactory} from "../../token/ERC1155/RareERC1155Contrac
 import {ERC20ApprovalManager} from "../../v2/approver/ERC20/ERC20ApprovalManager.sol";
 import {ERC721ApprovalManager} from "../../v2/approver/ERC721/ERC721ApprovalManager.sol";
 import {ERC1155ApprovalManager} from "../../v2/approver/ERC1155/ERC1155ApprovalManager.sol";
+import {IRareERC1155CheckoutExecutionModule} from "../../marketplace/IRareERC1155CheckoutExecutionModule.sol";
 import {IRareERC1155MarketplaceTypes} from "../../marketplace/IRareERC1155MarketplaceTypes.sol";
-import {IRareERC1155Settlement} from "../../marketplace/IRareERC1155Settlement.sol";
+import {RareERC1155CheckoutExecutionModule} from "../../marketplace/RareERC1155CheckoutExecutionModule.sol";
 import {RareERC1155Marketplace} from "../../marketplace/RareERC1155Marketplace.sol";
-import {RareERC1155Settlement} from "../../marketplace/RareERC1155Settlement.sol";
+import {RareERC1155TradeExecutionModule} from "../../marketplace/RareERC1155TradeExecutionModule.sol";
 import {IRoyaltyEngineV1} from "royalty-registry/IRoyaltyEngineV1.sol";
 
 contract CheckoutCurrency is ERC20 {
@@ -241,9 +242,22 @@ contract RejectETH {
     }
 }
 
+contract CheckoutFailureDecoderHarness is RareERC1155CheckoutExecutionModule {
+    function checkoutExecutionFailure(bytes memory _revertData)
+        external
+        pure
+        returns (IRareERC1155MarketplaceTypes.CheckoutFailureStage stage, bytes memory failureData)
+    {
+        return _checkoutExecutionFailure(_revertData);
+    }
+}
+
 contract RareERC1155MarketplaceSettlementTest is Test {
+    event MintDirectSaleCancelled(address indexed contractAddress, uint256 indexed tokenId);
+
     RareERC1155Marketplace private marketplace;
-    RareERC1155Settlement private settlement;
+    RareERC1155TradeExecutionModule private tradeExecutionModule;
+    RareERC1155CheckoutExecutionModule private checkoutExecutionModule;
     Payments private payments;
     RareERC1155 private token;
     CheckoutCurrency private currency;
@@ -281,12 +295,14 @@ contract RareERC1155MarketplaceSettlementTest is Test {
         erc20ApprovalManager = new ERC20ApprovalManager();
         erc721ApprovalManager = new ERC721ApprovalManager();
         erc1155ApprovalManager = new ERC1155ApprovalManager();
-        settlement = new RareERC1155Settlement();
+        tradeExecutionModule = new RareERC1155TradeExecutionModule();
+        checkoutExecutionModule = new RareERC1155CheckoutExecutionModule();
         payments = new Payments();
         marketplace = RareERC1155Marketplace(
             address(
                 new ERC1967Proxy(
-                    address(new RareERC1155Marketplace()), _initData(address(payments), address(settlement))
+                    address(new RareERC1155Marketplace()),
+                    _initData(address(payments), address(tradeExecutionModule), address(checkoutExecutionModule))
                 )
             )
         );
@@ -311,7 +327,7 @@ contract RareERC1155MarketplaceSettlementTest is Test {
         vm.etch(approvedTokenRegistry, address(marketplace).code);
     }
 
-    function testBuyListingThroughSettlementModule() public {
+    function testBuyListingThroughTradeExecutionModule() public {
         uint256 price = 1 ether;
         uint256 quantity = 2;
 
@@ -340,6 +356,154 @@ contract RareERC1155MarketplaceSettlementTest is Test {
         assertEq(token.balanceOf(buyer, tokenId), quantity);
         assertEq(token.balanceOf(seller, tokenId), 0);
         assertEq(marketplace.getSalePrice(address(token), tokenId, seller).quantity, 0);
+    }
+
+    function testBuyListingAcceptsMaxRoyaltyRecipients() public {
+        uint256 price = 1 ether;
+
+        vm.prank(seller);
+        token.mintBatchTo(seller, _singleTokenIds(tokenId), _singleAmounts(1));
+
+        vm.prank(seller);
+        token.setApprovalForAll(address(erc1155ApprovalManager), true);
+
+        vm.prank(seller);
+        marketplace.setSalePrices(
+            address(token),
+            address(0),
+            _singleSalePriceRequest(tokenId, price, 1),
+            _singleSplitRecipients(seller),
+            _singleSplitRatios()
+        );
+
+        _mockSecondaryPayoutWithRoyalties(
+            address(token), tokenId, price, seller, _royaltyReceivers(5), _royaltyAmounts(price, 5)
+        );
+
+        uint256 sellerBalanceBefore = seller.balance;
+        uint256 firstRoyaltyBalanceBefore = address(0x4101).balance;
+
+        vm.prank(buyer);
+        marketplace.buyBatch{value: _withFee(price)}(
+            address(token), seller, address(0), _singleBuyRequest(tokenId, price, 1)
+        );
+
+        assertEq(token.balanceOf(buyer, tokenId), 1);
+        assertEq(seller.balance, sellerBalanceBefore + ((price * 85) / 100));
+        assertEq(address(0x4101).balance, firstRoyaltyBalanceBefore + ((price * 1) / 100));
+    }
+
+    function testCheckoutListingTruncatesRoyaltyRecipientsAndFills() public {
+        uint256 price = 1 ether;
+
+        vm.prank(seller);
+        token.mintBatchTo(seller, _singleTokenIds(tokenId), _singleAmounts(1));
+
+        vm.prank(seller);
+        token.setApprovalForAll(address(erc1155ApprovalManager), true);
+
+        vm.prank(seller);
+        marketplace.setSalePrices(
+            address(token),
+            address(0),
+            _singleSalePriceRequest(tokenId, price, 1),
+            _singleSplitRecipients(seller),
+            _singleSplitRatios()
+        );
+
+        _mockSecondaryPayoutWithRoyalties(
+            address(token), tokenId, price, seller, _royaltyReceivers(6), _royaltyAmounts(price, 6)
+        );
+
+        IRareERC1155MarketplaceTypes.CheckoutItem[] memory items = new IRareERC1155MarketplaceTypes.CheckoutItem[](1);
+        items[0] = _listingCheckoutItem(address(token), seller, address(0), tokenId, price, 1);
+
+        uint256 sellerBalanceBefore = seller.balance;
+        uint256 firstRoyaltyBalanceBefore = address(0x4101).balance;
+        uint256 fifthRoyaltyBalanceBefore = address(0x4105).balance;
+        uint256 sixthRoyaltyBalanceBefore = address(0x4106).balance;
+
+        vm.prank(buyer);
+        IRareERC1155MarketplaceTypes.CheckoutExecution memory execution =
+            marketplace.checkout{value: _withFee(price)}(items);
+
+        assertEq(execution.summary.filledCount, 1);
+        assertEq(execution.summary.skippedCount, 0);
+        assertTrue(execution.items[0].filled);
+        assertEq(token.balanceOf(buyer, tokenId), 1);
+        assertEq(seller.balance, sellerBalanceBefore + ((price * 85) / 100));
+        assertEq(address(0x4101).balance, firstRoyaltyBalanceBefore + ((price * 1) / 100));
+        assertEq(address(0x4105).balance, fifthRoyaltyBalanceBefore + ((price * 5) / 100));
+        assertEq(address(0x4106).balance, sixthRoyaltyBalanceBefore);
+    }
+
+    function testBuyListingRejectsZeroAddressEthRoyaltyRecipient() public {
+        uint256 price = 1 ether;
+
+        vm.prank(seller);
+        token.mintBatchTo(seller, _singleTokenIds(tokenId), _singleAmounts(1));
+
+        vm.prank(seller);
+        token.setApprovalForAll(address(erc1155ApprovalManager), true);
+
+        vm.prank(seller);
+        marketplace.setSalePrices(
+            address(token),
+            address(0),
+            _singleSalePriceRequest(tokenId, price, 1),
+            _singleSplitRecipients(seller),
+            _singleSplitRatios()
+        );
+
+        _mockSecondaryPayoutWithRoyalties(
+            address(token), tokenId, price, seller, _zeroAddressRoyaltyReceivers(), _singleRoyaltyAmounts(price)
+        );
+
+        vm.prank(buyer);
+        vm.expectRevert(abi.encodeWithSelector(IRareERC1155MarketplaceTypes.RoyaltyRecipientCannotBeZero.selector, 0));
+        marketplace.buyBatch{value: _withFee(price)}(
+            address(token), seller, address(0), _singleBuyRequest(tokenId, price, 1)
+        );
+
+        assertEq(token.balanceOf(seller, tokenId), 1);
+        assertEq(token.balanceOf(buyer, tokenId), 0);
+        assertEq(address(payments).balance, 0);
+    }
+
+    function testBuyListingRejectsZeroAddressERC20RoyaltyRecipient() public {
+        uint256 price = 1 ether;
+
+        vm.prank(seller);
+        token.mintBatchTo(seller, _singleTokenIds(tokenId), _singleAmounts(1));
+
+        vm.prank(seller);
+        token.setApprovalForAll(address(erc1155ApprovalManager), true);
+
+        _mockApprovedCurrency(address(currency));
+
+        vm.prank(seller);
+        marketplace.setSalePrices(
+            address(token),
+            address(currency),
+            _singleSalePriceRequest(tokenId, price, 1),
+            _singleSplitRecipients(seller),
+            _singleSplitRatios()
+        );
+
+        _mockSecondaryPayoutWithRoyalties(
+            address(token), tokenId, price, seller, _zeroAddressRoyaltyReceivers(), _singleRoyaltyAmounts(price)
+        );
+
+        vm.prank(buyer);
+        currency.approve(address(erc20ApprovalManager), _withFee(price));
+
+        vm.prank(buyer);
+        vm.expectRevert(abi.encodeWithSelector(IRareERC1155MarketplaceTypes.RoyaltyRecipientCannotBeZero.selector, 0));
+        marketplace.buyBatch(address(token), seller, address(currency), _singleBuyRequest(tokenId, price, 1));
+
+        assertEq(token.balanceOf(seller, tokenId), 1);
+        assertEq(token.balanceOf(buyer, tokenId), 0);
+        assertEq(currency.balanceOf(address(marketplace)), 0);
     }
 
     function testBuyListingSkipsZeroValueERC20MarketplaceFeeRecipient() public {
@@ -394,7 +558,7 @@ contract RareERC1155MarketplaceSettlementTest is Test {
         assertEq(rejectingCurrency.balanceOf(rewardAccumulator), 0);
     }
 
-    function testAcceptOfferThroughSettlementModule() public {
+    function testAcceptOfferThroughTradeExecutionModule() public {
         uint256 price = 1 ether;
         uint256 offerQuantity = 2;
 
@@ -422,6 +586,51 @@ contract RareERC1155MarketplaceSettlementTest is Test {
         assertEq(offer.initialQuantity, offerQuantity);
         assertEq(offer.marketplaceFeeRemaining, _fee(price));
         assertEq(offer.marketplaceFeeTotal, _fee(price * offerQuantity));
+        assertEq(offer.stakingFeeRemaining, _stakingFee(price));
+        assertEq(offer.stakingFeeTotal, _stakingFee(price * offerQuantity));
+        assertEq(token.balanceOf(buyer, tokenId), 1);
+        assertEq(token.balanceOf(seller, tokenId), 1);
+    }
+
+    function testAcceptOfferUsesOfferTimeStakingFeeAfterSettingsRotation() public {
+        uint256 price = 1 ether;
+        uint256 offerQuantity = 2;
+
+        vm.prank(seller);
+        token.mintBatchTo(seller, _singleTokenIds(tokenId), _singleAmounts(offerQuantity));
+
+        vm.prank(seller);
+        token.setApprovalForAll(address(erc1155ApprovalManager), true);
+
+        _mockMarketplaceFee(price * offerQuantity, seller);
+        vm.prank(buyer);
+        marketplace.makeOffer{value: _withFee(price * offerQuantity)}(
+            address(token), tokenId, address(0), price, offerQuantity, 0
+        );
+
+        vm.mockCall(
+            stakingSettings,
+            abi.encodeWithSelector(IStakingSettings.calculateStakingFee.selector, price),
+            abi.encode(_fee(price) + 1)
+        );
+        vm.mockCall(
+            royaltyEngine,
+            abi.encodeWithSelector(IRoyaltyEngineV1.getRoyalty.selector, address(token), tokenId, price),
+            abi.encode(new address payable[](0), new uint256[](0))
+        );
+
+        vm.prank(seller);
+        marketplace.acceptOffer(
+            address(token), tokenId, buyer, address(0), price, 1, _singleSplitRecipients(seller), _singleSplitRatios()
+        );
+
+        IRareERC1155MarketplaceTypes.Offer memory offer =
+            marketplace.getOffer(address(token), tokenId, buyer, address(0));
+        assertEq(offer.quantity, 1);
+        assertEq(offer.marketplaceFeeRemaining, _fee(price));
+        assertEq(offer.stakingFeeRemaining, _stakingFee(price));
+        assertEq(networkBeneficiary.balance, _fee(price) - _stakingFee(price));
+        assertEq(rewardAccumulator.balance, _stakingFee(price));
         assertEq(token.balanceOf(buyer, tokenId), 1);
         assertEq(token.balanceOf(seller, tokenId), 1);
     }
@@ -467,7 +676,10 @@ contract RareERC1155MarketplaceSettlementTest is Test {
         assertEq(offer.initialQuantity, offerQuantity);
         assertEq(offer.marketplaceFeeRemaining, _fee(price * offerQuantity) - 1);
         assertEq(offer.marketplaceFeeTotal, _fee(price * offerQuantity));
+        assertEq(offer.stakingFeeRemaining, _stakingFee(price * offerQuantity));
+        assertEq(offer.stakingFeeTotal, _stakingFee(price * offerQuantity));
         assertEq(networkBeneficiary.balance, 1);
+        assertEq(rewardAccumulator.balance, 0);
 
         vm.prank(buyer);
         marketplace.cancelOffer(address(token), highQuantityTokenId, address(0));
@@ -477,7 +689,7 @@ contract RareERC1155MarketplaceSettlementTest is Test {
         assertEq(marketplace.getOffer(address(token), highQuantityTokenId, buyer, address(0)).quantity, 0);
     }
 
-    function testMintDirectSaleThroughSettlementModule() public {
+    function testMintDirectSaleThroughTradeExecutionModule() public {
         uint256 price = 1 ether;
         uint256 quantity = 2;
 
@@ -516,6 +728,62 @@ contract RareERC1155MarketplaceSettlementTest is Test {
             _singleSplitRecipients(seller),
             _singleSplitRatios()
         );
+    }
+
+    function testCancelMintDirectSalesClearsDirectSaleConfig() public {
+        uint256 price = 1 ether;
+
+        vm.prank(seller);
+        marketplace.prepareMintDirectSales(
+            address(token),
+            address(0),
+            _singleDirectSaleRequest(tokenId, price, 0, 0),
+            _singleSplitRecipients(seller),
+            _singleSplitRatios()
+        );
+
+        vm.expectEmit(true, true, false, false);
+        emit MintDirectSaleCancelled(address(token), tokenId);
+
+        vm.prank(seller);
+        marketplace.cancelMintDirectSales(address(token), _singleTokenIds(tokenId));
+
+        IRareERC1155MarketplaceTypes.DirectSaleConfig memory config =
+            marketplace.getDirectSaleConfig(address(token), tokenId);
+        assertEq(config.seller, address(0));
+        assertEq(config.currencyAddress, address(0));
+        assertEq(config.price, 0);
+        assertEq(config.startTime, 0);
+        assertEq(config.maxMints, 0);
+        assertEq(config.splitRecipients.length, 0);
+        assertEq(config.splitRatios.length, 0);
+
+        vm.prank(buyer);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IRareERC1155MarketplaceTypes.DirectSaleNotConfigured.selector, address(token), tokenId
+            )
+        );
+        marketplace.mintDirectSaleBatch(address(token), address(0), _singleMintRequest(tokenId, price, 1));
+    }
+
+    function testCancelMintDirectSalesRejectsNonContractOwner() public {
+        uint256 price = 1 ether;
+
+        vm.prank(seller);
+        marketplace.prepareMintDirectSales(
+            address(token),
+            address(0),
+            _singleDirectSaleRequest(tokenId, price, 0, 0),
+            _singleSplitRecipients(seller),
+            _singleSplitRatios()
+        );
+
+        vm.prank(buyer);
+        vm.expectRevert(
+            abi.encodeWithSelector(IRareERC1155MarketplaceTypes.NotContractOwner.selector, address(token), buyer)
+        );
+        marketplace.cancelMintDirectSales(address(token), _singleTokenIds(tokenId));
     }
 
     function testMintDirectSaleRevertsWhenMintDoesNotIncreaseBuyerBalance() public {
@@ -738,6 +1006,42 @@ contract RareERC1155MarketplaceSettlementTest is Test {
             execution.items[1].failureData,
             abi.encodeWithSelector(IRareERC1155MarketplaceTypes.MaxMintExceeded.selector, 2, maxMints)
         );
+    }
+
+    function testCheckoutCountsDuplicateDirectSaleItemsAsOneTransactionLimitUse() public {
+        uint256 price = 1 ether;
+
+        vm.startPrank(seller);
+        marketplace.prepareMintDirectSales(
+            address(token),
+            address(0),
+            _singleDirectSaleRequest(tokenId, price, 0, 0),
+            _singleSplitRecipients(seller),
+            _singleSplitRatios()
+        );
+        marketplace.setTokenMintLimits(address(token), _singleTokenLimitRequest(tokenId, 2));
+        marketplace.setTokenTxLimits(address(token), _singleTokenLimitRequest(tokenId, 1));
+        vm.stopPrank();
+        _mockPrimaryPayoutFor(address(token), price, seller);
+
+        IRareERC1155MarketplaceTypes.CheckoutItem[] memory items = new IRareERC1155MarketplaceTypes.CheckoutItem[](2);
+        items[0] = _directSaleCheckoutItem(address(token), seller, address(0), tokenId, price, 1);
+        items[1] = _directSaleCheckoutItem(address(token), seller, address(0), tokenId, price, 1);
+
+        vm.prank(buyer);
+        IRareERC1155MarketplaceTypes.CheckoutExecution memory execution =
+            marketplace.checkout{value: _withFee(price) * 2}(items);
+        IRareERC1155MarketplaceTypes.CheckoutSummary memory summary = execution.summary;
+
+        assertEq(summary.filledCount, 2);
+        assertEq(summary.skippedCount, 0);
+        assertEq(summary.ethSpent, _withFee(price) * 2);
+        assertEq(summary.ethRefunded, 0);
+        assertEq(token.balanceOf(buyer, tokenId), 2);
+        assertTrue(execution.items[0].filled);
+        assertTrue(execution.items[1].filled);
+        assertEq(marketplace.getTokenMintsPerAddress(address(token), tokenId, buyer), 2);
+        assertEq(marketplace.getTokenTxsPerAddress(address(token), tokenId, buyer), 1);
     }
 
     function testCheckoutSkipsInvalidItemsAndRefundsUnusedETH() public {
@@ -1356,6 +1660,59 @@ contract RareERC1155MarketplaceSettlementTest is Test {
         assertEq(execution.items[0].failureData, spoofedPayoutRevertData);
     }
 
+    function testCheckoutExecutionFailureDecodesStructuredStage() public {
+        CheckoutFailureDecoderHarness harness = new CheckoutFailureDecoderHarness();
+        bytes memory mintFailureData = abi.encodeWithSelector(
+            IRareERC1155MarketplaceTypes.InvalidERC1155Mint.selector, address(token), tokenId, buyer, 1
+        );
+        bytes memory revertData = abi.encodeWithSelector(
+            IRareERC1155MarketplaceTypes.CheckoutItemExecutionFailed.selector,
+            IRareERC1155MarketplaceTypes.CheckoutFailureStage.MINT,
+            mintFailureData
+        );
+
+        (IRareERC1155MarketplaceTypes.CheckoutFailureStage stage, bytes memory failureData) =
+            harness.checkoutExecutionFailure(revertData);
+
+        assertEq(uint8(stage), uint8(IRareERC1155MarketplaceTypes.CheckoutFailureStage.MINT));
+        assertEq(failureData, mintFailureData);
+    }
+
+    function testCheckoutExecutionFailureFallsBackToUnknownForRawRevertData() public {
+        bytes memory revertData = abi.encodeWithSignature("Error(string)", "unexpected failure");
+
+        _assertUnknownCheckoutFailure(revertData);
+    }
+
+    function testCheckoutExecutionFailureFallsBackToUnknownForMalformedStructuredPayloads() public {
+        bytes memory shortPayload = abi.encodePacked(
+            IRareERC1155MarketplaceTypes.CheckoutItemExecutionFailed.selector,
+            bytes32(uint256(uint8(IRareERC1155MarketplaceTypes.CheckoutFailureStage.PAYOUT)))
+        );
+        _assertUnknownCheckoutFailure(shortPayload);
+
+        bytes memory invalidStagePayload = abi.encodeWithSelector(
+            IRareERC1155MarketplaceTypes.CheckoutItemExecutionFailed.selector, uint256(255), bytes("stage")
+        );
+        _assertUnknownCheckoutFailure(invalidStagePayload);
+
+        bytes memory invalidOffsetPayload = abi.encodePacked(
+            IRareERC1155MarketplaceTypes.CheckoutItemExecutionFailed.selector,
+            bytes32(uint256(uint8(IRareERC1155MarketplaceTypes.CheckoutFailureStage.PAYOUT))),
+            bytes32(uint256(96)),
+            bytes32(uint256(0))
+        );
+        _assertUnknownCheckoutFailure(invalidOffsetPayload);
+
+        bytes memory invalidLengthPayload = abi.encodePacked(
+            IRareERC1155MarketplaceTypes.CheckoutItemExecutionFailed.selector,
+            bytes32(uint256(uint8(IRareERC1155MarketplaceTypes.CheckoutFailureStage.PAYOUT))),
+            bytes32(uint256(64)),
+            bytes32(uint256(1))
+        );
+        _assertUnknownCheckoutFailure(invalidLengthPayload);
+    }
+
     function testCheckoutEthRecipientRejectionEscrowsInPayments() public {
         uint256 price = 1 ether;
         RejectETH rejectRecipient = new RejectETH();
@@ -1445,32 +1802,32 @@ contract RareERC1155MarketplaceSettlementTest is Test {
         assertEq(currency.balanceOf(address(marketplace)), 0);
     }
 
-    function testDirectCallsToSettlementRevert() public {
+    function testDirectCallsToExecutionModulesRevert() public {
         IRareERC1155MarketplaceTypes.BuyRequest[] memory requests = new IRareERC1155MarketplaceTypes.BuyRequest[](1);
         requests[0] = IRareERC1155MarketplaceTypes.BuyRequest(tokenId, 1 ether, 1);
 
-        vm.expectRevert(IRareERC1155MarketplaceTypes.DirectSettlementCallUnsupported.selector);
-        settlement.buyBatch(address(token), seller, address(0), requests);
+        vm.expectRevert(IRareERC1155MarketplaceTypes.DirectModuleCallUnsupported.selector);
+        tradeExecutionModule.buyBatch(address(token), seller, address(0), requests);
 
         IRareERC1155MarketplaceTypes.CheckoutItem[] memory items = new IRareERC1155MarketplaceTypes.CheckoutItem[](0);
 
-        vm.expectRevert(IRareERC1155MarketplaceTypes.DirectSettlementCallUnsupported.selector);
-        settlement.checkout(items);
+        vm.expectRevert(IRareERC1155MarketplaceTypes.DirectModuleCallUnsupported.selector);
+        checkoutExecutionModule.checkout(items);
 
-        vm.expectRevert(IRareERC1155MarketplaceTypes.DirectSettlementCallUnsupported.selector);
-        settlement.executeCheckoutItem(
+        vm.expectRevert(IRareERC1155MarketplaceTypes.DirectModuleCallUnsupported.selector);
+        checkoutExecutionModule.executeCheckoutItem(
             _unsupportedCheckoutItem(), 0, address(0), 0, 0, new address payable[](0), new uint8[](0)
         );
 
-        vm.expectRevert(IRareERC1155MarketplaceTypes.DirectSettlementCallUnsupported.selector);
-        settlement.executeCheckoutPayout(
+        vm.expectRevert(IRareERC1155MarketplaceTypes.DirectModuleCallUnsupported.selector);
+        checkoutExecutionModule.executeCheckoutPayout(
             _unsupportedCheckoutItem(), seller, 0, 0, new address payable[](0), new uint8[](0)
         );
 
         (bool success,) = address(marketplace)
             .call(
                 abi.encodeWithSelector(
-                    IRareERC1155Settlement.executeCheckoutItem.selector,
+                    IRareERC1155CheckoutExecutionModule.executeCheckoutItem.selector,
                     _unsupportedCheckoutItem(),
                     0,
                     address(0),
@@ -1483,14 +1840,24 @@ contract RareERC1155MarketplaceSettlementTest is Test {
         assertFalse(success);
     }
 
-    function testOwnerCanUpdateSettlementModule() public {
+    function testOwnerCanUpdateTradeExecutionModule() public {
         vm.prank(deployer);
-        RareERC1155Settlement newSettlement = new RareERC1155Settlement();
+        RareERC1155TradeExecutionModule newTradeExecutionModule = new RareERC1155TradeExecutionModule();
 
         vm.prank(deployer);
-        marketplace.setSettlement(address(newSettlement));
+        marketplace.setTradeExecutionModule(address(newTradeExecutionModule));
 
-        assertEq(marketplace.getSettlement(), address(newSettlement));
+        assertEq(marketplace.getTradeExecutionModule(), address(newTradeExecutionModule));
+    }
+
+    function testOwnerCanUpdateCheckoutExecutionModule() public {
+        vm.prank(deployer);
+        RareERC1155CheckoutExecutionModule newCheckoutExecutionModule = new RareERC1155CheckoutExecutionModule();
+
+        vm.prank(deployer);
+        marketplace.setCheckoutExecutionModule(address(newCheckoutExecutionModule));
+
+        assertEq(marketplace.getCheckoutExecutionModule(), address(newCheckoutExecutionModule));
     }
 
     function testSetTokenAllowListConfigsRevertsWhenPaused() public {
@@ -1552,7 +1919,11 @@ contract RareERC1155MarketplaceSettlementTest is Test {
         marketplace.setTokenTxLimits(address(token), _singleTokenLimitRequest(tokenId, 5));
     }
 
-    function _initData(address _payments, address _settlement) private view returns (bytes memory) {
+    function _initData(address _payments, address _tradeExecutionModule, address _checkoutExecutionModule)
+        private
+        view
+        returns (bytes memory)
+    {
         return abi.encodeWithSelector(
             RareERC1155Marketplace.initialize.selector,
             networkBeneficiary,
@@ -1566,7 +1937,8 @@ contract RareERC1155MarketplaceSettlementTest is Test {
             address(erc20ApprovalManager),
             address(erc721ApprovalManager),
             address(erc1155ApprovalManager),
-            _settlement
+            _tradeExecutionModule,
+            _checkoutExecutionModule
         );
     }
 
@@ -1725,6 +2097,16 @@ contract RareERC1155MarketplaceSettlementTest is Test {
         assertEq(_result.reason, _reason);
     }
 
+    function _assertUnknownCheckoutFailure(bytes memory _revertData) private {
+        CheckoutFailureDecoderHarness harness = new CheckoutFailureDecoderHarness();
+
+        (IRareERC1155MarketplaceTypes.CheckoutFailureStage stage, bytes memory failureData) =
+            harness.checkoutExecutionFailure(_revertData);
+
+        assertEq(uint8(stage), uint8(IRareERC1155MarketplaceTypes.CheckoutFailureStage.UNKNOWN));
+        assertEq(failureData, _revertData);
+    }
+
     function _singleSplitRecipients(address _recipient) private pure returns (address payable[] memory recipients) {
         recipients = new address payable[](1);
         recipients[0] = payable(_recipient);
@@ -1774,18 +2156,60 @@ contract RareERC1155MarketplaceSettlementTest is Test {
     function _mockSecondaryPayoutFor(address _contractAddress, uint256 _tokenId, uint256 _amount, address _seller)
         private
     {
-        _mockMarketplaceFee(_amount, _seller);
-
         address payable[] memory receivers = new address payable[](1);
         uint256[] memory royalties = new uint256[](1);
         receivers[0] = payable(royaltyReceiver);
         royalties[0] = (_amount * 10) / 100;
 
+        _mockSecondaryPayoutWithRoyalties(_contractAddress, _tokenId, _amount, _seller, receivers, royalties);
+    }
+
+    function _mockSecondaryPayoutWithRoyalties(
+        address _contractAddress,
+        uint256 _tokenId,
+        uint256 _amount,
+        address _seller,
+        address payable[] memory _receivers,
+        uint256[] memory _royalties
+    ) private {
+        _mockMarketplaceFee(_amount, _seller);
         vm.mockCall(
             royaltyEngine,
             abi.encodeWithSelector(IRoyaltyEngineV1.getRoyalty.selector, _contractAddress, _tokenId, _amount),
-            abi.encode(receivers, royalties)
+            abi.encode(_receivers, _royalties)
         );
+    }
+
+    function _royaltyReceivers(uint256 _count) private pure returns (address payable[] memory receivers) {
+        address payable[6] memory allReceivers = [
+            payable(address(0x4101)),
+            payable(address(0x4102)),
+            payable(address(0x4103)),
+            payable(address(0x4104)),
+            payable(address(0x4105)),
+            payable(address(0x4106))
+        ];
+        receivers = new address payable[](_count);
+        for (uint256 i = 0; i < _count; i++) {
+            receivers[i] = allReceivers[i];
+        }
+    }
+
+    function _royaltyAmounts(uint256 _amount, uint256 _count) private pure returns (uint256[] memory royalties) {
+        royalties = new uint256[](_count);
+        for (uint256 i = 0; i < _count; i++) {
+            royalties[i] = (_amount * (i + 1)) / 100;
+        }
+    }
+
+    function _zeroAddressRoyaltyReceivers() private pure returns (address payable[] memory receivers) {
+        receivers = new address payable[](1);
+        receivers[0] = payable(address(0));
+    }
+
+    function _singleRoyaltyAmounts(uint256 _amount) private pure returns (uint256[] memory royalties) {
+        royalties = new uint256[](1);
+        royalties[0] = (_amount * 10) / 100;
     }
 
     function _mockApprovedCurrency(address _currencyAddress) private {
@@ -1839,5 +2263,9 @@ contract RareERC1155MarketplaceSettlementTest is Test {
 
     function _fee(uint256 _amount) private pure returns (uint256) {
         return (_amount * 3) / 100;
+    }
+
+    function _stakingFee(uint256 _amount) private pure returns (uint256) {
+        return (_amount * 1) / 100;
     }
 }

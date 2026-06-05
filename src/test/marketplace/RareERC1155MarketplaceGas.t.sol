@@ -14,8 +14,9 @@ import {ERC20ApprovalManager} from "../../v2/approver/ERC20/ERC20ApprovalManager
 import {ERC721ApprovalManager} from "../../v2/approver/ERC721/ERC721ApprovalManager.sol";
 import {ERC1155ApprovalManager} from "../../v2/approver/ERC1155/ERC1155ApprovalManager.sol";
 import {IRareERC1155MarketplaceTypes} from "../../marketplace/IRareERC1155MarketplaceTypes.sol";
+import {RareERC1155CheckoutExecutionModule} from "../../marketplace/RareERC1155CheckoutExecutionModule.sol";
 import {RareERC1155Marketplace} from "../../marketplace/RareERC1155Marketplace.sol";
-import {RareERC1155Settlement} from "../../marketplace/RareERC1155Settlement.sol";
+import {RareERC1155TradeExecutionModule} from "../../marketplace/RareERC1155TradeExecutionModule.sol";
 import {IRoyaltyEngineV1} from "royalty-registry/IRoyaltyEngineV1.sol";
 
 contract CheckoutGasCurrency is ERC20 {
@@ -246,7 +247,8 @@ contract RareERC1155MarketplaceGasTest is Test {
         erc20ApprovalManager = new ERC20ApprovalManager();
         erc721ApprovalManager = new ERC721ApprovalManager();
         erc1155ApprovalManager = new ERC1155ApprovalManager();
-        RareERC1155Settlement settlement = new RareERC1155Settlement();
+        RareERC1155TradeExecutionModule tradeExecutionModule = new RareERC1155TradeExecutionModule();
+        RareERC1155CheckoutExecutionModule checkoutExecutionModule = new RareERC1155CheckoutExecutionModule();
 
         address marketplaceSettings = address(new CheckoutGasMarketplaceSettings());
         address stakingSettings = address(new CheckoutGasStakingSettings());
@@ -272,7 +274,8 @@ contract RareERC1155MarketplaceGasTest is Test {
                         address(erc20ApprovalManager),
                         address(erc721ApprovalManager),
                         address(erc1155ApprovalManager),
-                        address(settlement)
+                        address(tradeExecutionModule),
+                        address(checkoutExecutionModule)
                     )
                 )
             )

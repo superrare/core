@@ -13,6 +13,8 @@ import {IRareERC1155MarketplaceTypes} from "./IRareERC1155MarketplaceTypes.sol";
 library RareERC1155MarketplacePayments {
     using SafeERC20 for IERC20;
 
+    uint256 private constant MAX_ROYALTY_RECIPIENTS = 5;
+
     function checkIfCurrencyIsApproved(MarketConfigV2.Config storage _config, address _currencyAddress) public view {
         if (_currencyAddress != address(0) && !_config.approvedTokenRegistry.isApprovedToken(_currencyAddress)) {
             revert IRareERC1155MarketplaceTypes.CurrencyNotApproved(_currencyAddress);
@@ -119,12 +121,40 @@ library RareERC1155MarketplacePayments {
         address payable[] memory _splitRecipients,
         uint8[] memory _splitRatios
     ) public {
+        uint256 stakingFee = _marketplaceFee == 0 ? 0 : _config.stakingSettings.calculateStakingFee(_amount);
+        payoutSecondaryWithStakingFee(
+            _config,
+            _contractAddress,
+            _tokenId,
+            _currencyAddress,
+            _amount,
+            _marketplaceFee,
+            stakingFee,
+            _seller,
+            _splitRecipients,
+            _splitRatios
+        );
+    }
+
+    function payoutSecondaryWithStakingFee(
+        MarketConfigV2.Config storage _config,
+        address _contractAddress,
+        uint256 _tokenId,
+        address _currencyAddress,
+        uint256 _amount,
+        uint256 _marketplaceFee,
+        uint256 _stakingFee,
+        address _seller,
+        address payable[] memory _splitRecipients,
+        uint8[] memory _splitRatios
+    ) public {
         uint256 remainingAmount = _amount;
 
-        payoutMarketplaceFee(_config, _currencyAddress, _amount, _marketplaceFee, _seller);
+        payoutMarketplaceFeeWithStakingFee(_config, _currencyAddress, _marketplaceFee, _stakingFee, _seller);
 
         (address payable[] memory receivers, uint256[] memory royalties) =
             _config.royaltyEngine.getRoyalty(_contractAddress, _tokenId, _amount);
+        (receivers, royalties) = _truncateRoyaltyRecipients(receivers, royalties);
 
         uint256 totalRoyalties = 0;
         for (uint256 i = 0; i < royalties.length; i++) {
@@ -155,8 +185,22 @@ library RareERC1155MarketplacePayments {
         }
 
         uint256 stakingFee = _config.stakingSettings.calculateStakingFee(_amount);
-        if (stakingFee > _marketplaceFee) {
-            revert IRareERC1155MarketplaceTypes.StakingFeeExceedsMarketplaceFee(_marketplaceFee, stakingFee);
+        payoutMarketplaceFeeWithStakingFee(_config, _currencyAddress, _marketplaceFee, stakingFee, _seller);
+    }
+
+    function payoutMarketplaceFeeWithStakingFee(
+        MarketConfigV2.Config storage _config,
+        address _currencyAddress,
+        uint256 _marketplaceFee,
+        uint256 _stakingFee,
+        address _seller
+    ) public {
+        if (_marketplaceFee == 0) {
+            return;
+        }
+
+        if (_stakingFee > _marketplaceFee) {
+            revert IRareERC1155MarketplaceTypes.StakingFeeExceedsMarketplaceFee(_marketplaceFee, _stakingFee);
         }
 
         address payable[] memory recipients = new address payable[](2);
@@ -165,8 +209,8 @@ library RareERC1155MarketplacePayments {
         recipients[1] = recipients[1] == address(0) ? payable(_config.networkBeneficiary) : recipients[1];
 
         uint256[] memory amounts = new uint256[](2);
-        amounts[0] = _marketplaceFee - stakingFee;
-        amounts[1] = stakingFee;
+        amounts[0] = _marketplaceFee - _stakingFee;
+        amounts[1] = _stakingFee;
 
         if (amounts[0] == 0) {
             address payable[] memory stakingRecipients = new address payable[](1);
@@ -223,6 +267,35 @@ library RareERC1155MarketplacePayments {
         }
 
         IERC20(_currencyAddress).safeTransfer(_recipient, _amount);
+    }
+
+    function _truncateRoyaltyRecipients(address payable[] memory _receivers, uint256[] memory _royalties)
+        private
+        pure
+        returns (address payable[] memory receivers, uint256[] memory royalties)
+    {
+        if (_receivers.length != _royalties.length) {
+            revert IRareERC1155MarketplaceTypes.PayoutLengthMismatch(_receivers.length, _royalties.length);
+        }
+
+        uint256 royaltyRecipientCount =
+            _receivers.length > MAX_ROYALTY_RECIPIENTS ? MAX_ROYALTY_RECIPIENTS : _receivers.length;
+        for (uint256 i = 0; i < royaltyRecipientCount; i++) {
+            if (_receivers[i] == address(0) && _royalties[i] != 0) {
+                revert IRareERC1155MarketplaceTypes.RoyaltyRecipientCannotBeZero(i);
+            }
+        }
+
+        if (_receivers.length <= MAX_ROYALTY_RECIPIENTS) {
+            return (_receivers, _royalties);
+        }
+
+        receivers = new address payable[](MAX_ROYALTY_RECIPIENTS);
+        royalties = new uint256[](MAX_ROYALTY_RECIPIENTS);
+        for (uint256 i = 0; i < MAX_ROYALTY_RECIPIENTS; i++) {
+            receivers[i] = _receivers[i];
+            royalties[i] = _royalties[i];
+        }
     }
 
     function payoutSplits(
