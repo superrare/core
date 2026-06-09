@@ -41,30 +41,6 @@ contract CheckoutGasMarketplaceSettings {
   }
 }
 
-contract CheckoutGasStakingSettings {
-  function calculateStakingFee(uint256 _amount) external pure returns (uint256) {
-    return (_amount * 1) / 100;
-  }
-}
-
-contract CheckoutGasStakingRegistry {
-  address private immutable rewardAccumulator;
-
-  constructor(address _rewardAccumulator) {
-    rewardAccumulator = _rewardAccumulator;
-  }
-
-  function getRewardAccumulatorAddressForUser(address) external view returns (address) {
-    return rewardAccumulator;
-  }
-}
-
-contract CheckoutGasSpaceOperatorRegistry {
-  function isApprovedSpaceOperator(address) external pure returns (bool) {
-    return false;
-  }
-}
-
 contract CheckoutGasRoyaltyEngine is IRoyaltyEngineV1 {
   uint256 private immutable royaltyRecipientCount;
 
@@ -304,10 +280,7 @@ contract RareERC1155MarketplaceGasTest is Test {
     RareERC1155CheckoutExecutionModule checkoutExecutionModule = new RareERC1155CheckoutExecutionModule();
 
     address marketplaceSettings = address(new CheckoutGasMarketplaceSettings());
-    address stakingSettings = address(new CheckoutGasStakingSettings());
-    address stakingRegistry = address(new CheckoutGasStakingRegistry(rewardAccumulator));
     address royaltyEngine = address(new CheckoutGasRoyaltyEngine(_royaltyRecipientCount));
-    address spaceOperatorRegistry = address(new CheckoutGasSpaceOperatorRegistry());
     address approvedTokenRegistry = address(new CheckoutGasApprovedTokenRegistry());
 
     marketplace = RareERC1155Marketplace(
@@ -318,12 +291,9 @@ contract RareERC1155MarketplaceGasTest is Test {
             RareERC1155Marketplace.initialize.selector,
             networkBeneficiary,
             marketplaceSettings,
-            spaceOperatorRegistry,
             royaltyEngine,
             address(new Payments()),
             approvedTokenRegistry,
-            stakingSettings,
-            stakingRegistry,
             address(erc20ApprovalManager),
             address(erc721ApprovalManager),
             address(erc1155ApprovalManager),

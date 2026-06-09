@@ -20,12 +20,9 @@ abstract contract RareERC1155MarketplaceStorage is IRareERC1155MarketplaceTypes 
 
     bytes32 internal constant NETWORK_BENEFICIARY_FIELD = "NETWORK_BENEFICIARY";
     bytes32 internal constant MARKETPLACE_SETTINGS_FIELD = "MARKETPLACE_SETTINGS";
-    bytes32 internal constant SPACE_OPERATOR_REGISTRY_FIELD = "SPACE_OPERATOR_REGISTRY";
     bytes32 internal constant ROYALTY_ENGINE_FIELD = "ROYALTY_ENGINE";
     bytes32 internal constant PAYMENTS_FIELD = "PAYMENTS";
     bytes32 internal constant APPROVED_TOKEN_REGISTRY_FIELD = "APPROVED_TOKEN_REGISTRY";
-    bytes32 internal constant STAKING_SETTINGS_FIELD = "STAKING_SETTINGS";
-    bytes32 internal constant STAKING_REGISTRY_FIELD = "STAKING_REGISTRY";
     bytes32 internal constant ERC20_APPROVAL_MANAGER_FIELD = "ERC20_APPROVAL_MANAGER";
     bytes32 internal constant ERC721_APPROVAL_MANAGER_FIELD = "ERC721_APPROVAL_MANAGER";
     bytes32 internal constant ERC1155_APPROVAL_MANAGER_FIELD = "ERC1155_APPROVAL_MANAGER";

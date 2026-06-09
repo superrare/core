@@ -80,17 +80,15 @@ library RareERC1155MarketplacePayments {
         address _currencyAddress,
         uint256 _amount,
         uint256 _marketplaceFee,
-        address _seller,
         address payable[] memory _splitRecipients,
         uint8[] memory _splitRatios
     ) public {
         uint256 remainingAmount = _amount;
 
-        payoutMarketplaceFee(_config, _currencyAddress, _amount, _marketplaceFee, _seller);
+        payoutMarketplaceFee(_config, _currencyAddress, _marketplaceFee);
 
-        uint256 platformCommission = _config.spaceOperatorRegistry.isApprovedSpaceOperator(_seller)
-            ? _config.spaceOperatorRegistry.getPlatformCommission(_seller)
-            : _config.marketplaceSettings.getERC721ContractPrimarySaleFeePercentage(_contractAddress);
+        uint256 platformCommission =
+            _config.marketplaceSettings.getERC721ContractPrimarySaleFeePercentage(_contractAddress);
         if (platformCommission > 100) {
             revert IRareERC1155MarketplaceTypes.PlatformCommissionExceeded(platformCommission, 100);
         }
@@ -117,40 +115,12 @@ library RareERC1155MarketplacePayments {
         address _currencyAddress,
         uint256 _amount,
         uint256 _marketplaceFee,
-        address _seller,
-        address payable[] memory _splitRecipients,
-        uint8[] memory _splitRatios
-    ) public {
-        uint256 stakingFee = _marketplaceFee == 0 ? 0 : _config.stakingSettings.calculateStakingFee(_amount);
-        payoutSecondaryWithStakingFee(
-            _config,
-            _contractAddress,
-            _tokenId,
-            _currencyAddress,
-            _amount,
-            _marketplaceFee,
-            stakingFee,
-            _seller,
-            _splitRecipients,
-            _splitRatios
-        );
-    }
-
-    function payoutSecondaryWithStakingFee(
-        MarketConfigV2.Config storage _config,
-        address _contractAddress,
-        uint256 _tokenId,
-        address _currencyAddress,
-        uint256 _amount,
-        uint256 _marketplaceFee,
-        uint256 _stakingFee,
-        address _seller,
         address payable[] memory _splitRecipients,
         uint8[] memory _splitRatios
     ) public {
         uint256 remainingAmount = _amount;
 
-        payoutMarketplaceFeeWithStakingFee(_config, _currencyAddress, _marketplaceFee, _stakingFee, _seller);
+        payoutMarketplaceFee(_config, _currencyAddress, _marketplaceFee);
 
         (address payable[] memory receivers, uint256[] memory royalties) =
             _config.royaltyEngine.getRoyalty(_contractAddress, _tokenId, _amount);
@@ -176,59 +146,17 @@ library RareERC1155MarketplacePayments {
     function payoutMarketplaceFee(
         MarketConfigV2.Config storage _config,
         address _currencyAddress,
-        uint256 _amount,
-        uint256 _marketplaceFee,
-        address _seller
+        uint256 _marketplaceFee
     ) public {
         if (_marketplaceFee == 0) {
             return;
         }
 
-        uint256 stakingFee = _config.stakingSettings.calculateStakingFee(_amount);
-        payoutMarketplaceFeeWithStakingFee(_config, _currencyAddress, _marketplaceFee, stakingFee, _seller);
-    }
-
-    function payoutMarketplaceFeeWithStakingFee(
-        MarketConfigV2.Config storage _config,
-        address _currencyAddress,
-        uint256 _marketplaceFee,
-        uint256 _stakingFee,
-        address _seller
-    ) public {
-        if (_marketplaceFee == 0) {
-            return;
-        }
-
-        if (_stakingFee > _marketplaceFee) {
-            revert IRareERC1155MarketplaceTypes.StakingFeeExceedsMarketplaceFee(_marketplaceFee, _stakingFee);
-        }
-
-        address payable[] memory recipients = new address payable[](2);
+        address payable[] memory recipients = new address payable[](1);
         recipients[0] = payable(_config.networkBeneficiary);
-        recipients[1] = payable(_config.stakingRegistry.getRewardAccumulatorAddressForUser(_seller));
-        recipients[1] = recipients[1] == address(0) ? payable(_config.networkBeneficiary) : recipients[1];
 
-        uint256[] memory amounts = new uint256[](2);
-        amounts[0] = _marketplaceFee - _stakingFee;
-        amounts[1] = _stakingFee;
-
-        if (amounts[0] == 0) {
-            address payable[] memory stakingRecipients = new address payable[](1);
-            stakingRecipients[0] = recipients[1];
-            uint256[] memory stakingAmounts = new uint256[](1);
-            stakingAmounts[0] = amounts[1];
-            performPayouts(_config, _currencyAddress, _marketplaceFee, stakingRecipients, stakingAmounts);
-            return;
-        }
-
-        if (amounts[1] == 0) {
-            address payable[] memory marketplaceRecipients = new address payable[](1);
-            marketplaceRecipients[0] = recipients[0];
-            uint256[] memory marketplaceAmounts = new uint256[](1);
-            marketplaceAmounts[0] = amounts[0];
-            performPayouts(_config, _currencyAddress, _marketplaceFee, marketplaceRecipients, marketplaceAmounts);
-            return;
-        }
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = _marketplaceFee;
 
         performPayouts(_config, _currencyAddress, _marketplaceFee, recipients, amounts);
     }

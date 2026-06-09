@@ -12,12 +12,9 @@ interface IRareERC1155Marketplace is IRareERC1155MarketplaceTypes {
     function initialize(
         address _networkBeneficiary,
         address _marketplaceSettings,
-        address _spaceOperatorRegistry,
         address _royaltyEngine,
         address _payments,
         address _approvedTokenRegistry,
-        address _stakingSettings,
-        address _stakingRegistry,
         address _erc20ApprovalManager,
         address _erc721ApprovalManager,
         address _erc1155ApprovalManager,
@@ -149,12 +146,9 @@ interface IRareERC1155Marketplace is IRareERC1155MarketplaceTypes {
 
     function setNetworkBeneficiary(address _networkBeneficiary) external;
     function setMarketplaceSettings(address _marketplaceSettings) external;
-    function setSpaceOperatorRegistry(address _spaceOperatorRegistry) external;
     function setRoyaltyEngine(address _royaltyEngine) external;
     function setPayments(address _payments) external;
     function setApprovedTokenRegistry(address _approvedTokenRegistry) external;
-    function setStakingSettings(address _stakingSettings) external;
-    function setStakingRegistry(address _stakingRegistry) external;
     function setERC20ApprovalManager(address _erc20ApprovalManager) external;
     function setERC721ApprovalManager(address _erc721ApprovalManager) external;
     function setERC1155ApprovalManager(address _erc1155ApprovalManager) external;

@@ -11,9 +11,6 @@ import {ERC1967Proxy} from "openzeppelin-contracts/proxy/ERC1967/ERC1967Proxy.so
 
 import {IApprovedTokenRegistry} from "../../registry/interfaces/IApprovedTokenRegistry.sol";
 import {IMarketplaceSettings} from "../../marketplace/IMarketplaceSettings.sol";
-import {IStakingSettings} from "../../marketplace/IStakingSettings.sol";
-import {IRareStakingRegistry} from "../../staking/registry/IRareStakingRegistry.sol";
-import {ISpaceOperatorRegistry} from "../../registry/interfaces/ISpaceOperatorRegistry.sol";
 import {Payments} from "../../payments/Payments.sol";
 import {RareERC1155} from "../../token/ERC1155/RareERC1155.sol";
 import {RareERC1155ContractFactory} from "../../token/ERC1155/RareERC1155ContractFactory.sol";
@@ -83,10 +80,7 @@ contract RareERC1155MarketplaceHandler is Test {
   address private collectionOwner;
   address private rejectingPayoutRecipient;
   address private marketplaceSettings;
-  address private stakingSettings;
-  address private stakingRegistry;
   address private royaltyEngine;
-  address private spaceOperatorRegistry;
 
   address[3] private buyers;
   address[2] private sellers;
@@ -114,10 +108,7 @@ contract RareERC1155MarketplaceHandler is Test {
     address _collectionOwner,
     address _rejectingPayoutRecipient,
     address _marketplaceSettings,
-    address _stakingSettings,
-    address _stakingRegistry,
     address _royaltyEngine,
-    address _spaceOperatorRegistry,
     address[3] memory _buyers,
     address[2] memory _sellers,
     uint256[3] memory _tokenIds
@@ -128,10 +119,7 @@ contract RareERC1155MarketplaceHandler is Test {
     collectionOwner = _collectionOwner;
     rejectingPayoutRecipient = _rejectingPayoutRecipient;
     marketplaceSettings = _marketplaceSettings;
-    stakingSettings = _stakingSettings;
-    stakingRegistry = _stakingRegistry;
     royaltyEngine = _royaltyEngine;
-    spaceOperatorRegistry = _spaceOperatorRegistry;
     buyers = _buyers;
     sellers = _sellers;
     tokenIds = _tokenIds;
@@ -584,20 +572,11 @@ contract RareERC1155MarketplaceHandler is Test {
       abi.encodeWithSelector(IMarketplaceSettings.calculateMarketplaceFee.selector, _amount),
       abi.encode(_fee(_amount))
     );
-    vm.mockCall(
-      stakingSettings,
-      abi.encodeWithSelector(IStakingSettings.calculateStakingFee.selector, _amount),
-      abi.encode(_stakingFee(_amount))
-    );
   }
 
   function _mockSecondaryPayout(uint256 _tokenId, uint256 _amount, address _seller) private {
+    _seller;
     _mockOfferFees(_amount);
-    vm.mockCall(
-      stakingRegistry,
-      abi.encodeWithSelector(IRareStakingRegistry.getRewardAccumulatorAddressForUser.selector, _seller),
-      abi.encode(address(0))
-    );
 
     address payable[] memory receivers = new address payable[](0);
     uint256[] memory royalties = new uint256[](0);
@@ -609,12 +588,8 @@ contract RareERC1155MarketplaceHandler is Test {
   }
 
   function _mockPrimaryPayout(uint256 _amount, address _seller) private {
+    _seller;
     _mockOfferFees(_amount);
-    vm.mockCall(
-      spaceOperatorRegistry,
-      abi.encodeWithSelector(ISpaceOperatorRegistry.isApprovedSpaceOperator.selector, _seller),
-      abi.encode(false)
-    );
     vm.mockCall(
       marketplaceSettings,
       abi.encodeWithSelector(IMarketplaceSettings.getERC721ContractPrimarySaleFeePercentage.selector, address(token)),
@@ -755,10 +730,6 @@ contract RareERC1155MarketplaceHandler is Test {
     return (_amount * 3) / 100;
   }
 
-  function _stakingFee(uint256 _amount) private pure returns (uint256) {
-    return (_amount * 1) / 100;
-  }
-
   function _bounded(uint256 _seed, uint256 _minValue, uint256 _maxValue) private pure returns (uint256) {
     return _minValue + (_seed % (_maxValue - _minValue + 1));
   }
@@ -786,10 +757,7 @@ contract RareERC1155MarketplaceInvariantTest is StdInvariant, Test {
   address private networkBeneficiary = address(0x5000);
 
   address private marketplaceSettings = address(0x7100);
-  address private stakingSettings = address(0x7200);
-  address private stakingRegistry = address(0x7300);
   address private royaltyEngine = address(0x7400);
-  address private spaceOperatorRegistry = address(0x7500);
   address private approvedTokenRegistry = address(0x7600);
 
   uint256[3] private tokenIds;
@@ -850,10 +818,7 @@ contract RareERC1155MarketplaceInvariantTest is StdInvariant, Test {
     _fundAndApproveCurrency(address(rejectingBuyer));
 
     vm.etch(marketplaceSettings, address(marketplace).code);
-    vm.etch(stakingSettings, address(marketplace).code);
-    vm.etch(stakingRegistry, address(marketplace).code);
     vm.etch(royaltyEngine, address(marketplace).code);
-    vm.etch(spaceOperatorRegistry, address(marketplace).code);
     vm.etch(approvedTokenRegistry, address(marketplace).code);
 
     vm.mockCall(
@@ -871,10 +836,7 @@ contract RareERC1155MarketplaceInvariantTest is StdInvariant, Test {
       seller,
       address(rejectingPayoutRecipient),
       marketplaceSettings,
-      stakingSettings,
-      stakingRegistry,
       royaltyEngine,
-      spaceOperatorRegistry,
       buyers,
       sellers,
       tokenIds
@@ -961,8 +923,6 @@ contract RareERC1155MarketplaceInvariantTest is StdInvariant, Test {
         assertEq(offer.initialQuantity, 0);
         assertEq(offer.marketplaceFeeRemaining, 0);
         assertEq(offer.marketplaceFeeTotal, 0);
-        assertEq(offer.stakingFeeRemaining, 0);
-        assertEq(offer.stakingFeeTotal, 0);
         assertEq(offer.expirationTime, 0);
         continue;
       }
@@ -971,9 +931,6 @@ contract RareERC1155MarketplaceInvariantTest is StdInvariant, Test {
       assertGt(offer.price, 0);
       assertGe(offer.initialQuantity, offer.quantity);
       assertLe(offer.marketplaceFeeRemaining, offer.marketplaceFeeTotal);
-      assertLe(offer.stakingFeeRemaining, offer.stakingFeeTotal);
-      assertLe(offer.stakingFeeRemaining, offer.marketplaceFeeRemaining);
-      assertLe(offer.stakingFeeTotal, offer.marketplaceFeeTotal);
 
       uint256 escrowOwed = (offer.price * offer.quantity) + offer.marketplaceFeeRemaining;
       if (currencyAddress == address(0)) {
@@ -1003,12 +960,9 @@ contract RareERC1155MarketplaceInvariantTest is StdInvariant, Test {
         RareERC1155Marketplace.initialize.selector,
         networkBeneficiary,
         marketplaceSettings,
-        spaceOperatorRegistry,
         royaltyEngine,
         _payments,
         approvedTokenRegistry,
-        stakingSettings,
-        stakingRegistry,
         address(erc20ApprovalManager),
         address(erc721ApprovalManager),
         address(erc1155ApprovalManager),

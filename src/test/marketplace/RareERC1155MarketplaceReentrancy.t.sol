@@ -29,28 +29,6 @@ contract ReentrancyMarketplaceSettings {
   }
 }
 
-contract ReentrancyStakingSettings {
-  function calculateStakingFee(uint256 _amount) external pure returns (uint256) {
-    return (_amount * 1) / 100;
-  }
-}
-
-contract ReentrancyStakingRegistry {
-  function getRewardAccumulatorAddressForUser(address) external pure returns (address) {
-    return address(0);
-  }
-}
-
-contract ReentrancySpaceOperatorRegistry {
-  function isApprovedSpaceOperator(address) external pure returns (bool) {
-    return false;
-  }
-
-  function getPlatformCommission(address) external pure returns (uint8) {
-    return 0;
-  }
-}
-
 contract ReentrancyApprovedTokenRegistry {
   mapping(address => bool) private approvedTokens;
 
@@ -283,10 +261,6 @@ contract RareERC1155MarketplaceReentrancyTest is Test {
   address private networkBeneficiary = address(0x5000);
 
   ReentrancyMarketplaceSettings private marketplaceSettings;
-  ReentrancyStakingSettings private stakingSettings;
-  ReentrancyStakingRegistry private stakingRegistry;
-  ReentrancySpaceOperatorRegistry private spaceOperatorRegistry;
-
   uint256 private tokenId;
   uint256 private tokenIdTwo;
   uint256 private tokenIdThree;
@@ -298,9 +272,6 @@ contract RareERC1155MarketplaceReentrancyTest is Test {
 
     vm.startPrank(deployer);
     marketplaceSettings = new ReentrancyMarketplaceSettings();
-    stakingSettings = new ReentrancyStakingSettings();
-    stakingRegistry = new ReentrancyStakingRegistry();
-    spaceOperatorRegistry = new ReentrancySpaceOperatorRegistry();
     approvedTokenRegistry = new ReentrancyApprovedTokenRegistry();
     royaltyEngine = new ReenteringRoyaltyEngine();
 
@@ -612,12 +583,9 @@ contract RareERC1155MarketplaceReentrancyTest is Test {
         RareERC1155Marketplace.initialize.selector,
         networkBeneficiary,
         address(marketplaceSettings),
-        address(spaceOperatorRegistry),
         address(royaltyEngine),
         address(payments),
         address(approvedTokenRegistry),
-        address(stakingSettings),
-        address(stakingRegistry),
         address(erc20ApprovalManager),
         address(erc721ApprovalManager),
         address(erc1155ApprovalManager),

@@ -87,7 +87,6 @@ contract RareERC1155TradeExecutionModule is IRareERC1155TradeExecutionModule, Ra
                         _currencyAddress,
                         payoutContexts[i].grossAmount,
                         payoutContexts[i].marketplaceFee,
-                        payoutContexts[i].seller,
                         payoutContexts[i].splitRecipients,
                         payoutContexts[i].splitRatios
                     );
@@ -178,7 +177,6 @@ contract RareERC1155TradeExecutionModule is IRareERC1155TradeExecutionModule, Ra
                     _currencyAddress,
                     payoutContexts[i].grossAmount,
                     payoutContexts[i].marketplaceFee,
-                    _seller,
                     payoutContexts[i].splitRecipients,
                     payoutContexts[i].splitRatios
                 );
@@ -233,7 +231,7 @@ contract RareERC1155TradeExecutionModule is IRareERC1155TradeExecutionModule, Ra
         RareERC1155MarketplacePayments.checkSplits(_splitRecipients, _splitRatios);
         if (_input.quantity == 0) revert QuantityCannotBeZero();
 
-        (uint256 grossAmount, uint256 marketplaceFee, uint256 stakingFee) = _validateAndApplyOfferFill(_input);
+        (uint256 grossAmount, uint256 marketplaceFee) = _validateAndApplyOfferFill(_input);
 
         MarketplaceStorage storage $ = _marketplaceStorage();
         IERC1155 erc1155 = IERC1155(_input.contractAddress);
@@ -244,14 +242,12 @@ contract RareERC1155TradeExecutionModule is IRareERC1155TradeExecutionModule, Ra
         _safeTransferFrom(_input.contractAddress, msg.sender, _input.buyer, _input.tokenId, _input.quantity);
 
         $.marketConfig
-            .payoutSecondaryWithStakingFee(
+            .payoutSecondary(
                 _input.contractAddress,
                 _input.tokenId,
                 _input.currencyAddress,
                 grossAmount,
                 marketplaceFee,
-                stakingFee,
-                msg.sender,
                 _splitRecipients,
                 _splitRatios
             );
@@ -269,7 +265,7 @@ contract RareERC1155TradeExecutionModule is IRareERC1155TradeExecutionModule, Ra
 
     function _validateAndApplyOfferFill(AcceptOfferInput memory _input)
         internal
-        returns (uint256 grossAmount, uint256 marketplaceFee, uint256 stakingFee)
+        returns (uint256 grossAmount, uint256 marketplaceFee)
     {
         Offer storage offer = _marketplaceStorage()
         .offers[_input.contractAddress][_input.tokenId][_input.buyer][_input.currencyAddress];
@@ -289,7 +285,7 @@ contract RareERC1155TradeExecutionModule is IRareERC1155TradeExecutionModule, Ra
         if (_input.quantity > offer.quantity) revert QuantityExceedsOfferQuantity(_input.quantity, offer.quantity);
 
         grossAmount = _input.price * _input.quantity;
-        (marketplaceFee, stakingFee) = _allocateOfferFees(offer, _input.quantity);
+        marketplaceFee = _allocateOfferFees(offer, _input.quantity);
     }
 
     function _safeTransferFrom(

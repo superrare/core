@@ -10,8 +10,6 @@ import {ERC1967Proxy} from "openzeppelin-contracts/proxy/ERC1967/ERC1967Proxy.so
 
 import {IApprovedTokenRegistry} from "../../registry/interfaces/IApprovedTokenRegistry.sol";
 import {IMarketplaceSettings} from "../../marketplace/IMarketplaceSettings.sol";
-import {IStakingSettings} from "../../marketplace/IStakingSettings.sol";
-import {IRareStakingRegistry} from "../../staking/registry/IRareStakingRegistry.sol";
 import {Payments} from "../../payments/Payments.sol";
 import {RareERC1155} from "../../token/ERC1155/RareERC1155.sol";
 import {RareERC1155ContractFactory} from "../../token/ERC1155/RareERC1155ContractFactory.sol";
@@ -276,10 +274,7 @@ contract RareERC1155MarketplaceSettlementTest is Test {
   address private rewardAccumulator = address(0x6000);
 
   address private marketplaceSettings = address(0x7100);
-  address private stakingSettings = address(0x7200);
-  address private stakingRegistry = address(0x7300);
   address private royaltyEngine = address(0x7400);
-  address private spaceOperatorRegistry = address(0x7500);
   address private approvedTokenRegistry = address(0x7600);
 
   uint256 private tokenId;
@@ -321,10 +316,7 @@ contract RareERC1155MarketplaceSettlementTest is Test {
     tokenId = token.createToken("ipfs://token/1.json", 20, seller);
 
     vm.etch(marketplaceSettings, address(marketplace).code);
-    vm.etch(stakingSettings, address(marketplace).code);
-    vm.etch(stakingRegistry, address(marketplace).code);
     vm.etch(royaltyEngine, address(marketplace).code);
-    vm.etch(spaceOperatorRegistry, address(marketplace).code);
     vm.etch(approvedTokenRegistry, address(marketplace).code);
   }
 
@@ -566,16 +558,6 @@ contract RareERC1155MarketplaceSettlementTest is Test {
       abi.encode(_fee(price))
     );
     vm.mockCall(
-      stakingRegistry,
-      abi.encodeWithSelector(IRareStakingRegistry.getRewardAccumulatorAddressForUser.selector, seller),
-      abi.encode(rewardAccumulator)
-    );
-    vm.mockCall(
-      stakingSettings,
-      abi.encodeWithSelector(IStakingSettings.calculateStakingFee.selector, price),
-      abi.encode(0)
-    );
-    vm.mockCall(
       royaltyEngine,
       abi.encodeWithSelector(IRoyaltyEngineV1.getRoyalty.selector, address(token), tokenId, price),
       abi.encode(new address payable[](0), new uint256[](0))
@@ -630,13 +612,11 @@ contract RareERC1155MarketplaceSettlementTest is Test {
     assertEq(offer.initialQuantity, offerQuantity);
     assertEq(offer.marketplaceFeeRemaining, _fee(price));
     assertEq(offer.marketplaceFeeTotal, _fee(price * offerQuantity));
-    assertEq(offer.stakingFeeRemaining, _stakingFee(price));
-    assertEq(offer.stakingFeeTotal, _stakingFee(price * offerQuantity));
     assertEq(token.balanceOf(buyer, tokenId), 1);
     assertEq(token.balanceOf(seller, tokenId), 1);
   }
 
-  function testAcceptOfferUsesOfferTimeStakingFeeAfterSettingsRotation() public {
+  function testAcceptOfferIgnoresStakingFeeAfterSettingsRotation() public {
     uint256 price = 1 ether;
     uint256 offerQuantity = 2;
 
@@ -658,11 +638,6 @@ contract RareERC1155MarketplaceSettlementTest is Test {
     );
 
     vm.mockCall(
-      stakingSettings,
-      abi.encodeWithSelector(IStakingSettings.calculateStakingFee.selector, price),
-      abi.encode(_fee(price) + 1)
-    );
-    vm.mockCall(
       royaltyEngine,
       abi.encodeWithSelector(IRoyaltyEngineV1.getRoyalty.selector, address(token), tokenId, price),
       abi.encode(new address payable[](0), new uint256[](0))
@@ -683,9 +658,8 @@ contract RareERC1155MarketplaceSettlementTest is Test {
     IRareERC1155MarketplaceTypes.Offer memory offer = marketplace.getOffer(address(token), tokenId, buyer, address(0));
     assertEq(offer.quantity, 1);
     assertEq(offer.marketplaceFeeRemaining, _fee(price));
-    assertEq(offer.stakingFeeRemaining, _stakingFee(price));
-    assertEq(networkBeneficiary.balance, _fee(price) - _stakingFee(price));
-    assertEq(rewardAccumulator.balance, _stakingFee(price));
+    assertEq(networkBeneficiary.balance, _fee(price));
+    assertEq(rewardAccumulator.balance, 0);
     assertEq(token.balanceOf(buyer, tokenId), 1);
     assertEq(token.balanceOf(seller, tokenId), 1);
   }
@@ -740,8 +714,6 @@ contract RareERC1155MarketplaceSettlementTest is Test {
     assertEq(offer.initialQuantity, offerQuantity);
     assertEq(offer.marketplaceFeeRemaining, _fee(price * offerQuantity) - 1);
     assertEq(offer.marketplaceFeeTotal, _fee(price * offerQuantity));
-    assertEq(offer.stakingFeeRemaining, _stakingFee(price * offerQuantity));
-    assertEq(offer.stakingFeeTotal, _stakingFee(price * offerQuantity));
     assertEq(networkBeneficiary.balance, 1);
     assertEq(rewardAccumulator.balance, 0);
 
@@ -793,7 +765,6 @@ contract RareERC1155MarketplaceSettlementTest is Test {
     assertEq(offer.quantity, 2);
     assertEq(offer.initialQuantity, offerQuantity);
     assertEq(offer.marketplaceFeeRemaining, _fee(price * 2));
-    assertEq(offer.stakingFeeRemaining, _stakingFee(price * 2));
     assertEq(address(marketplace).balance, _withFee(price * 2));
     assertEq(token.balanceOf(buyer, tokenId), 1);
     assertEq(token.balanceOf(seller, tokenId), 2);
@@ -815,7 +786,6 @@ contract RareERC1155MarketplaceSettlementTest is Test {
     assertEq(offer.quantity, 0);
     assertEq(offer.initialQuantity, 0);
     assertEq(offer.marketplaceFeeRemaining, 0);
-    assertEq(offer.stakingFeeRemaining, 0);
     assertEq(address(marketplace).balance, 0);
     assertEq(token.balanceOf(buyer, tokenId), offerQuantity);
     assertEq(token.balanceOf(seller, tokenId), 0);
@@ -1603,12 +1573,6 @@ contract RareERC1155MarketplaceSettlementTest is Test {
       abi.encodeWithSelector(IMarketplaceSettings.calculateMarketplaceFee.selector, uint256(0)),
       uint64(0)
     );
-    vm.expectCall(
-      spaceOperatorRegistry,
-      abi.encodeWithSignature("isApprovedSpaceOperator(address)", seller),
-      uint64(0)
-    );
-
     vm.prank(buyer);
     IRareERC1155MarketplaceTypes.CheckoutExecution memory execution = marketplace.checkout{value: 0}(items);
 
@@ -1652,12 +1616,6 @@ contract RareERC1155MarketplaceSettlementTest is Test {
       ),
       uint64(0)
     );
-    vm.expectCall(
-      spaceOperatorRegistry,
-      abi.encodeWithSignature("isApprovedSpaceOperator(address)", seller),
-      uint64(0)
-    );
-
     vm.prank(buyer);
     IRareERC1155MarketplaceTypes.CheckoutExecution memory execution = marketplace.checkout{value: 0}(items);
 
@@ -1718,8 +1676,8 @@ contract RareERC1155MarketplaceSettlementTest is Test {
     assertEq(execution.items[1].totalPaid, _withFee(paidPrice));
     assertEq(buyer.balance, buyerBalanceBefore - _withFee(paidPrice));
     assertEq(seller.balance, sellerBalanceBefore + ((paidPrice * 90) / 100));
-    assertEq(networkBeneficiary.balance, networkBalanceBefore + ((paidPrice * 12) / 100));
-    assertEq(rewardAccumulator.balance, rewardBalanceBefore + _stakingFee(paidPrice));
+    assertEq(networkBeneficiary.balance, networkBalanceBefore + ((paidPrice * 13) / 100));
+    assertEq(rewardAccumulator.balance, rewardBalanceBefore);
     assertEq(token.balanceOf(buyer, tokenId), 1);
     assertEq(token.balanceOf(buyer, paidTokenId), 1);
     assertEq(address(marketplace).balance, 0);
@@ -2433,12 +2391,9 @@ contract RareERC1155MarketplaceSettlementTest is Test {
         RareERC1155Marketplace.initialize.selector,
         networkBeneficiary,
         marketplaceSettings,
-        spaceOperatorRegistry,
         royaltyEngine,
         _payments,
         approvedTokenRegistry,
-        stakingSettings,
-        stakingRegistry,
         address(erc20ApprovalManager),
         address(erc721ApprovalManager),
         address(erc1155ApprovalManager),
@@ -2732,21 +2687,12 @@ contract RareERC1155MarketplaceSettlementTest is Test {
   }
 
   function _mockMarketplaceFee(uint256 _amount, address _seller) private {
+    _seller;
     _mockApprovedCurrency(address(0));
     vm.mockCall(
       marketplaceSettings,
       abi.encodeWithSelector(IMarketplaceSettings.calculateMarketplaceFee.selector, _amount),
       abi.encode(_fee(_amount))
-    );
-    vm.mockCall(
-      stakingRegistry,
-      abi.encodeWithSelector(IRareStakingRegistry.getRewardAccumulatorAddressForUser.selector, _seller),
-      abi.encode(rewardAccumulator)
-    );
-    vm.mockCall(
-      stakingSettings,
-      abi.encodeWithSelector(IStakingSettings.calculateStakingFee.selector, _amount),
-      abi.encode((_amount * 1) / 100)
     );
   }
 
@@ -2756,11 +2702,6 @@ contract RareERC1155MarketplaceSettlementTest is Test {
 
   function _mockPrimaryPayoutFor(address _contractAddress, uint256 _amount, address _seller) private {
     _mockMarketplaceFee(_amount, _seller);
-    vm.mockCall(
-      spaceOperatorRegistry,
-      abi.encodeWithSignature("isApprovedSpaceOperator(address)", _seller),
-      abi.encode(false)
-    );
     vm.mockCall(
       marketplaceSettings,
       abi.encodeWithSignature("getERC721ContractPrimarySaleFeePercentage(address)", _contractAddress),
@@ -2774,9 +2715,5 @@ contract RareERC1155MarketplaceSettlementTest is Test {
 
   function _fee(uint256 _amount) private pure returns (uint256) {
     return (_amount * 3) / 100;
-  }
-
-  function _stakingFee(uint256 _amount) private pure returns (uint256) {
-    return (_amount * 1) / 100;
   }
 }

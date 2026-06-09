@@ -6,13 +6,19 @@ import {OwnableUpgradeable} from "openzeppelin-contracts-upgradeable/access/Owna
 import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import {UUPSUpgradeable} from "openzeppelin-contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
+import {IApprovedTokenRegistry} from "../registry/interfaces/IApprovedTokenRegistry.sol";
+import {IPayments} from "../payments/IPayments.sol";
 import {MarketConfigV2} from "../v2/utils/MarketConfigV2.sol";
+import {IERC20ApprovalManager} from "../v2/approver/ERC20/IERC20ApprovalManager.sol";
+import {IERC721ApprovalManager} from "../v2/approver/ERC721/IERC721ApprovalManager.sol";
 import {IERC1155ApprovalManager} from "../v2/approver/ERC1155/IERC1155ApprovalManager.sol";
+import {IMarketplaceSettings} from "./IMarketplaceSettings.sol";
 import {IRareERC1155CheckoutExecutionModule} from "./IRareERC1155CheckoutExecutionModule.sol";
 import {IRareERC1155Marketplace} from "./IRareERC1155Marketplace.sol";
 import {IRareERC1155TradeExecutionModule} from "./IRareERC1155TradeExecutionModule.sol";
 import {RareERC1155MarketplacePayments} from "./RareERC1155MarketplacePayments.sol";
 import {RareERC1155MarketplaceStorage} from "./RareERC1155MarketplaceStorage.sol";
+import {IRoyaltyEngineV1} from "royalty-registry/IRoyaltyEngineV1.sol";
 
 /// @author SuperRare Labs Inc.
 /// @title RareERC1155Marketplace
@@ -42,12 +48,9 @@ contract RareERC1155Marketplace is
     function initialize(
         address _networkBeneficiary,
         address _marketplaceSettings,
-        address _spaceOperatorRegistry,
         address _royaltyEngine,
         address _payments,
         address _approvedTokenRegistry,
-        address _stakingSettings,
-        address _stakingRegistry,
         address _erc20ApprovalManager,
         address _erc721ApprovalManager,
         address _erc1155ApprovalManager,
@@ -56,12 +59,9 @@ contract RareERC1155Marketplace is
     ) external initializer {
         _validateMarketConfigAddress(_networkBeneficiary, NETWORK_BENEFICIARY_FIELD);
         _validateMarketConfigAddress(_marketplaceSettings, MARKETPLACE_SETTINGS_FIELD);
-        _validateMarketConfigAddress(_spaceOperatorRegistry, SPACE_OPERATOR_REGISTRY_FIELD);
         _validateMarketConfigAddress(_royaltyEngine, ROYALTY_ENGINE_FIELD);
         _validateMarketConfigAddress(_payments, PAYMENTS_FIELD);
         _validateMarketConfigAddress(_approvedTokenRegistry, APPROVED_TOKEN_REGISTRY_FIELD);
-        _validateMarketConfigAddress(_stakingSettings, STAKING_SETTINGS_FIELD);
-        _validateMarketConfigAddress(_stakingRegistry, STAKING_REGISTRY_FIELD);
         _validateApprovalManager(_erc20ApprovalManager);
         _validateApprovalManager(_erc721ApprovalManager);
         _validateApprovalManager(_erc1155ApprovalManager);
@@ -69,18 +69,14 @@ contract RareERC1155Marketplace is
         _validateExecutionModule(_checkoutExecutionModule);
 
         MarketplaceStorage storage $ = _marketplaceStorage();
-        $.marketConfig = MarketConfigV2.generateMarketConfig(
-            _networkBeneficiary,
-            _marketplaceSettings,
-            _spaceOperatorRegistry,
-            _royaltyEngine,
-            _payments,
-            _approvedTokenRegistry,
-            _stakingSettings,
-            _stakingRegistry,
-            _erc20ApprovalManager,
-            _erc721ApprovalManager
-        );
+        MarketConfigV2.Config storage config = $.marketConfig;
+        config.networkBeneficiary = _networkBeneficiary;
+        config.marketplaceSettings = IMarketplaceSettings(_marketplaceSettings);
+        config.royaltyEngine = IRoyaltyEngineV1(_royaltyEngine);
+        config.payments = IPayments(_payments);
+        config.approvedTokenRegistry = IApprovedTokenRegistry(_approvedTokenRegistry);
+        config.erc20ApprovalManager = IERC20ApprovalManager(_erc20ApprovalManager);
+        config.erc721ApprovalManager = IERC721ApprovalManager(_erc721ApprovalManager);
         $.erc1155ApprovalManager = IERC1155ApprovalManager(_erc1155ApprovalManager);
         $.tradeExecutionModule = _tradeExecutionModule;
         $.checkoutExecutionModule = _checkoutExecutionModule;
@@ -109,11 +105,12 @@ contract RareERC1155Marketplace is
         _marketplaceStorage().marketConfig.checkIfCurrencyIsApproved(_currencyAddress);
         RareERC1155MarketplacePayments.checkSplits(_splitRecipients, _splitRatios);
 
+        MarketplaceStorage storage $ = _marketplaceStorage();
         for (uint256 i = 0; i < _requests.length; i++) {
             uint256 tokenId = _requests[i].tokenId;
             _revertIfTokenNotFound(_contractAddress, tokenId);
 
-            _marketplaceStorage().directSaleConfigs[_contractAddress][tokenId] = DirectSaleConfig({
+            $.directSaleConfigs[_contractAddress][tokenId] = DirectSaleConfig({
                 seller: msg.sender,
                 currencyAddress: _currencyAddress,
                 price: _requests[i].price,
@@ -165,6 +162,7 @@ contract RareERC1155Marketplace is
         }
         _validateAllowListConfigRequests(_requests);
 
+        MarketplaceStorage storage $ = _marketplaceStorage();
         for (uint256 i = 0; i < _requests.length; i++) {
             uint256 tokenId = _requests[i].tokenId;
             bytes32 root = _requests[i].root;
@@ -175,8 +173,7 @@ contract RareERC1155Marketplace is
                 revert AllowListEndTimestampInvalid(endTimestamp, block.timestamp);
             }
 
-            _marketplaceStorage().tokenAllowlistRoots[_contractAddress][tokenId] =
-                AllowListConfig({root: root, endTimestamp: endTimestamp});
+            $.tokenAllowlistRoots[_contractAddress][tokenId] = AllowListConfig({root: root, endTimestamp: endTimestamp});
             emit SetTokenAllowListConfig(_contractAddress, tokenId, root, endTimestamp);
         }
     }
@@ -191,10 +188,11 @@ contract RareERC1155Marketplace is
         }
         _validateTokenLimitRequests(_requests);
 
+        MarketplaceStorage storage $ = _marketplaceStorage();
         for (uint256 i = 0; i < _requests.length; i++) {
             uint256 tokenId = _requests[i].tokenId;
             _revertIfTokenNotFound(_contractAddress, tokenId);
-            _marketplaceStorage().tokenMintLimit[_contractAddress][tokenId] = _requests[i].limit;
+            $.tokenMintLimit[_contractAddress][tokenId] = _requests[i].limit;
             emit TokenMintLimitSet(_contractAddress, tokenId, _requests[i].limit);
         }
     }
@@ -209,10 +207,11 @@ contract RareERC1155Marketplace is
         }
         _validateTokenLimitRequests(_requests);
 
+        MarketplaceStorage storage $ = _marketplaceStorage();
         for (uint256 i = 0; i < _requests.length; i++) {
             uint256 tokenId = _requests[i].tokenId;
             _revertIfTokenNotFound(_contractAddress, tokenId);
-            _marketplaceStorage().tokenTxLimit[_contractAddress][tokenId] = _requests[i].limit;
+            $.tokenTxLimit[_contractAddress][tokenId] = _requests[i].limit;
             emit TokenTxLimitSet(_contractAddress, tokenId, _requests[i].limit);
         }
     }
@@ -277,13 +276,14 @@ contract RareERC1155Marketplace is
     function cancelSalePrices(address _contractAddress, uint256[] calldata _tokenIds) external nonReentrant {
         _validateTokenIds(_tokenIds);
 
+        MarketplaceStorage storage $ = _marketplaceStorage();
         for (uint256 i = 0; i < _tokenIds.length; i++) {
             uint256 tokenId = _tokenIds[i];
-            if (_marketplaceStorage().salePrices[_contractAddress][tokenId][msg.sender].quantity == 0) {
+            if ($.salePrices[_contractAddress][tokenId][msg.sender].quantity == 0) {
                 continue;
             }
 
-            delete _marketplaceStorage().salePrices[_contractAddress][tokenId][msg.sender];
+            delete $.salePrices[_contractAddress][tokenId][msg.sender];
             emit SalePriceCancelled(msg.sender, _contractAddress, tokenId);
         }
     }
@@ -307,10 +307,6 @@ contract RareERC1155Marketplace is
 
         uint256 grossAmount = _price * _quantity;
         uint256 marketplaceFee = $.marketConfig.marketplaceSettings.calculateMarketplaceFee(grossAmount);
-        uint256 stakingFee = $.marketConfig.stakingSettings.calculateStakingFee(grossAmount);
-        if (stakingFee > marketplaceFee) {
-            revert StakingFeeExceedsMarketplaceFee(marketplaceFee, stakingFee);
-        }
         $.marketConfig.checkAmountAndTransfer(_currencyAddress, grossAmount + marketplaceFee);
 
         Offer memory previousOffer = $.offers[_contractAddress][_tokenId][msg.sender][_currencyAddress];
@@ -321,8 +317,6 @@ contract RareERC1155Marketplace is
             initialQuantity: _quantity,
             marketplaceFeeRemaining: marketplaceFee,
             marketplaceFeeTotal: marketplaceFee,
-            stakingFeeRemaining: stakingFee,
-            stakingFeeTotal: stakingFee,
             expirationTime: _expirationTime
         });
 
@@ -528,12 +522,6 @@ contract RareERC1155Marketplace is
         emit MarketplaceDependencyUpdated(MARKETPLACE_SETTINGS_FIELD, _marketplaceSettings);
     }
 
-    function setSpaceOperatorRegistry(address _spaceOperatorRegistry) external onlyOwner {
-        _validateMarketConfigAddress(_spaceOperatorRegistry, SPACE_OPERATOR_REGISTRY_FIELD);
-        _marketplaceStorage().marketConfig.updateSpaceOperatorRegistry(_spaceOperatorRegistry);
-        emit MarketplaceDependencyUpdated(SPACE_OPERATOR_REGISTRY_FIELD, _spaceOperatorRegistry);
-    }
-
     function setRoyaltyEngine(address _royaltyEngine) external onlyOwner {
         _validateMarketConfigAddress(_royaltyEngine, ROYALTY_ENGINE_FIELD);
         _marketplaceStorage().marketConfig.updateRoyaltyEngine(_royaltyEngine);
@@ -550,18 +538,6 @@ contract RareERC1155Marketplace is
         _validateMarketConfigAddress(_approvedTokenRegistry, APPROVED_TOKEN_REGISTRY_FIELD);
         _marketplaceStorage().marketConfig.updateApprovedTokenRegistry(_approvedTokenRegistry);
         emit MarketplaceDependencyUpdated(APPROVED_TOKEN_REGISTRY_FIELD, _approvedTokenRegistry);
-    }
-
-    function setStakingSettings(address _stakingSettings) external onlyOwner {
-        _validateMarketConfigAddress(_stakingSettings, STAKING_SETTINGS_FIELD);
-        _marketplaceStorage().marketConfig.updateStakingSettings(_stakingSettings);
-        emit MarketplaceDependencyUpdated(STAKING_SETTINGS_FIELD, _stakingSettings);
-    }
-
-    function setStakingRegistry(address _stakingRegistry) external onlyOwner {
-        _validateMarketConfigAddress(_stakingRegistry, STAKING_REGISTRY_FIELD);
-        _marketplaceStorage().marketConfig.updateStakingRegistry(_stakingRegistry);
-        emit MarketplaceDependencyUpdated(STAKING_REGISTRY_FIELD, _stakingRegistry);
     }
 
     function setERC20ApprovalManager(address _erc20ApprovalManager) external onlyOwner {

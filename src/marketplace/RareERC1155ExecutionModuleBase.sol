@@ -339,24 +339,18 @@ abstract contract RareERC1155ExecutionModuleBase is RareERC1155MarketplaceStorag
         );
     }
 
-    function _allocateOfferFees(Offer storage _offer, uint256 _quantity)
-        internal
-        returns (uint256 marketplaceFee, uint256 stakingFee)
-    {
+    function _allocateOfferFees(Offer storage _offer, uint256 _quantity) internal returns (uint256 marketplaceFee) {
         uint256 remainingQuantity = _offer.quantity;
         if (_quantity == remainingQuantity) {
             marketplaceFee = _offer.marketplaceFeeRemaining;
-            stakingFee = _offer.stakingFeeRemaining;
             delete _offer.currencyAddress;
             delete _offer.price;
             delete _offer.quantity;
             delete _offer.initialQuantity;
             delete _offer.marketplaceFeeRemaining;
             delete _offer.marketplaceFeeTotal;
-            delete _offer.stakingFeeRemaining;
-            delete _offer.stakingFeeTotal;
             delete _offer.expirationTime;
-            return (marketplaceFee, stakingFee);
+            return marketplaceFee;
         }
 
         uint256 marketplaceFeeTotal = _offer.marketplaceFeeTotal;
@@ -367,15 +361,8 @@ abstract contract RareERC1155ExecutionModuleBase is RareERC1155MarketplaceStorag
         uint256 marketplaceFeeDueAfter = Math.mulDiv(marketplaceFeeTotal, filledQuantityAfter, initialQuantity);
 
         marketplaceFee = marketplaceFeeDueAfter - marketplaceFeePaidBefore;
-        uint256 stakingFeeTotal = _offer.stakingFeeTotal;
-        if (stakingFeeTotal != 0) {
-            uint256 stakingFeePaidBefore = stakingFeeTotal - _offer.stakingFeeRemaining;
-            uint256 stakingFeeDueAfter = Math.mulDiv(stakingFeeTotal, marketplaceFeeDueAfter, marketplaceFeeTotal);
-            stakingFee = stakingFeeDueAfter - stakingFeePaidBefore;
-        }
 
         _offer.quantity = remainingQuantity - _quantity;
         _offer.marketplaceFeeRemaining -= marketplaceFee;
-        _offer.stakingFeeRemaining -= stakingFee;
     }
 }

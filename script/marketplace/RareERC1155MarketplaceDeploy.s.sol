@@ -28,12 +28,9 @@ contract RareERC1155MarketplaceDeploy is RareERC1155ExecutionModuleScriptGuard {
 
         address networkBeneficiary = _required(config.networkBeneficiary, "networkBeneficiary");
         address marketplaceSettings = _required(config.marketplaceSettingsV3, "marketplaceSettingsV3");
-        address spaceOperatorRegistry = _required(config.spaceOperatorRegistry, "spaceOperatorRegistry");
         address royaltyEngine = _required(config.royaltyEngineManifold, "royaltyEngineManifold");
         address payments = _required(config.payments, "payments");
         address approvedTokenRegistry = _required(config.approvedTokenRegistry, "approvedTokenRegistry");
-        address stakingSettings = marketplaceSettings;
-        address stakingRegistry = _required(config.stakingRegistry, "stakingRegistry");
         address erc20ApprovalManager = _required(config.erc20ApprovalManager, "erc20ApprovalManager");
         address erc721ApprovalManager = _required(config.erc721ApprovalManager, "erc721ApprovalManager");
         address erc1155ApprovalManager = _required(config.erc1155ApprovalManager, "erc1155ApprovalManager");
@@ -48,12 +45,9 @@ contract RareERC1155MarketplaceDeploy is RareERC1155ExecutionModuleScriptGuard {
             RareERC1155Marketplace.initialize.selector,
             networkBeneficiary,
             marketplaceSettings,
-            spaceOperatorRegistry,
             royaltyEngine,
             payments,
             approvedTokenRegistry,
-            stakingSettings,
-            stakingRegistry,
             erc20ApprovalManager,
             erc721ApprovalManager,
             erc1155ApprovalManager,
@@ -70,12 +64,9 @@ contract RareERC1155MarketplaceDeploy is RareERC1155ExecutionModuleScriptGuard {
         console.log("Chain ID:", block.chainid);
         console.log("Network beneficiary:", networkBeneficiary);
         console.log("Marketplace settings:", marketplaceSettings);
-        console.log("Space operator registry:", spaceOperatorRegistry);
         console.log("Royalty engine:", royaltyEngine);
         console.log("Payments:", payments);
         console.log("Approved token registry:", approvedTokenRegistry);
-        console.log("Staking settings:", stakingSettings);
-        console.log("Staking registry:", stakingRegistry);
         console.log("ERC20ApprovalManager:", erc20ApprovalManager);
         console.log("ERC721ApprovalManager:", erc721ApprovalManager);
         console.log("ERC1155ApprovalManager:", erc1155ApprovalManager);

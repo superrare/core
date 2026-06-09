@@ -43,8 +43,6 @@ interface IRareERC1155MarketplaceTypes {
         uint256 initialQuantity;
         uint256 marketplaceFeeRemaining;
         uint256 marketplaceFeeTotal;
-        uint256 stakingFeeRemaining;
-        uint256 stakingFeeTotal;
         uint256 expirationTime;
     }
 
@@ -332,7 +330,6 @@ interface IRareERC1155MarketplaceTypes {
     error MsgValueMustBeZero();
     error RoyaltiesExceedSaleAmount(uint256 _royalties, uint256 _saleAmount);
     error RoyaltyRecipientCannotBeZero(uint256 _index);
-    error StakingFeeExceedsMarketplaceFee(uint256 _marketplaceFee, uint256 _stakingFee);
     error PlatformCommissionExceeded(uint256 _platformCommission, uint256 _maxPlatformCommission);
     error SplitRecipientsRequired();
     error SplitRecipientsExceededMax(uint256 _recipientsLength, uint256 _maxRecipients);
