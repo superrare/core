@@ -352,6 +352,17 @@ library NetworkConfig {
     config.payments = _addr(0xCe898D2308cEB524299C4657e63CBB720d07Ff7C);
     config.rareGovToken = _addr(0x8b21bC8571d11F7AdB705ad8F6f6BD1deb79cE01);
     config.approvedTokenRegistry = _addr(0x0eF69420ff32aB9c6D948eAc2fa88f3E67D0D239);
+    config.erc20ApprovalManager = _addr(0x1104B5dA0fc1C08011a90557CA9b495c29D9BBaa);
+    config.erc721ApprovalManager = _addr(0xaDf5459B9B6B3021aef027EC23E68C4011303F5B);
+    config.erc1155ApprovalManager = _addr(0xDCEA787A109b2627a895EEb49FCe2D1dA63aA8E4);
+    config.rareErc1155TradeExecutionModule = _addr(0xae2a455f05D83D0B8e51a22E2b5452BE39219398);
+    config.rareErc1155CheckoutExecutionModule = _addr(0xf1361B8fe3b721A821292BdD4a43f3cc949DdF28);
+    config.rareErc1155MarketplaceImplementation = _addr(0x90406F0c92256055EeACBDFEaa39d348b0DB8BF5);
+    config.rareErc1155MarketplaceProxy = _addr(0xc0D9CB069d7CfFb963A1527968bF28370A978BB6);
+    config.rareErc1155ContractFactory = _addr(0x293AE7701A7830B1d38A7608EdF86A106d9E2645);
+    config.rareErc1155Implementation = _addr(0x9DF98290b6ad210CFE31e1b349E9807D7F016FDe);
+    config.rareErc1155ContractFactoryOwner = _addr(0x3B9C3C5EA16E7d3c9C0bb293a549aFa4066dc162);
+    config.rareErc1155ContractFactoryDefaultMinter = _addr(0xc0D9CB069d7CfFb963A1527968bF28370A978BB6);
     config.baseL2BridgeProxy = _addr(0xca491bb62A7730E97F500510132C47633DDD0229);
     config.baseL2BridgeImplementation = _addr(0x38302C717F793dD7EA5C0a2F215494409EaD3ce0);
     config.rareGovTokenL2Proxy = _addr(0x8b21bC8571d11F7AdB705ad8F6f6BD1deb79cE01);
@@ -397,8 +408,6 @@ library NetworkConfig {
     config.season1Claim = address(0);
     config.season3Claim = address(0);
     config.marketUtilsV2 = address(0);
-    config.erc20ApprovalManager = address(0);
-    config.erc721ApprovalManager = address(0);
     config.rareBatchAuctionHouseProxy = address(0);
     config.rareBatchAuctionHouseLogic = address(0);
     config.rareBatchListingMarketplaceImplementation = address(0);
