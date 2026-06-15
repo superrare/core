@@ -154,7 +154,7 @@ library NetworkConfig {
     config.season1Claim = _addr(0x65B852E084d4b7B3a3ab202541aF3bc5E7b2af03);
     config.erc20ApprovalManager = _addr(0xa837a7eAff154Ab837617Cf7250648D3Ec0A4436);
     config.erc721ApprovalManager = _addr(0x4bb0Deea6d1A30C601338aAB776d394C2AE5c0F8);
-    config.erc1155ApprovalManager = address(0);
+    config.erc1155ApprovalManager = _addr(0x6c88e19dB0d11939e283F3f876C6Dc3Cadf16a2F);
     config.approvalManagerAdmin = _addr(0xdc005449848f65639D101A7D2B141c527E53f9d4);
     config.rareBatchAuctionHouseProxy = _addr(0xdfce0a0569492c59f27B3715b81F1Bd25DdEbcE3);
     config.rareBatchAuctionHouseLogic = _addr(0xED45D28be67A99Fa83194Ed9568712775688b18C);
@@ -291,6 +291,26 @@ library NetworkConfig {
     config.liquidRegistry = _addr(0x539e8261e18C56D801c7549fb29d06c779ef5004);
     config.rareBurner = _addr(0x8B333c7cE380A7efE110Ea444e81609DBA4b75e5);
     config.networkBeneficiary = _addr(0xD2437c0511906085CbDD06C27e8915d715dC3290);
+    config.rareMinterLogic = _addr(0x665cE5F87937cBA46AA8C56645D4aBe2B9E93eee);
+    config.rareMinter = _addr(0xFb2bd8A5543c73D38BabA504520A48ff7ed6CF57);
+    config.batchOfferCreatorImplementation = _addr(0x8353B38729A399d6A6d0f7db89cC5DB958A99328);
+    config.batchOfferCreatorProxy = _addr(0xe52976E85393C344F01A3dDFbFDc2F68854427Cc);
+    config.erc20ApprovalManager = _addr(0x325B4CF6c521b3F67559731AEB63C71211bc724d);
+    config.erc721ApprovalManager = _addr(0xDd867a8Eb1720185B3fdAD7F81Caed4E8132Be19);
+    config.erc1155ApprovalManager = _addr(0xE56Fc28cd3F748Ee7b427C55b68820bd688B0F68);
+    config.rareErc1155TradeExecutionModule = _addr(0xfAb892fE62387C38D16e64De4F7FeD9303e85776);
+    config.rareErc1155CheckoutExecutionModule = _addr(0x9e9D06102A580420273b8362e255b11EA092aE88);
+    config.rareErc1155MarketplaceImplementation = _addr(0x8AAfE84B10fC960669708CEF98f675FEF24c529e);
+    config.rareErc1155MarketplaceProxy = _addr(0xc0554C5e9483606A6A0Eff61CD9D4b3d413bAB7B);
+    config.rareErc1155ContractFactory = _addr(0xCE472E1f8A519f92c1c0A32974309b82aE13c83C);
+    config.rareErc1155Implementation = _addr(0xa786FEC30F5768aFB17418B3A30ADed808FAd680);
+    config.rareErc1155ContractFactoryOwner = _addr(0x0bbF6fbB27645d6E587F63a260917EcD9B19b22F);
+    config.rareErc1155ContractFactoryDefaultMinter = _addr(0xc0554C5e9483606A6A0Eff61CD9D4b3d413bAB7B);
+    config.rareBatchAuctionHouseProxy = _addr(0xc033BBef0Af25Db7523FCe16BaB1C39df0bF2Ae3);
+    config.rareBatchAuctionHouseLogic = _addr(0xF1B3994869ae236Fe1D6dC48cBb1C8b7FB749C7B);
+    config.rareBatchListingMarketplaceImplementation = _addr(0xE34014A17D2943bd67c94294aED8c8859D4468Cb);
+    config.rareBatchListingMarketplaceProxy = _addr(0x36A66dF396877f6771D9f9981AD70B712ee523CF);
+    config.lazySovereignBatchMintFactory = _addr(0x787A1705E2c4B07A716299F8F1fAa8CaC48305cd);
 
     // Missing from directory.
     config.superRareV1 = address(0);
@@ -316,25 +336,14 @@ library NetworkConfig {
     config.rewardAccumulatorFactory = address(0);
     config.rarityPoolFactory = address(0);
     config.lazySovereignFactory = address(0);
-    config.rareMinterLogic = address(0);
-    config.rareMinter = address(0);
     config.baseL1BridgeProxy = address(0);
     config.baseL1BridgeImplementation = address(0);
     config.ccipReceiverL2 = address(0);
-    config.batchOfferCreatorImplementation = address(0);
-    config.batchOfferCreatorProxy = address(0);
     config.season1Claim = address(0);
     config.marketUtilsV2 = address(0);
-    config.erc20ApprovalManager = address(0);
-    config.erc721ApprovalManager = address(0);
-    config.rareBatchAuctionHouseProxy = address(0);
-    config.rareBatchAuctionHouseLogic = address(0);
-    config.rareBatchListingMarketplaceImplementation = address(0);
-    config.rareBatchListingMarketplaceProxy = address(0);
     config.rareStakingV1 = address(0);
     config.rareStakingV1Implementation = address(0);
     config.batchAuctionHouse = address(0);
-    config.lazySovereignBatchMintFactory = address(0);
     config.superRareBazaarErc20BuyProxy = address(0);
   }
 
@@ -377,6 +386,15 @@ library NetworkConfig {
     config.liquidRegistry = _addr(0x5AB6B3f7eBEFDA67cfc4D135718F9E34d58856b9);
     config.rareBurner = _addr(0x9156b06d9849429d5C6D32c815b56004d582e5C8);
     config.networkBeneficiary = _addr(0x3B9C3C5EA16E7d3c9C0bb293a549aFa4066dc162);
+    config.rareMinterLogic = _addr(0xaF0Ec0205d0d02F40080661ed4df1cbad3e2c897);
+    config.rareMinter = _addr(0xcB8BC09dc91fe8E8F43211537a709Fc6053837F8);
+    config.batchOfferCreatorImplementation = _addr(0xB9d37C78a621df1BE83D15EfbF8f1f86681F7F0e);
+    config.batchOfferCreatorProxy = _addr(0x20d2FA511Fb1248a535600538816aC60477D3D09);
+    config.rareBatchAuctionHouseProxy = _addr(0x2982275aCd95B97cCe02fdd8552E31D0a916C03c);
+    config.rareBatchAuctionHouseLogic = _addr(0x8DdE325d11f538c88Bfe98B0E3c276375eAFFa9F);
+    config.rareBatchListingMarketplaceImplementation = _addr(0x2226Ba2Cc9AA1a9d0A3cE625c317c63fB714A509);
+    config.rareBatchListingMarketplaceProxy = _addr(0xAF5686eAdc6A575a0e9f455978ad712201744B3F);
+    config.lazySovereignBatchMintFactory = _addr(0xAF2302b45DdFF8243C62149217Eb529850A61A89);
 
     // Missing from directory.
     config.superRareV1 = address(0);
@@ -399,22 +417,13 @@ library NetworkConfig {
     config.rewardAccumulatorFactory = address(0);
     config.rarityPoolFactory = address(0);
     config.lazySovereignFactory = address(0);
-    config.rareMinterLogic = address(0);
-    config.rareMinter = address(0);
     config.baseL1BridgeProxy = address(0);
     config.baseL1BridgeImplementation = address(0);
-    config.batchOfferCreatorImplementation = address(0);
-    config.batchOfferCreatorProxy = address(0);
     config.season1Claim = address(0);
     config.season3Claim = address(0);
     config.marketUtilsV2 = address(0);
-    config.rareBatchAuctionHouseProxy = address(0);
-    config.rareBatchAuctionHouseLogic = address(0);
-    config.rareBatchListingMarketplaceImplementation = address(0);
-    config.rareBatchListingMarketplaceProxy = address(0);
     config.rareStakingV1Implementation = address(0);
     config.batchAuctionHouse = address(0);
-    config.lazySovereignBatchMintFactory = address(0);
     config.superRareBazaarErc20BuyProxy = address(0);
   }
 
