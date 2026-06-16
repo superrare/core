@@ -84,10 +84,14 @@ abstract contract RareERC1155MarketplaceStorage is IRareERC1155MarketplaceTypes 
         if (_module == address(0) || _module.code.length == 0) revert InvalidExecutionModule();
     }
 
+    function _validateRecipient(address _recipient) internal pure {
+        if (_recipient == address(0)) revert RecipientCannotBeZero();
+    }
+
     function _validateERC1155Contract(address _contractAddress) internal view {
         if (
-            _contractAddress.code.length == 0
-                || !ERC165Checker.supportsInterface(_contractAddress, type(IERC1155).interfaceId)
+            _contractAddress.code.length == 0 ||
+            !ERC165Checker.supportsInterface(_contractAddress, type(IERC1155).interfaceId)
         ) {
             revert InvalidERC1155Contract(_contractAddress);
         }

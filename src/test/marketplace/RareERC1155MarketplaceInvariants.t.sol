@@ -285,6 +285,7 @@ contract RareERC1155MarketplaceHandler is Test {
           address(token),
           key.seller,
           salePrice.currencyAddress,
+          buyer,
           _singleBuyRequest(key.tokenId, salePrice.price, quantity)
         )
       {
@@ -296,6 +297,7 @@ contract RareERC1155MarketplaceHandler is Test {
           address(token),
           key.seller,
           salePrice.currencyAddress,
+          buyer,
           _singleBuyRequest(key.tokenId, salePrice.price, quantity)
         )
       {
@@ -374,7 +376,7 @@ contract RareERC1155MarketplaceHandler is Test {
     ethValue += 1 wei;
 
     vm.prank(buyer);
-    try marketplace.checkout{value: ethValue}(items) returns (
+    try marketplace.checkout{value: ethValue}(buyer, items) returns (
       IRareERC1155MarketplaceTypes.CheckoutExecution memory execution
     ) {
       _recordCheckoutFills(execution, buyer);

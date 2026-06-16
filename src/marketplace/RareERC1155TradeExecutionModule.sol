@@ -26,11 +26,13 @@ contract RareERC1155TradeExecutionModule is IRareERC1155TradeExecutionModule, Ra
         uint256 quantity;
     }
 
-    function mintDirectSaleBatch(address _contractAddress, address _currencyAddress, MintRequest[] calldata _requests)
-        external
-        payable
-        onlyDelegateCall
-    {
+    function mintDirectSaleBatch(
+        address _contractAddress,
+        address _currencyAddress,
+        address _recipient,
+        MintRequest[] calldata _requests
+    ) external payable onlyDelegateCall {
+        _validateRecipient(_recipient);
         _validateMintRequests(_requests);
         MarketplaceStorage storage $ = _marketplaceStorage();
         $.marketConfig.checkIfCurrencyIsApproved(_currencyAddress);
@@ -42,12 +44,12 @@ contract RareERC1155TradeExecutionModule is IRareERC1155TradeExecutionModule, Ra
         PrimaryPayoutContext[] memory payoutContexts = new PrimaryPayoutContext[](requestCount);
         uint256 buyerTotal = 0;
 
-        for (uint256 i = 0; i < requestCount;) {
-            payoutContexts[i] =
-                _validateMintDirectSaleRequest(_contractAddress, _currencyAddress, msg.sender, _requests[i]);
+        for (uint256 i = 0; i < requestCount; ) {
+            payoutContexts[i] = _validateMintDirectSaleRequest(_contractAddress, _currencyAddress, _recipient, _requests[i]);
             if (payoutContexts[i].grossAmount != 0) {
-                payoutContexts[i].marketplaceFee =
-                    $.marketConfig.marketplaceSettings.calculateMarketplaceFee(payoutContexts[i].grossAmount);
+                payoutContexts[i].marketplaceFee = $.marketConfig.marketplaceSettings.calculateMarketplaceFee(
+                    payoutContexts[i].grossAmount
+                );
                 buyerTotal += payoutContexts[i].grossAmount + payoutContexts[i].marketplaceFee;
             }
 
@@ -61,15 +63,15 @@ contract RareERC1155TradeExecutionModule is IRareERC1155TradeExecutionModule, Ra
 
         $.marketConfig.checkBatchPayment(_currencyAddress, buyerTotal);
 
-        for (uint256 i = 0; i < requestCount;) {
+        for (uint256 i = 0; i < requestCount; ) {
             uint256 tokenId = _requests[i].tokenId;
 
             if ($.tokenMintLimit[_contractAddress][tokenId] > 0) {
-                $.tokenMintsPerAddress[_contractAddress][tokenId][msg.sender] += _requests[i].quantity;
+                $.tokenMintsPerAddress[_contractAddress][tokenId][_recipient] += _requests[i].quantity;
             }
 
             if ($.tokenTxLimit[_contractAddress][tokenId] > 0) {
-                $.tokenTxsPerAddress[_contractAddress][tokenId][msg.sender] += 1;
+                $.tokenTxsPerAddress[_contractAddress][tokenId][_recipient] += 1;
             }
 
             unchecked {
@@ -77,25 +79,25 @@ contract RareERC1155TradeExecutionModule is IRareERC1155TradeExecutionModule, Ra
             }
         }
 
-        _mintBatchToWithBalanceCheck(_contractAddress, msg.sender, tokenIds, amounts);
+        _mintBatchToWithBalanceCheck(_contractAddress, _recipient, tokenIds, amounts);
 
-        for (uint256 i = 0; i < requestCount;) {
+        for (uint256 i = 0; i < requestCount; ) {
             if (payoutContexts[i].grossAmount != 0) {
-                $.marketConfig
-                    .payoutPrimary(
-                        _contractAddress,
-                        _currencyAddress,
-                        payoutContexts[i].grossAmount,
-                        payoutContexts[i].marketplaceFee,
-                        payoutContexts[i].splitRecipients,
-                        payoutContexts[i].splitRatios
-                    );
+                $.marketConfig.payoutPrimary(
+                    _contractAddress,
+                    _currencyAddress,
+                    payoutContexts[i].grossAmount,
+                    payoutContexts[i].marketplaceFee,
+                    payoutContexts[i].splitRecipients,
+                    payoutContexts[i].splitRatios
+                );
             }
 
             emit MintDirectSale(
                 _contractAddress,
                 payoutContexts[i].tokenId,
                 msg.sender,
+                _recipient,
                 payoutContexts[i].seller,
                 _requests[i].quantity,
                 _currencyAddress,
@@ -112,10 +114,12 @@ contract RareERC1155TradeExecutionModule is IRareERC1155TradeExecutionModule, Ra
         address _contractAddress,
         address _seller,
         address _currencyAddress,
+        address _recipient,
         BuyRequest[] calldata _requests
     ) external payable onlyDelegateCall {
+        _validateRecipient(_recipient);
         _validateBuyRequests(_requests);
-        if (msg.sender == _seller) revert SelfPurchaseUnsupported(_seller);
+        if (msg.sender == _seller || _recipient == _seller) revert SelfPurchaseUnsupported(_seller);
 
         MarketplaceStorage storage $ = _marketplaceStorage();
         $.marketConfig.checkIfCurrencyIsApproved(_currencyAddress);
@@ -132,9 +136,8 @@ contract RareERC1155TradeExecutionModule is IRareERC1155TradeExecutionModule, Ra
         SecondaryPayoutContext[] memory payoutContexts = new SecondaryPayoutContext[](requestCount);
         uint256 buyerTotal = 0;
 
-        for (uint256 i = 0; i < requestCount;) {
-            payoutContexts[i] =
-                _validateSecondaryBuyRequest($, _contractAddress, _seller, _currencyAddress, _requests[i]);
+        for (uint256 i = 0; i < requestCount; ) {
+            payoutContexts[i] = _validateSecondaryBuyRequest($, _contractAddress, _seller, _currencyAddress, _requests[i]);
 
             tokenIds[i] = _requests[i].tokenId;
             amounts[i] = _requests[i].quantity;
@@ -144,8 +147,9 @@ contract RareERC1155TradeExecutionModule is IRareERC1155TradeExecutionModule, Ra
                 revert InsufficientTokenBalance(_seller, _contractAddress, tokenIds[i], amounts[i], sellerBalance);
             }
 
-            payoutContexts[i].marketplaceFee =
-                $.marketConfig.marketplaceSettings.calculateMarketplaceFee(payoutContexts[i].grossAmount);
+            payoutContexts[i].marketplaceFee = $.marketConfig.marketplaceSettings.calculateMarketplaceFee(
+                payoutContexts[i].grossAmount
+            );
             buyerTotal += payoutContexts[i].grossAmount + payoutContexts[i].marketplaceFee;
 
             unchecked {
@@ -155,7 +159,7 @@ contract RareERC1155TradeExecutionModule is IRareERC1155TradeExecutionModule, Ra
 
         $.marketConfig.checkBatchPayment(_currencyAddress, buyerTotal);
 
-        for (uint256 i = 0; i < requestCount;) {
+        for (uint256 i = 0; i < requestCount; ) {
             SalePrice storage salePrice = $.salePrices[_contractAddress][_requests[i].tokenId][_seller];
             salePrice.quantity -= _requests[i].quantity;
             if (salePrice.quantity == 0) {
@@ -167,24 +171,24 @@ contract RareERC1155TradeExecutionModule is IRareERC1155TradeExecutionModule, Ra
             }
         }
 
-        _safeBatchTransferFrom(_contractAddress, _seller, msg.sender, tokenIds, amounts);
+        _safeBatchTransferFrom(_contractAddress, _seller, _recipient, tokenIds, amounts);
 
-        for (uint256 i = 0; i < requestCount;) {
-            $.marketConfig
-                .payoutSecondary(
-                    _contractAddress,
-                    payoutContexts[i].tokenId,
-                    _currencyAddress,
-                    payoutContexts[i].grossAmount,
-                    payoutContexts[i].marketplaceFee,
-                    payoutContexts[i].splitRecipients,
-                    payoutContexts[i].splitRatios
-                );
+        for (uint256 i = 0; i < requestCount; ) {
+            $.marketConfig.payoutSecondary(
+                _contractAddress,
+                payoutContexts[i].tokenId,
+                _currencyAddress,
+                payoutContexts[i].grossAmount,
+                payoutContexts[i].marketplaceFee,
+                payoutContexts[i].splitRecipients,
+                payoutContexts[i].splitRatios
+            );
 
             emit Sold(
                 _seller,
                 msg.sender,
                 _contractAddress,
+                _recipient,
                 payoutContexts[i].tokenId,
                 _currencyAddress,
                 _requests[i].price,
@@ -241,16 +245,15 @@ contract RareERC1155TradeExecutionModule is IRareERC1155TradeExecutionModule, Ra
 
         _safeTransferFrom(_input.contractAddress, msg.sender, _input.buyer, _input.tokenId, _input.quantity);
 
-        $.marketConfig
-            .payoutSecondary(
-                _input.contractAddress,
-                _input.tokenId,
-                _input.currencyAddress,
-                grossAmount,
-                marketplaceFee,
-                _splitRecipients,
-                _splitRatios
-            );
+        $.marketConfig.payoutSecondary(
+            _input.contractAddress,
+            _input.tokenId,
+            _input.currencyAddress,
+            grossAmount,
+            marketplaceFee,
+            _splitRecipients,
+            _splitRatios
+        );
 
         emit OfferAccepted(
             msg.sender,
@@ -263,19 +266,23 @@ contract RareERC1155TradeExecutionModule is IRareERC1155TradeExecutionModule, Ra
         );
     }
 
-    function _validateAndApplyOfferFill(AcceptOfferInput memory _input)
-        internal
-        returns (uint256 grossAmount, uint256 marketplaceFee)
-    {
-        Offer storage offer = _marketplaceStorage()
-        .offers[_input.contractAddress][_input.tokenId][_input.buyer][_input.currencyAddress];
+    function _validateAndApplyOfferFill(
+        AcceptOfferInput memory _input
+    ) internal returns (uint256 grossAmount, uint256 marketplaceFee) {
+        Offer storage offer = _marketplaceStorage().offers[_input.contractAddress][_input.tokenId][_input.buyer][
+            _input.currencyAddress
+        ];
 
         if (offer.quantity == 0) {
             revert OfferDoesNotExist(_input.contractAddress, _input.tokenId, _input.buyer, _input.currencyAddress);
         }
         if (offer.expirationTime != 0 && offer.expirationTime <= block.timestamp) {
             revert OfferExpired(
-                _input.contractAddress, _input.tokenId, _input.buyer, _input.currencyAddress, offer.expirationTime
+                _input.contractAddress,
+                _input.tokenId,
+                _input.buyer,
+                _input.currencyAddress,
+                offer.expirationTime
             );
         }
         if (offer.currencyAddress != _input.currencyAddress) {
@@ -302,8 +309,14 @@ contract RareERC1155TradeExecutionModule is IRareERC1155TradeExecutionModule, Ra
         }
         uint256 buyerBalanceBefore = erc1155.balanceOf(_buyer, _tokenId);
 
-        _marketplaceStorage().erc1155ApprovalManager
-            .safeTransferFrom(_contractAddress, _seller, _buyer, _tokenId, _amount, "");
+        _marketplaceStorage().erc1155ApprovalManager.safeTransferFrom(
+            _contractAddress,
+            _seller,
+            _buyer,
+            _tokenId,
+            _amount,
+            ""
+        );
 
         uint256 sellerBalanceAfter = erc1155.balanceOf(_seller, _tokenId);
         uint256 buyerBalanceAfter = erc1155.balanceOf(_buyer, _tokenId);
@@ -324,7 +337,7 @@ contract RareERC1155TradeExecutionModule is IRareERC1155TradeExecutionModule, Ra
         address[] memory balanceAccounts = new address[](requestCount * 2);
         uint256[] memory balanceTokenIds = new uint256[](requestCount * 2);
 
-        for (uint256 i = 0; i < requestCount;) {
+        for (uint256 i = 0; i < requestCount; ) {
             uint256 balanceIndex = i * 2;
             balanceAccounts[balanceIndex] = _seller;
             balanceAccounts[balanceIndex + 1] = _buyer;
@@ -337,11 +350,15 @@ contract RareERC1155TradeExecutionModule is IRareERC1155TradeExecutionModule, Ra
         }
 
         uint256[] memory balancesBeforeTransfer = erc1155.balanceOfBatch(balanceAccounts, balanceTokenIds);
-        for (uint256 i = 0; i < requestCount;) {
+        for (uint256 i = 0; i < requestCount; ) {
             uint256 sellerBalanceIndex = i * 2;
             if (balancesBeforeTransfer[sellerBalanceIndex] < _amounts[i]) {
                 revert InsufficientTokenBalance(
-                    _seller, _contractAddress, _tokenIds[i], _amounts[i], balancesBeforeTransfer[sellerBalanceIndex]
+                    _seller,
+                    _contractAddress,
+                    _tokenIds[i],
+                    _amounts[i],
+                    balancesBeforeTransfer[sellerBalanceIndex]
                 );
             }
 
@@ -350,15 +367,21 @@ contract RareERC1155TradeExecutionModule is IRareERC1155TradeExecutionModule, Ra
             }
         }
 
-        _marketplaceStorage().erc1155ApprovalManager
-            .safeBatchTransferFrom(_contractAddress, _seller, _buyer, _tokenIds, _amounts, "");
+        _marketplaceStorage().erc1155ApprovalManager.safeBatchTransferFrom(
+            _contractAddress,
+            _seller,
+            _buyer,
+            _tokenIds,
+            _amounts,
+            ""
+        );
 
         uint256[] memory balancesAfterTransfer = erc1155.balanceOfBatch(balanceAccounts, balanceTokenIds);
-        for (uint256 i = 0; i < requestCount;) {
+        for (uint256 i = 0; i < requestCount; ) {
             uint256 balanceIndex = i * 2;
             if (
-                balancesAfterTransfer[balanceIndex] != balancesBeforeTransfer[balanceIndex] - _amounts[i]
-                    || balancesAfterTransfer[balanceIndex + 1] != balancesBeforeTransfer[balanceIndex + 1] + _amounts[i]
+                balancesAfterTransfer[balanceIndex] != balancesBeforeTransfer[balanceIndex] - _amounts[i] ||
+                balancesAfterTransfer[balanceIndex + 1] != balancesBeforeTransfer[balanceIndex + 1] + _amounts[i]
             ) {
                 revert InvalidERC1155Transfer(_contractAddress, _tokenIds[i], _seller, _buyer, _amounts[i]);
             }
@@ -387,7 +410,7 @@ contract RareERC1155TradeExecutionModule is IRareERC1155TradeExecutionModule, Ra
 
     function _balanceAccounts(address _account, uint256 _length) internal pure returns (address[] memory accounts) {
         accounts = new address[](_length);
-        for (uint256 i = 0; i < _length;) {
+        for (uint256 i = 0; i < _length; ) {
             accounts[i] = _account;
 
             unchecked {
@@ -404,7 +427,7 @@ contract RareERC1155TradeExecutionModule is IRareERC1155TradeExecutionModule, Ra
         uint256[] memory _balancesBeforeMint,
         uint256[] memory _balancesAfterMint
     ) internal pure {
-        for (uint256 i = 0; i < _tokenIds.length;) {
+        for (uint256 i = 0; i < _tokenIds.length; ) {
             if (_balancesAfterMint[i] != _balancesBeforeMint[i] + _amounts[i]) {
                 revert InvalidERC1155Mint(_contractAddress, _tokenIds[i], _buyer, _amounts[i]);
             }

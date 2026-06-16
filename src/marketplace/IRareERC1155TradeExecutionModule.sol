@@ -9,9 +9,12 @@ import {IRareERC1155MarketplaceTypes} from "./IRareERC1155MarketplaceTypes.sol";
 interface IRareERC1155TradeExecutionModule is IRareERC1155MarketplaceTypes {
     /// @notice Mints tokens from configured primary sales.
     /// @dev Intended for delegatecall from the marketplace proxy. Direct calls to the module implementation revert.
-    function mintDirectSaleBatch(address _contractAddress, address _currencyAddress, MintRequest[] calldata _requests)
-        external
-        payable;
+    function mintDirectSaleBatch(
+        address _contractAddress,
+        address _currencyAddress,
+        address _recipient,
+        MintRequest[] calldata _requests
+    ) external payable;
 
     /// @notice Buys tokens from a seller's secondary fixed-price listings.
     /// @dev Intended for delegatecall from the marketplace proxy. Direct calls to the module implementation revert.
@@ -19,6 +22,7 @@ interface IRareERC1155TradeExecutionModule is IRareERC1155MarketplaceTypes {
         address _contractAddress,
         address _seller,
         address _currencyAddress,
+        address _recipient,
         BuyRequest[] calldata _requests
     ) external payable;
 

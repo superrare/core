@@ -246,7 +246,7 @@ contract RareERC1155MarketplaceGasTest is Test {
 
       vm.prank(buyer);
       uint256 gasBefore = gasleft();
-      marketplace.mintDirectSaleBatch{value: _withFee(PRICE) * count}(address(token), address(0), requests);
+      marketplace.mintDirectSaleBatch{value: _withFee(PRICE) * count}(address(token), address(0), buyer, requests);
       _recordGas("mint_direct_sale_batch_eth_max_splits", count, gasBefore - gasleft());
     }
   }
@@ -261,7 +261,7 @@ contract RareERC1155MarketplaceGasTest is Test {
 
       vm.prank(buyer);
       uint256 gasBefore = gasleft();
-      marketplace.buyBatch{value: _withFee(PRICE) * count}(address(token), seller, address(0), requests);
+      marketplace.buyBatch{value: _withFee(PRICE) * count}(address(token), seller, address(0), buyer, requests);
       _recordGas("buy_batch_eth_max_splits_max_royalties", count, gasBefore - gasleft());
     }
   }
@@ -406,7 +406,10 @@ contract RareERC1155MarketplaceGasTest is Test {
   ) private returns (uint256 gasUsed) {
     vm.prank(buyer);
     uint256 gasBefore = gasleft();
-    IRareERC1155MarketplaceTypes.CheckoutExecution memory execution = marketplace.checkout{value: _value}(_items);
+    IRareERC1155MarketplaceTypes.CheckoutExecution memory execution = marketplace.checkout{value: _value}(
+      buyer,
+      _items
+    );
     IRareERC1155MarketplaceTypes.CheckoutSummary memory summary = execution.summary;
     gasUsed = gasBefore - gasleft();
 

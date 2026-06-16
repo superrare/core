@@ -321,10 +321,13 @@ contract RareERC1155MarketplaceReentrancyTest is Test {
     IRareERC1155MarketplaceTypes.CheckoutItem[] memory reentryItems = _singleCheckoutItem(
       _directSaleCheckoutItem(tokenId, 0, 1)
     );
-    receiver.setReentry(abi.encodeWithSelector(marketplace.checkout.selector, reentryItems), 0);
+    receiver.setReentry(abi.encodeWithSelector(marketplace.checkout.selector, address(receiver), reentryItems), 0);
 
     vm.prank(address(receiver));
-    IRareERC1155MarketplaceTypes.CheckoutExecution memory execution = marketplace.checkout(reentryItems);
+    IRareERC1155MarketplaceTypes.CheckoutExecution memory execution = marketplace.checkout(
+      address(receiver),
+      reentryItems
+    );
 
     assertEq(execution.summary.filledCount, 1);
     assertTrue(receiver.reentryReverted());
@@ -341,7 +344,10 @@ contract RareERC1155MarketplaceReentrancyTest is Test {
     IRareERC1155MarketplaceTypes.CheckoutItem[] memory reentryItems = _singleCheckoutItem(
       _directSaleCheckoutItem(tokenIdTwo, 0, 1)
     );
-    payoutRecipient.setReentry(abi.encodeWithSelector(marketplace.checkout.selector, reentryItems), 0);
+    payoutRecipient.setReentry(
+      abi.encodeWithSelector(marketplace.checkout.selector, address(payoutRecipient), reentryItems),
+      0
+    );
 
     _setListing(tokenId, address(0), price, 1, payable(address(payoutRecipient)));
 
@@ -350,6 +356,7 @@ contract RareERC1155MarketplaceReentrancyTest is Test {
       address(token),
       seller,
       address(0),
+      buyer,
       _singleBuyRequest(tokenId, price, 1)
     );
 
@@ -375,7 +382,7 @@ contract RareERC1155MarketplaceReentrancyTest is Test {
     );
     maliciousCurrency.setReentry(
       marketplace,
-      abi.encodeWithSelector(marketplace.checkout.selector, reentryItems),
+      abi.encodeWithSelector(marketplace.checkout.selector, address(maliciousCurrency), reentryItems),
       ReenteringERC20.Hook.BALANCE_OF_REVERT
     );
 
@@ -383,7 +390,13 @@ contract RareERC1155MarketplaceReentrancyTest is Test {
 
     vm.expectRevert("balanceOf reentry blocked");
     vm.prank(buyer);
-    marketplace.buyBatch(address(token), seller, address(maliciousCurrency), _singleBuyRequest(tokenId, price, 1));
+    marketplace.buyBatch(
+      address(token),
+      seller,
+      address(maliciousCurrency),
+      buyer,
+      _singleBuyRequest(tokenId, price, 1)
+    );
 
     IRareERC1155MarketplaceTypes.SalePrice memory salePrice = marketplace.getSalePrice(address(token), tokenId, seller);
     assertEq(salePrice.quantity, 1);
@@ -392,7 +405,7 @@ contract RareERC1155MarketplaceReentrancyTest is Test {
 
     maliciousCurrency.setReentry(
       marketplace,
-      abi.encodeWithSelector(marketplace.checkout.selector, reentryItems),
+      abi.encodeWithSelector(marketplace.checkout.selector, address(maliciousCurrency), reentryItems),
       ReenteringERC20.Hook.ALLOWANCE_REVERT
     );
 
@@ -401,7 +414,7 @@ contract RareERC1155MarketplaceReentrancyTest is Test {
     );
 
     vm.prank(buyer);
-    IRareERC1155MarketplaceTypes.CheckoutExecution memory execution = marketplace.checkout(items);
+    IRareERC1155MarketplaceTypes.CheckoutExecution memory execution = marketplace.checkout(buyer, items);
 
     assertEq(execution.summary.filledCount, 0);
     assertEq(execution.summary.skippedCount, 1);
@@ -426,7 +439,10 @@ contract RareERC1155MarketplaceReentrancyTest is Test {
     IRareERC1155MarketplaceTypes.CheckoutItem[] memory royaltyReentryItems = _singleCheckoutItem(
       _directSaleCheckoutItem(tokenIdThree, 0, 1)
     );
-    royaltyEngine.setReentry(abi.encodeWithSelector(marketplace.checkout.selector, royaltyReentryItems), true);
+    royaltyEngine.setReentry(
+      abi.encodeWithSelector(marketplace.checkout.selector, address(royaltyEngine), royaltyReentryItems),
+      true
+    );
 
     IRareERC1155MarketplaceTypes.CheckoutItem[] memory items = new IRareERC1155MarketplaceTypes.CheckoutItem[](2);
     items[0] = _listingCheckoutItem(tokenId, seller, address(0), price, 1);
@@ -434,6 +450,7 @@ contract RareERC1155MarketplaceReentrancyTest is Test {
 
     vm.prank(buyer);
     IRareERC1155MarketplaceTypes.CheckoutExecution memory execution = marketplace.checkout{value: _withFee(price)}(
+      buyer,
       items
     );
 

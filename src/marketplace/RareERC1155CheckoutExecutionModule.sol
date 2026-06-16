@@ -35,29 +35,44 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
         uint256 quantity;
     }
 
-    function checkout(CheckoutItem[] calldata _items)
-        external
-        payable
-        onlyDelegateCall
-        returns (CheckoutExecution memory execution)
-    {
+    function checkout(
+        address _recipient,
+        CheckoutItem[] calldata _items
+    ) external payable onlyDelegateCall returns (CheckoutExecution memory execution) {
+        _validateRecipient(_recipient);
         _validateCheckoutSize(_items.length);
 
         execution.items = new CheckoutItemResult[](_items.length);
         MarketplaceStorage storage $ = _marketplaceStorage();
-        CheckoutDirectSaleMintAggregate[] memory directSaleMintAggregates =
-            new CheckoutDirectSaleMintAggregate[](_items.length);
+        CheckoutDirectSaleMintAggregate[] memory directSaleMintAggregates = new CheckoutDirectSaleMintAggregate[](
+            _items.length
+        );
         uint256 directSaleMintAggregateCount = 0;
         uint256 remainingEth = msg.value;
-        for (uint256 i = 0; i < _items.length;) {
+        for (uint256 i = 0; i < _items.length; ) {
             (CheckoutItemResult memory result, bool filled, uint256 newRemainingEth) = _processCheckoutItem(
-                $, _items[i], i, remainingEth, directSaleMintAggregates, directSaleMintAggregateCount
+                $,
+                _items[i],
+                i,
+                remainingEth,
+                _recipient,
+                directSaleMintAggregates,
+                directSaleMintAggregateCount
             );
             if (filled) {
                 remainingEth = newRemainingEth;
-                _recordCheckoutDirectSaleMintTx($, _items[i], directSaleMintAggregates, directSaleMintAggregateCount);
-                directSaleMintAggregateCount =
-                    _recordCheckoutDirectSaleMint(directSaleMintAggregates, directSaleMintAggregateCount, _items[i]);
+                _recordCheckoutDirectSaleMintTx(
+                    $,
+                    _items[i],
+                    _recipient,
+                    directSaleMintAggregates,
+                    directSaleMintAggregateCount
+                );
+                directSaleMintAggregateCount = _recordCheckoutDirectSaleMint(
+                    directSaleMintAggregates,
+                    directSaleMintAggregateCount,
+                    _items[i]
+                );
                 execution.summary.filledCount += 1;
                 if (_items[i].currencyAddress == address(0)) execution.summary.ethSpent += result.totalPaid;
             } else {
@@ -65,7 +80,7 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
             }
 
             execution.items[i] = result;
-            _emitCheckoutItemProcessed(result);
+            _emitCheckoutItemProcessed(result, _recipient);
 
             unchecked {
                 ++i;
@@ -79,6 +94,7 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
 
         emit CheckoutCompleted(
             msg.sender,
+            _recipient,
             execution.summary.filledCount,
             execution.summary.skippedCount,
             execution.summary.ethSpent,
@@ -89,6 +105,7 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
     function executeCheckoutItem(
         CheckoutItem calldata _item,
         uint256 _remainingEth,
+        address _recipient,
         address _seller,
         uint256 _grossAmount,
         uint256 _marketplaceFee,
@@ -96,14 +113,30 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
         uint8[] calldata _splitRatios
     ) external payable onlyDelegateCall returns (uint256 totalPaid, uint256 newRemainingEth) {
         if (_item.itemKind == uint8(CheckoutItemKind.DIRECT_SALE_MINT)) {
-            return _executeCheckoutDirectSaleMint(
-                _item, _remainingEth, _seller, _grossAmount, _marketplaceFee, _splitRecipients, _splitRatios
-            );
+            return
+                _executeCheckoutDirectSaleMint(
+                    _item,
+                    _remainingEth,
+                    _recipient,
+                    _seller,
+                    _grossAmount,
+                    _marketplaceFee,
+                    _splitRecipients,
+                    _splitRatios
+                );
         }
         if (_item.itemKind == uint8(CheckoutItemKind.LISTING_BUY)) {
-            return _executeCheckoutListingBuy(
-                _item, _remainingEth, _seller, _grossAmount, _marketplaceFee, _splitRecipients, _splitRatios
-            );
+            return
+                _executeCheckoutListingBuy(
+                    _item,
+                    _remainingEth,
+                    _recipient,
+                    _seller,
+                    _grossAmount,
+                    _marketplaceFee,
+                    _splitRecipients,
+                    _splitRatios
+                );
         }
 
         revert CheckoutItemExecutionFailed(
@@ -123,28 +156,26 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
         _seller;
         MarketplaceStorage storage $ = _marketplaceStorage();
         if (_item.itemKind == uint8(CheckoutItemKind.DIRECT_SALE_MINT)) {
-            $.marketConfig
-                .payoutPrimary(
-                    _item.contractAddress,
-                    _item.currencyAddress,
-                    _grossAmount,
-                    _marketplaceFee,
-                    _splitRecipients,
-                    _splitRatios
-                );
+            $.marketConfig.payoutPrimary(
+                _item.contractAddress,
+                _item.currencyAddress,
+                _grossAmount,
+                _marketplaceFee,
+                _splitRecipients,
+                _splitRatios
+            );
             return;
         }
         if (_item.itemKind == uint8(CheckoutItemKind.LISTING_BUY)) {
-            $.marketConfig
-                .payoutSecondary(
-                    _item.contractAddress,
-                    _item.tokenId,
-                    _item.currencyAddress,
-                    _grossAmount,
-                    _marketplaceFee,
-                    _splitRecipients,
-                    _splitRatios
-                );
+            $.marketConfig.payoutSecondary(
+                _item.contractAddress,
+                _item.tokenId,
+                _item.currencyAddress,
+                _grossAmount,
+                _marketplaceFee,
+                _splitRecipients,
+                _splitRatios
+            );
             return;
         }
 
@@ -156,18 +187,25 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
         CheckoutItem calldata _item,
         uint256 _itemIndex,
         uint256 _remainingEth,
+        address _recipient,
         CheckoutDirectSaleMintAggregate[] memory _directSaleMintAggregates,
         uint256 _directSaleMintAggregateCount
     ) internal returns (CheckoutItemResult memory result, bool filled, uint256 newRemainingEth) {
         result = _baseCheckoutItemResult(_itemIndex, _item);
         newRemainingEth = _remainingEth;
 
-        bool directSaleMintTxAlreadyRecorded =
-            _checkoutDirectSaleMintAggregateQuantity(
-                    _directSaleMintAggregates, _directSaleMintAggregateCount, _item.contractAddress, _item.tokenId
-                ) != 0;
-        (bool valid, bytes memory failureData, CheckoutFillContext memory context) =
-            _validateCheckoutItem($, _item, directSaleMintTxAlreadyRecorded);
+        bool directSaleMintTxAlreadyRecorded = _checkoutDirectSaleMintAggregateQuantity(
+            _directSaleMintAggregates,
+            _directSaleMintAggregateCount,
+            _item.contractAddress,
+            _item.tokenId
+        ) != 0;
+        (bool valid, bytes memory failureData, CheckoutFillContext memory context) = _validateCheckoutItem(
+            $,
+            _item,
+            _recipient,
+            directSaleMintTxAlreadyRecorded
+        );
         if (context.seller != address(0)) result.seller = context.seller;
         if (!valid) {
             _setCheckoutItemFailure(result, CheckoutFailureStage.VALIDATION, failureData);
@@ -175,15 +213,19 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
         }
 
         bytes memory aggregateFailureData = _checkoutDirectSaleMintAggregateFailureData(
-            _item, _directSaleMintAggregates, _directSaleMintAggregateCount, context.maxMints
+            _item,
+            _directSaleMintAggregates,
+            _directSaleMintAggregateCount,
+            context.maxMints
         );
         if (aggregateFailureData.length != 0) {
             _setCheckoutItemFailure(result, CheckoutFailureStage.VALIDATION, aggregateFailureData);
             return (result, false, newRemainingEth);
         }
 
-        (bool success, bytes memory data) =
-            $.checkoutExecutionModule.delegatecall(_checkoutItemCallData(_item, _remainingEth, context));
+        (bool success, bytes memory data) = $.checkoutExecutionModule.delegatecall(
+            _checkoutItemCallData(_item, _remainingEth, _recipient, context)
+        );
         if (!success) {
             (CheckoutFailureStage stage, bytes memory executionFailureData) = _checkoutExecutionFailure(data);
             _setCheckoutItemFailure(result, stage, executionFailureData);
@@ -199,23 +241,27 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
     function _checkoutItemCallData(
         CheckoutItem calldata _item,
         uint256 _remainingEth,
+        address _recipient,
         CheckoutFillContext memory _context
     ) internal pure returns (bytes memory) {
-        return abi.encodeWithSelector(
-            IRareERC1155CheckoutExecutionModule.executeCheckoutItem.selector,
-            _item,
-            _remainingEth,
-            _context.seller,
-            _context.grossAmount,
-            _context.marketplaceFee,
-            _context.splitRecipients,
-            _context.splitRatios
-        );
+        return
+            abi.encodeWithSelector(
+                IRareERC1155CheckoutExecutionModule.executeCheckoutItem.selector,
+                _item,
+                _remainingEth,
+                _recipient,
+                _context.seller,
+                _context.grossAmount,
+                _context.marketplaceFee,
+                _context.splitRecipients,
+                _context.splitRatios
+            );
     }
 
     function _executeCheckoutDirectSaleMint(
         CheckoutItem calldata _item,
         uint256 _remainingEth,
+        address _recipient,
         address _seller,
         uint256 _grossAmount,
         uint256 _marketplaceFee,
@@ -226,15 +272,19 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
         MarketplaceStorage storage $ = _marketplaceStorage();
 
         totalPaid = _grossAmount + _marketplaceFee;
-        bytes memory paymentFailureData =
-            _checkoutPaymentFailureData($.marketConfig, _item.currencyAddress, totalPaid, _remainingEth);
+        bytes memory paymentFailureData = _checkoutPaymentFailureData(
+            $.marketConfig,
+            _item.currencyAddress,
+            totalPaid,
+            _remainingEth
+        );
         if (paymentFailureData.length != 0) {
             revert CheckoutItemExecutionFailed(CheckoutFailureStage.PAYMENT_COLLECTION, paymentFailureData);
         }
 
         bool mintLimitEnabled = $.tokenMintLimit[_item.contractAddress][_item.tokenId] > 0;
         if (mintLimitEnabled) {
-            $.tokenMintsPerAddress[_item.contractAddress][_item.tokenId][msg.sender] += _item.quantity;
+            $.tokenMintsPerAddress[_item.contractAddress][_item.tokenId][_recipient] += _item.quantity;
         }
 
         if (_item.currencyAddress == address(0)) {
@@ -244,7 +294,10 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
         }
 
         _checkoutMintBatchToWithBalanceCheck(
-            _item.contractAddress, msg.sender, _singleUintArray(_item.tokenId), _singleUintArray(_item.quantity)
+            _item.contractAddress,
+            _recipient,
+            _singleUintArray(_item.tokenId),
+            _singleUintArray(_item.quantity)
         );
 
         if (_grossAmount != 0) {
@@ -255,6 +308,7 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
             _item.contractAddress,
             _item.tokenId,
             msg.sender,
+            _recipient,
             _seller,
             _item.quantity,
             _item.currencyAddress,
@@ -265,6 +319,7 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
     function _executeCheckoutListingBuy(
         CheckoutItem calldata _item,
         uint256 _remainingEth,
+        address _recipient,
         address _seller,
         uint256 _grossAmount,
         uint256 _marketplaceFee,
@@ -275,8 +330,12 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
         MarketplaceStorage storage $ = _marketplaceStorage();
 
         totalPaid = _grossAmount + _marketplaceFee;
-        bytes memory paymentFailureData =
-            _checkoutPaymentFailureData($.marketConfig, _item.currencyAddress, totalPaid, _remainingEth);
+        bytes memory paymentFailureData = _checkoutPaymentFailureData(
+            $.marketConfig,
+            _item.currencyAddress,
+            totalPaid,
+            _remainingEth
+        );
         if (paymentFailureData.length != 0) {
             revert CheckoutItemExecutionFailed(CheckoutFailureStage.PAYMENT_COLLECTION, paymentFailureData);
         }
@@ -294,7 +353,12 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
         }
 
         _checkoutSafeTransferFrom(
-            $.erc1155ApprovalManager, _item.contractAddress, _seller, msg.sender, _item.tokenId, _item.quantity
+            $.erc1155ApprovalManager,
+            _item.contractAddress,
+            _seller,
+            _recipient,
+            _item.tokenId,
+            _item.quantity
         );
 
         _executeCheckoutPayout($, _item, _seller, _grossAmount, _marketplaceFee, _splitRecipients, _splitRatios);
@@ -303,6 +367,7 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
             _seller,
             msg.sender,
             _item.contractAddress,
+            _recipient,
             _item.tokenId,
             _item.currencyAddress,
             _item.price,
@@ -313,13 +378,14 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
     function _validateCheckoutItem(
         MarketplaceStorage storage $,
         CheckoutItem calldata _item,
+        address _recipient,
         bool _directSaleMintTxAlreadyRecorded
     ) internal view returns (bool valid, bytes memory failureData, CheckoutFillContext memory context) {
         if (_item.itemKind == uint8(CheckoutItemKind.DIRECT_SALE_MINT)) {
-            return _validateCheckoutDirectSaleMint($, _item, _directSaleMintTxAlreadyRecorded);
+            return _validateCheckoutDirectSaleMint($, _item, _recipient, _directSaleMintTxAlreadyRecorded);
         }
         if (_item.itemKind == uint8(CheckoutItemKind.LISTING_BUY)) {
-            return _validateCheckoutListingBuy($, _item);
+            return _validateCheckoutListingBuy($, _item, _recipient);
         }
 
         return (false, abi.encodeWithSelector(UnsupportedCheckoutItemKind.selector, _item.itemKind), context);
@@ -328,6 +394,7 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
     function _validateCheckoutDirectSaleMint(
         MarketplaceStorage storage $,
         CheckoutItem calldata _item,
+        address _recipient,
         bool _txLimitAlreadyConsumed
     ) internal view returns (bool valid, bytes memory failureData, CheckoutFillContext memory context) {
         if (!_checkoutCurrencyApproved($.marketConfig, _item.currencyAddress)) {
@@ -341,7 +408,7 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
             $,
             _item.contractAddress,
             _item.currencyAddress,
-            msg.sender,
+            _recipient,
             _item.tokenId,
             _item.price,
             _item.quantity,
@@ -358,7 +425,7 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
                     $,
                     _item.contractAddress,
                     _item.currencyAddress,
-                    msg.sender,
+                    _recipient,
                     _item.tokenId,
                     _item.price,
                     _item.quantity
@@ -378,13 +445,13 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
         return (true, "", context);
     }
 
-    function _validateCheckoutListingBuy(MarketplaceStorage storage $, CheckoutItem calldata _item)
-        internal
-        view
-        returns (bool valid, bytes memory failureData, CheckoutFillContext memory context)
-    {
+    function _validateCheckoutListingBuy(
+        MarketplaceStorage storage $,
+        CheckoutItem calldata _item,
+        address _recipient
+    ) internal view returns (bool valid, bytes memory failureData, CheckoutFillContext memory context) {
         context.seller = _item.seller;
-        if (msg.sender == _item.seller) {
+        if (msg.sender == _item.seller || _recipient == _item.seller) {
             return (false, abi.encodeWithSelector(SelfPurchaseUnsupported.selector, _item.seller), context);
         }
         if (!_checkoutCurrencyApproved($.marketConfig, _item.currencyAddress)) {
@@ -397,7 +464,13 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
         SecondaryPayoutContext memory payoutContext;
         bytes4 reason;
         (valid, reason, payoutContext) = _checkSecondaryBuyRequest(
-            $, _item.contractAddress, _item.seller, _item.currencyAddress, _item.tokenId, _item.price, _item.quantity
+            $,
+            _item.contractAddress,
+            _item.seller,
+            _item.currencyAddress,
+            _item.tokenId,
+            _item.price,
+            _item.quantity
         );
         if (!valid) {
             return (
@@ -480,26 +553,24 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
         address payable[] calldata _splitRecipients,
         uint8[] calldata _splitRatios
     ) internal {
-        (bool success, bytes memory data) = $.checkoutExecutionModule
-            .delegatecall(
-                abi.encodeWithSelector(
-                    IRareERC1155CheckoutExecutionModule.executeCheckoutPayout.selector,
-                    _item,
-                    _seller,
-                    _grossAmount,
-                    _marketplaceFee,
-                    _splitRecipients,
-                    _splitRatios
-                )
-            );
+        (bool success, bytes memory data) = $.checkoutExecutionModule.delegatecall(
+            abi.encodeWithSelector(
+                IRareERC1155CheckoutExecutionModule.executeCheckoutPayout.selector,
+                _item,
+                _seller,
+                _grossAmount,
+                _marketplaceFee,
+                _splitRecipients,
+                _splitRatios
+            )
+        );
         if (!success) revert CheckoutItemExecutionFailed(CheckoutFailureStage.PAYOUT, data);
     }
 
-    function _baseCheckoutItemResult(uint256 _itemIndex, CheckoutItem calldata _item)
-        internal
-        pure
-        returns (CheckoutItemResult memory result)
-    {
+    function _baseCheckoutItemResult(
+        uint256 _itemIndex,
+        CheckoutItem calldata _item
+    ) internal pure returns (CheckoutItemResult memory result) {
         result = CheckoutItemResult({
             itemIndex: _itemIndex,
             itemKind: _item.itemKind,
@@ -527,11 +598,13 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
         _result.failureData = _failureData;
     }
 
-    function _emitCheckoutItemProcessed(CheckoutItemResult memory _result) internal {
+    function _emitCheckoutItemProcessed(CheckoutItemResult memory _result, address _recipient) internal {
         emit CheckoutItemProcessed(
             _result.itemIndex,
             _result.itemKind,
             _result.contractAddress,
+            msg.sender,
+            _recipient,
             _result.tokenId,
             _result.seller,
             _result.currencyAddress,
@@ -545,22 +618,21 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
         );
     }
 
-    function _checkoutExecutionFailure(bytes memory _revertData)
-        internal
-        pure
-        returns (CheckoutFailureStage stage, bytes memory failureData)
-    {
-        (bool decoded, CheckoutFailureStage decodedStage, bytes memory decodedFailureData) =
-            _decodeCheckoutItemExecutionFailed(_revertData);
+    function _checkoutExecutionFailure(
+        bytes memory _revertData
+    ) internal pure returns (CheckoutFailureStage stage, bytes memory failureData) {
+        (
+            bool decoded,
+            CheckoutFailureStage decodedStage,
+            bytes memory decodedFailureData
+        ) = _decodeCheckoutItemExecutionFailed(_revertData);
         if (decoded) return (decodedStage, decodedFailureData);
         return (CheckoutFailureStage.UNKNOWN, _revertData);
     }
 
-    function _decodeCheckoutItemExecutionFailed(bytes memory _revertData)
-        internal
-        pure
-        returns (bool decoded, CheckoutFailureStage stage, bytes memory failureData)
-    {
+    function _decodeCheckoutItemExecutionFailed(
+        bytes memory _revertData
+    ) internal pure returns (bool decoded, CheckoutFailureStage stage, bytes memory failureData) {
         // CheckoutItemExecutionFailed(CheckoutFailureStage,bytes):
         // selector | stage | offset | bytes length | bytes data
         if (_revertSelector(_revertData) != CheckoutItemExecutionFailed.selector || _revertData.length < 100) {
@@ -596,7 +668,10 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
         if (_item.itemKind != uint8(CheckoutItemKind.DIRECT_SALE_MINT) || _maxMints == 0) return "";
 
         uint256 filledQuantity = _checkoutDirectSaleMintAggregateQuantity(
-            _directSaleMintAggregates, _directSaleMintAggregateCount, _item.contractAddress, _item.tokenId
+            _directSaleMintAggregates,
+            _directSaleMintAggregateCount,
+            _item.contractAddress,
+            _item.tokenId
         );
         uint256 aggregateQuantity = filledQuantity + _item.quantity;
         if (aggregateQuantity <= _maxMints) return "";
@@ -610,10 +685,10 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
         address _contractAddress,
         uint256 _tokenId
     ) internal pure returns (uint256) {
-        for (uint256 i = 0; i < _directSaleMintAggregateCount;) {
+        for (uint256 i = 0; i < _directSaleMintAggregateCount; ) {
             if (
-                _directSaleMintAggregates[i].contractAddress == _contractAddress
-                    && _directSaleMintAggregates[i].tokenId == _tokenId
+                _directSaleMintAggregates[i].contractAddress == _contractAddress &&
+                _directSaleMintAggregates[i].tokenId == _tokenId
             ) {
                 return _directSaleMintAggregates[i].quantity;
             }
@@ -629,6 +704,7 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
     function _recordCheckoutDirectSaleMintTx(
         MarketplaceStorage storage $,
         CheckoutItem calldata _item,
+        address _recipient,
         CheckoutDirectSaleMintAggregate[] memory _directSaleMintAggregates,
         uint256 _directSaleMintAggregateCount
     ) internal {
@@ -636,13 +712,16 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
         if ($.tokenTxLimit[_item.contractAddress][_item.tokenId] == 0) return;
         if (
             _checkoutDirectSaleMintAggregateQuantity(
-                    _directSaleMintAggregates, _directSaleMintAggregateCount, _item.contractAddress, _item.tokenId
-                ) != 0
+                _directSaleMintAggregates,
+                _directSaleMintAggregateCount,
+                _item.contractAddress,
+                _item.tokenId
+            ) != 0
         ) {
             return;
         }
 
-        $.tokenTxsPerAddress[_item.contractAddress][_item.tokenId][msg.sender] += 1;
+        $.tokenTxsPerAddress[_item.contractAddress][_item.tokenId][_recipient] += 1;
     }
 
     function _recordCheckoutDirectSaleMint(
@@ -654,10 +733,10 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
             return _directSaleMintAggregateCount;
         }
 
-        for (uint256 i = 0; i < _directSaleMintAggregateCount;) {
+        for (uint256 i = 0; i < _directSaleMintAggregateCount; ) {
             if (
-                _directSaleMintAggregates[i].contractAddress == _item.contractAddress
-                    && _directSaleMintAggregates[i].tokenId == _item.tokenId
+                _directSaleMintAggregates[i].contractAddress == _item.contractAddress &&
+                _directSaleMintAggregates[i].tokenId == _item.tokenId
             ) {
                 _directSaleMintAggregates[i].quantity += _item.quantity;
                 return _directSaleMintAggregateCount;
@@ -669,16 +748,17 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
         }
 
         _directSaleMintAggregates[_directSaleMintAggregateCount] = CheckoutDirectSaleMintAggregate({
-            contractAddress: _item.contractAddress, tokenId: _item.tokenId, quantity: _item.quantity
+            contractAddress: _item.contractAddress,
+            tokenId: _item.tokenId,
+            quantity: _item.quantity
         });
         return _directSaleMintAggregateCount + 1;
     }
 
-    function _checkoutCurrencyApproved(MarketConfigV2.Config storage _config, address _currencyAddress)
-        internal
-        view
-        returns (bool)
-    {
+    function _checkoutCurrencyApproved(
+        MarketConfigV2.Config storage _config,
+        address _currencyAddress
+    ) internal view returns (bool) {
         if (_currencyAddress == address(0)) return true;
 
         try _config.approvedTokenRegistry.isApprovedToken(_currencyAddress) returns (bool approved) {
@@ -689,8 +769,9 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
     }
 
     function _checkoutValidErc1155Contract(address _contractAddress) internal view returns (bool) {
-        return _contractAddress.code.length != 0
-            && ERC165Checker.supportsInterface(_contractAddress, type(IERC1155).interfaceId);
+        return
+            _contractAddress.code.length != 0 &&
+            ERC165Checker.supportsInterface(_contractAddress, type(IERC1155).interfaceId);
     }
 
     function _checkoutPaymentFailureData(
@@ -708,10 +789,7 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
         IERC20 erc20 = IERC20(_currencyAddress);
         try erc20.balanceOf(msg.sender) returns (uint256 balance) {
             if (balance < _amount) {
-                return
-                    abi.encodeWithSelector(
-                        InsufficientCheckoutERC20Balance.selector, _currencyAddress, _amount, balance
-                    );
+                return abi.encodeWithSelector(InsufficientCheckoutERC20Balance.selector, _currencyAddress, _amount, balance);
             }
         } catch {
             return abi.encodeWithSelector(InsufficientCheckoutERC20Balance.selector, _currencyAddress, _amount, 0);
@@ -719,9 +797,8 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
 
         try erc20.allowance(msg.sender, address(_config.erc20ApprovalManager)) returns (uint256 allowance) {
             if (allowance < _amount) {
-                return abi.encodeWithSelector(
-                    InsufficientCheckoutERC20Allowance.selector, _currencyAddress, _amount, allowance
-                );
+                return
+                    abi.encodeWithSelector(InsufficientCheckoutERC20Allowance.selector, _currencyAddress, _amount, allowance);
             }
         } catch {
             return abi.encodeWithSelector(InsufficientCheckoutERC20Allowance.selector, _currencyAddress, _amount, 0);
@@ -730,9 +807,11 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
         return "";
     }
 
-    function _collectCheckoutErc20(MarketConfigV2.Config storage _config, address _currencyAddress, uint256 _amount)
-        internal
-    {
+    function _collectCheckoutErc20(
+        MarketConfigV2.Config storage _config,
+        address _currencyAddress,
+        uint256 _amount
+    ) internal {
         if (_amount == 0) return;
 
         IERC20 erc20 = IERC20(_currencyAddress);
@@ -743,8 +822,9 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
             revert CheckoutItemExecutionFailed(CheckoutFailureStage.PAYMENT_COLLECTION, revertData);
         }
 
-        try _config.erc20ApprovalManager.transferFrom(_currencyAddress, msg.sender, address(this), _amount) {}
-        catch (bytes memory revertData) {
+        try _config.erc20ApprovalManager.transferFrom(_currencyAddress, msg.sender, address(this), _amount) {} catch (
+            bytes memory revertData
+        ) {
             revert CheckoutItemExecutionFailed(CheckoutFailureStage.PAYMENT_COLLECTION, revertData);
         }
 
@@ -759,9 +839,7 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
         if (receivedAmount != _amount) {
             revert CheckoutItemExecutionFailed(
                 CheckoutFailureStage.PAYMENT_COLLECTION,
-                abi.encodeWithSelector(
-                    ERC20FeeOnTransferUnsupported.selector, _currencyAddress, _amount, receivedAmount
-                )
+                abi.encodeWithSelector(ERC20FeeOnTransferUnsupported.selector, _currencyAddress, _amount, receivedAmount)
             );
         }
     }
@@ -785,7 +863,12 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
             revert CheckoutItemExecutionFailed(
                 CheckoutFailureStage.TRANSFER,
                 abi.encodeWithSelector(
-                    InsufficientTokenBalance.selector, _seller, _contractAddress, _tokenId, _amount, sellerBalanceBefore
+                    InsufficientTokenBalance.selector,
+                    _seller,
+                    _contractAddress,
+                    _tokenId,
+                    _amount,
+                    sellerBalanceBefore
                 )
             );
         }
@@ -797,8 +880,9 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
             revert CheckoutItemExecutionFailed(CheckoutFailureStage.TRANSFER, revertData);
         }
 
-        try _erc1155ApprovalManager.safeTransferFrom(_contractAddress, _seller, _buyer, _tokenId, _amount, "") {}
-        catch (bytes memory revertData) {
+        try _erc1155ApprovalManager.safeTransferFrom(_contractAddress, _seller, _buyer, _tokenId, _amount, "") {} catch (
+            bytes memory revertData
+        ) {
             revert CheckoutItemExecutionFailed(CheckoutFailureStage.TRANSFER, revertData);
         }
 
@@ -819,9 +903,7 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
         if (sellerBalanceAfter != sellerBalanceBefore - _amount || buyerBalanceAfter != buyerBalanceBefore + _amount) {
             revert CheckoutItemExecutionFailed(
                 CheckoutFailureStage.TRANSFER,
-                abi.encodeWithSelector(
-                    InvalidERC1155Transfer.selector, _contractAddress, _tokenId, _seller, _buyer, _amount
-                )
+                abi.encodeWithSelector(InvalidERC1155Transfer.selector, _contractAddress, _tokenId, _seller, _buyer, _amount)
             );
         }
     }
@@ -842,8 +924,7 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
             revert CheckoutItemExecutionFailed(CheckoutFailureStage.MINT, revertData);
         }
 
-        try IRareERC1155(_contractAddress).mintBatchTo(_buyer, _tokenIds, _amounts) {}
-        catch (bytes memory revertData) {
+        try IRareERC1155(_contractAddress).mintBatchTo(_buyer, _tokenIds, _amounts) {} catch (bytes memory revertData) {
             revert CheckoutItemExecutionFailed(CheckoutFailureStage.MINT, revertData);
         }
 
@@ -854,13 +935,11 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
             revert CheckoutItemExecutionFailed(CheckoutFailureStage.MINT, revertData);
         }
 
-        for (uint256 i = 0; i < _tokenIds.length;) {
+        for (uint256 i = 0; i < _tokenIds.length; ) {
             if (balancesAfterMint[i] != balancesBeforeMint[i] + _amounts[i]) {
                 revert CheckoutItemExecutionFailed(
                     CheckoutFailureStage.MINT,
-                    abi.encodeWithSelector(
-                        InvalidERC1155Mint.selector, _contractAddress, _tokenIds[i], _buyer, _amounts[i]
-                    )
+                    abi.encodeWithSelector(InvalidERC1155Mint.selector, _contractAddress, _tokenIds[i], _buyer, _amounts[i])
                 );
             }
 
@@ -872,7 +951,7 @@ contract RareERC1155CheckoutExecutionModule is IRareERC1155CheckoutExecutionModu
 
     function _balanceAccounts(address _account, uint256 _length) internal pure returns (address[] memory accounts) {
         accounts = new address[](_length);
-        for (uint256 i = 0; i < _length;) {
+        for (uint256 i = 0; i < _length; ) {
             accounts[i] = _account;
 
             unchecked {

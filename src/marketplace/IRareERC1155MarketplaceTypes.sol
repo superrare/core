@@ -165,8 +165,9 @@ interface IRareERC1155MarketplaceTypes {
 
     event MintDirectSale(
         address indexed contractAddress,
-        uint256 indexed tokenId,
-        address indexed buyer,
+        uint256 tokenId,
+        address indexed payer,
+        address indexed recipient,
         address seller,
         uint256 quantity,
         address currency,
@@ -176,7 +177,10 @@ interface IRareERC1155MarketplaceTypes {
     event MintDirectSaleCancelled(address indexed contractAddress, uint256 indexed tokenId);
 
     event SetTokenAllowListConfig(
-        address indexed contractAddress, uint256 indexed tokenId, bytes32 root, uint256 endTimestamp
+        address indexed contractAddress,
+        uint256 indexed tokenId,
+        bytes32 root,
+        uint256 endTimestamp
     );
 
     event TokenMintLimitSet(address indexed contractAddress, uint256 indexed tokenId, uint256 limit);
@@ -197,9 +201,10 @@ interface IRareERC1155MarketplaceTypes {
     event SalePriceCancelled(address indexed seller, address indexed contractAddress, uint256 indexed tokenId);
 
     event Sold(
-        address indexed seller,
-        address indexed buyer,
+        address seller,
+        address indexed payer,
         address indexed contractAddress,
+        address indexed recipient,
         uint256 tokenId,
         address currency,
         uint256 price,
@@ -238,9 +243,11 @@ interface IRareERC1155MarketplaceTypes {
     );
 
     event CheckoutItemProcessed(
-        uint256 indexed itemIndex,
-        uint8 indexed itemKind,
+        uint256 itemIndex,
+        uint8 itemKind,
         address indexed contractAddress,
+        address indexed payer,
+        address indexed recipient,
         uint256 tokenId,
         address seller,
         address currencyAddress,
@@ -254,10 +261,16 @@ interface IRareERC1155MarketplaceTypes {
     );
 
     event CheckoutCompleted(
-        address indexed buyer, uint256 filledCount, uint256 skippedCount, uint256 ethSpent, uint256 ethRefunded
+        address indexed payer,
+        address indexed recipient,
+        uint256 filledCount,
+        uint256 skippedCount,
+        uint256 ethSpent,
+        uint256 ethRefunded
     );
 
     error ContractPaused();
+    error RecipientCannotBeZero();
     error EmptyBatch();
     error BatchSizeExceeded(uint256 supplied, uint256 max);
     error TokenIdsNotStrictlyAscending(uint256 index, uint256 previousTokenId, uint256 tokenId);
@@ -274,7 +287,11 @@ interface IRareERC1155MarketplaceTypes {
         uint256 _limit
     );
     error TransactionLimitExceeded(
-        address _contractAddress, uint256 _tokenId, address _account, uint256 _usedTransactions, uint256 _limit
+        address _contractAddress,
+        uint256 _tokenId,
+        address _account,
+        uint256 _usedTransactions,
+        uint256 _limit
     );
     error MaxMintExceeded(uint256 _requestedQuantity, uint256 _maxMints);
     error SaleNotStarted(uint256 _startTime);
@@ -297,7 +314,11 @@ interface IRareERC1155MarketplaceTypes {
     error SalePriceExpired(address _contractAddress, uint256 _tokenId, address _seller, uint256 _expirationTime);
     error QuantityExceedsSalePriceQuantity(uint256 _requestedQuantity, uint256 _availableQuantity);
     error InvalidERC1155Transfer(
-        address _contractAddress, uint256 _tokenId, address _seller, address _buyer, uint256 _quantity
+        address _contractAddress,
+        uint256 _tokenId,
+        address _seller,
+        address _buyer,
+        uint256 _quantity
     );
     error InvalidERC1155Mint(address _contractAddress, uint256 _tokenId, address _buyer, uint256 _quantity);
     error AddressNotAllowlisted(address _account);
@@ -311,15 +332,17 @@ interface IRareERC1155MarketplaceTypes {
     error CheckoutItemExecutionFailed(CheckoutFailureStage _stage, bytes _failureData);
     error InsufficientCheckoutETH(uint256 _requiredAmount, uint256 _availableAmount);
     error InsufficientCheckoutERC20Balance(address _currencyAddress, uint256 _requiredAmount, uint256 _availableAmount);
-    error InsufficientCheckoutERC20Allowance(
-        address _currencyAddress, uint256 _requiredAmount, uint256 _availableAmount
-    );
+    error InsufficientCheckoutERC20Allowance(address _currencyAddress, uint256 _requiredAmount, uint256 _availableAmount);
     error OfferPriceCannotBeZero();
     error OfferExpirationInvalid(uint256 _expirationTime, uint256 _currentTime);
     error SelfOfferAcceptanceUnsupported(address _buyer);
     error OfferDoesNotExist(address _contractAddress, uint256 _tokenId, address _buyer, address _currencyAddress);
     error OfferExpired(
-        address _contractAddress, uint256 _tokenId, address _buyer, address _currencyAddress, uint256 _expirationTime
+        address _contractAddress,
+        uint256 _tokenId,
+        address _buyer,
+        address _currencyAddress,
+        uint256 _expirationTime
     );
     error QuantityExceedsOfferQuantity(uint256 _requestedQuantity, uint256 _availableQuantity);
 

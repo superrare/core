@@ -76,15 +76,21 @@ interface IRareERC1155Marketplace is IRareERC1155MarketplaceTypes {
     function cancelOffer(address _contractAddress, uint256 _tokenId, address _currencyAddress) external;
 
     /// @notice Mints tokens from configured primary sales through the trade execution module.
-    function mintDirectSaleBatch(address _contractAddress, address _currencyAddress, MintRequest[] calldata _requests)
-        external
-        payable;
+    /// @dev `msg.sender` pays and `_recipient` receives the minted tokens.
+    function mintDirectSaleBatch(
+        address _contractAddress,
+        address _currencyAddress,
+        address _recipient,
+        MintRequest[] calldata _requests
+    ) external payable;
 
     /// @notice Buys tokens from a seller's secondary fixed-price listings through the trade execution module.
+    /// @dev `msg.sender` pays and `_recipient` receives the purchased tokens.
     function buyBatch(
         address _contractAddress,
         address _seller,
         address _currencyAddress,
+        address _recipient,
         BuyRequest[] calldata _requests
     ) external payable;
 
@@ -100,43 +106,51 @@ interface IRareERC1155Marketplace is IRareERC1155MarketplaceTypes {
         uint8[] calldata _splitRatios
     ) external;
 
-    /// @notice Executes a buyer cart of direct-sale mints and secondary fixed-price listing purchases.
+    /// @notice Executes a payer cart of direct-sale mints and secondary fixed-price listing purchases.
     /// @dev Best-effort execution returns one result per item. All-skipped checkouts complete successfully.
-    function checkout(CheckoutItem[] calldata _items) external payable returns (CheckoutExecution memory);
+    function checkout(
+        address _recipient,
+        CheckoutItem[] calldata _items
+    ) external payable returns (CheckoutExecution memory);
 
-    function getDirectSaleConfig(address _contractAddress, uint256 _tokenId)
-        external
-        view
-        returns (DirectSaleConfig memory);
+    function getDirectSaleConfig(
+        address _contractAddress,
+        uint256 _tokenId
+    ) external view returns (DirectSaleConfig memory);
 
-    function getTokenAllowListConfig(address _contractAddress, uint256 _tokenId)
-        external
-        view
-        returns (AllowListConfig memory);
+    function getTokenAllowListConfig(
+        address _contractAddress,
+        uint256 _tokenId
+    ) external view returns (AllowListConfig memory);
 
     function getTokenMintLimit(address _contractAddress, uint256 _tokenId) external view returns (uint256);
 
-    function getTokenMintsPerAddress(address _contractAddress, uint256 _tokenId, address _account)
-        external
-        view
-        returns (uint256);
+    function getTokenMintsPerAddress(
+        address _contractAddress,
+        uint256 _tokenId,
+        address _account
+    ) external view returns (uint256);
 
     function getTokenTxLimit(address _contractAddress, uint256 _tokenId) external view returns (uint256);
 
-    function getTokenTxsPerAddress(address _contractAddress, uint256 _tokenId, address _account)
-        external
-        view
-        returns (uint256);
+    function getTokenTxsPerAddress(
+        address _contractAddress,
+        uint256 _tokenId,
+        address _account
+    ) external view returns (uint256);
 
-    function getSalePrice(address _contractAddress, uint256 _tokenId, address _seller)
-        external
-        view
-        returns (SalePrice memory);
+    function getSalePrice(
+        address _contractAddress,
+        uint256 _tokenId,
+        address _seller
+    ) external view returns (SalePrice memory);
 
-    function getOffer(address _contractAddress, uint256 _tokenId, address _buyer, address _currencyAddress)
-        external
-        view
-        returns (Offer memory);
+    function getOffer(
+        address _contractAddress,
+        uint256 _tokenId,
+        address _buyer,
+        address _currencyAddress
+    ) external view returns (Offer memory);
 
     function getMarketConfig() external view returns (MarketConfigV2.Config memory);
     function getERC1155ApprovalManager() external view returns (address);

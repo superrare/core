@@ -46,7 +46,7 @@ abstract contract RareERC1155ExecutionModuleBase is RareERC1155MarketplaceStorag
         MarketplaceStorage storage $,
         address _contractAddress,
         address _currencyAddress,
-        address _buyer,
+        address _recipient,
         uint256 _tokenId,
         uint256 _price,
         uint256 _quantity
@@ -63,22 +63,35 @@ abstract contract RareERC1155ExecutionModuleBase is RareERC1155MarketplaceStorag
             return abi.encodeWithSelector(NotContractOwner.selector, _contractAddress, directSaleConfig.seller);
         }
         if (_reason == AddressNotAllowlisted.selector) {
-            return abi.encodeWithSelector(AddressNotAllowlisted.selector, _buyer);
+            return abi.encodeWithSelector(AddressNotAllowlisted.selector, _recipient);
         }
         if (_reason == QuantityCannotBeZero.selector) return abi.encodeWithSelector(QuantityCannotBeZero.selector);
         if (_reason == MintLimitExceeded.selector) {
             uint256 mintLimit = $.tokenMintLimit[_contractAddress][_tokenId];
-            uint256 currentMints = $.tokenMintsPerAddress[_contractAddress][_tokenId][_buyer];
-            return abi.encodeWithSelector(
-                MintLimitExceeded.selector, _contractAddress, _tokenId, _buyer, _quantity, currentMints, mintLimit
-            );
+            uint256 currentMints = $.tokenMintsPerAddress[_contractAddress][_tokenId][_recipient];
+            return
+                abi.encodeWithSelector(
+                    MintLimitExceeded.selector,
+                    _contractAddress,
+                    _tokenId,
+                    _recipient,
+                    _quantity,
+                    currentMints,
+                    mintLimit
+                );
         }
         if (_reason == TransactionLimitExceeded.selector) {
             uint256 txLimit = $.tokenTxLimit[_contractAddress][_tokenId];
-            uint256 currentTxs = $.tokenTxsPerAddress[_contractAddress][_tokenId][_buyer];
-            return abi.encodeWithSelector(
-                TransactionLimitExceeded.selector, _contractAddress, _tokenId, _buyer, currentTxs, txLimit
-            );
+            uint256 currentTxs = $.tokenTxsPerAddress[_contractAddress][_tokenId][_recipient];
+            return
+                abi.encodeWithSelector(
+                    TransactionLimitExceeded.selector,
+                    _contractAddress,
+                    _tokenId,
+                    _recipient,
+                    currentTxs,
+                    txLimit
+                );
         }
         if (_reason == MaxMintExceeded.selector) {
             return abi.encodeWithSelector(MaxMintExceeded.selector, _quantity, directSaleConfig.maxMints);
@@ -113,9 +126,14 @@ abstract contract RareERC1155ExecutionModuleBase is RareERC1155MarketplaceStorag
             return abi.encodeWithSelector(SalePriceDoesNotExist.selector, _contractAddress, _tokenId, _seller);
         }
         if (_reason == SalePriceExpired.selector) {
-            return abi.encodeWithSelector(
-                SalePriceExpired.selector, _contractAddress, _tokenId, _seller, salePrice.expirationTime
-            );
+            return
+                abi.encodeWithSelector(
+                    SalePriceExpired.selector,
+                    _contractAddress,
+                    _tokenId,
+                    _seller,
+                    salePrice.expirationTime
+                );
         }
         if (_reason == CurrencyMismatch.selector) {
             return abi.encodeWithSelector(CurrencyMismatch.selector, _currencyAddress, salePrice.currencyAddress);
@@ -130,11 +148,10 @@ abstract contract RareERC1155ExecutionModuleBase is RareERC1155MarketplaceStorag
         return "";
     }
 
-    function _checkContractOwner(address _contractAddress, address _account)
-        internal
-        view
-        returns (bool readable, bool isOwner)
-    {
+    function _checkContractOwner(
+        address _contractAddress,
+        address _account
+    ) internal view returns (bool readable, bool isOwner) {
         (bool success, bytes memory data) = _contractAddress.staticcall(abi.encodeWithSignature("owner()"));
         if (!success || data.length < 32) return (false, false);
         return (true, abi.decode(data, (address)) == _account);
@@ -202,7 +219,13 @@ abstract contract RareERC1155ExecutionModuleBase is RareERC1155MarketplaceStorag
         BuyRequest calldata _request
     ) internal view returns (SecondaryPayoutContext memory payoutContext) {
         (bool valid, bytes4 reason, SecondaryPayoutContext memory checkedContext) = _checkSecondaryBuyRequest(
-            $, _contractAddress, _seller, _currencyAddress, _request.tokenId, _request.price, _request.quantity
+            $,
+            _contractAddress,
+            _seller,
+            _currencyAddress,
+            _request.tokenId,
+            _request.price,
+            _request.quantity
         );
         if (!valid) _revertSecondaryBuyRequest(reason, $, _contractAddress, _seller, _currencyAddress, _request);
         return checkedContext;

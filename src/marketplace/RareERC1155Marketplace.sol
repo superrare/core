@@ -152,11 +152,10 @@ contract RareERC1155Marketplace is
         }
     }
 
-    function setTokenAllowListConfigs(address _contractAddress, AllowListConfigRequest[] calldata _requests)
-        external
-        nonReentrant
-        notPaused
-    {
+    function setTokenAllowListConfigs(
+        address _contractAddress,
+        AllowListConfigRequest[] calldata _requests
+    ) external nonReentrant notPaused {
         if (!_isContractOwner(_contractAddress, msg.sender)) {
             revert NotContractOwner(_contractAddress, msg.sender);
         }
@@ -178,11 +177,10 @@ contract RareERC1155Marketplace is
         }
     }
 
-    function setTokenMintLimits(address _contractAddress, TokenLimitRequest[] calldata _requests)
-        external
-        nonReentrant
-        notPaused
-    {
+    function setTokenMintLimits(
+        address _contractAddress,
+        TokenLimitRequest[] calldata _requests
+    ) external nonReentrant notPaused {
         if (!_isContractOwner(_contractAddress, msg.sender)) {
             revert NotContractOwner(_contractAddress, msg.sender);
         }
@@ -197,11 +195,10 @@ contract RareERC1155Marketplace is
         }
     }
 
-    function setTokenTxLimits(address _contractAddress, TokenLimitRequest[] calldata _requests)
-        external
-        nonReentrant
-        notPaused
-    {
+    function setTokenTxLimits(
+        address _contractAddress,
+        TokenLimitRequest[] calldata _requests
+    ) external nonReentrant notPaused {
         if (!_isContractOwner(_contractAddress, msg.sender)) {
             revert NotContractOwner(_contractAddress, msg.sender);
         }
@@ -321,17 +318,23 @@ contract RareERC1155Marketplace is
         });
 
         emit OfferMade(
-            msg.sender, _contractAddress, _tokenId, _currencyAddress, _price, _quantity, marketplaceFee, _expirationTime
+            msg.sender,
+            _contractAddress,
+            _tokenId,
+            _currencyAddress,
+            _price,
+            _quantity,
+            marketplaceFee,
+            _expirationTime
         );
 
-        $.marketConfig
-            .refundRemainingOffer(
-                _currencyAddress,
-                msg.sender,
-                previousOffer.price,
-                previousOffer.quantity,
-                previousOffer.marketplaceFeeRemaining
-            );
+        $.marketConfig.refundRemainingOffer(
+            _currencyAddress,
+            msg.sender,
+            previousOffer.price,
+            previousOffer.quantity,
+            previousOffer.marketplaceFeeRemaining
+        );
     }
 
     function cancelOffer(address _contractAddress, uint256 _tokenId, address _currencyAddress) external nonReentrant {
@@ -351,24 +354,28 @@ contract RareERC1155Marketplace is
             offer.marketplaceFeeRemaining
         );
 
-        $.marketConfig
-            .refundRemainingOffer(
-                _currencyAddress, msg.sender, offer.price, offer.quantity, offer.marketplaceFeeRemaining
-            );
+        $.marketConfig.refundRemainingOffer(
+            _currencyAddress,
+            msg.sender,
+            offer.price,
+            offer.quantity,
+            offer.marketplaceFeeRemaining
+        );
     }
 
-    function mintDirectSaleBatch(address _contractAddress, address _currencyAddress, MintRequest[] calldata _requests)
-        external
-        payable
-        nonReentrant
-        notPaused
-    {
+    function mintDirectSaleBatch(
+        address _contractAddress,
+        address _currencyAddress,
+        address _recipient,
+        MintRequest[] calldata _requests
+    ) external payable nonReentrant notPaused {
         _delegateToModule(
             _marketplaceStorage().tradeExecutionModule,
             abi.encodeWithSelector(
                 IRareERC1155TradeExecutionModule.mintDirectSaleBatch.selector,
                 _contractAddress,
                 _currencyAddress,
+                _recipient,
                 _requests
             )
         );
@@ -378,6 +385,7 @@ contract RareERC1155Marketplace is
         address _contractAddress,
         address _seller,
         address _currencyAddress,
+        address _recipient,
         BuyRequest[] calldata _requests
     ) external payable nonReentrant notPaused {
         _delegateToModule(
@@ -387,6 +395,7 @@ contract RareERC1155Marketplace is
                 _contractAddress,
                 _seller,
                 _currencyAddress,
+                _recipient,
                 _requests
             )
         );
@@ -418,35 +427,31 @@ contract RareERC1155Marketplace is
         );
     }
 
-    function checkout(CheckoutItem[] calldata _items)
-        external
-        payable
-        nonReentrant
-        notPaused
-        returns (CheckoutExecution memory)
-    {
-        return abi.decode(
-            _delegateToModule(
-                _marketplaceStorage().checkoutExecutionModule,
-                abi.encodeWithSelector(IRareERC1155CheckoutExecutionModule.checkout.selector, _items)
-            ),
-            (CheckoutExecution)
-        );
+    function checkout(
+        address _recipient,
+        CheckoutItem[] calldata _items
+    ) external payable nonReentrant notPaused returns (CheckoutExecution memory) {
+        return
+            abi.decode(
+                _delegateToModule(
+                    _marketplaceStorage().checkoutExecutionModule,
+                    abi.encodeWithSelector(IRareERC1155CheckoutExecutionModule.checkout.selector, _recipient, _items)
+                ),
+                (CheckoutExecution)
+            );
     }
 
-    function getDirectSaleConfig(address _contractAddress, uint256 _tokenId)
-        external
-        view
-        returns (DirectSaleConfig memory)
-    {
+    function getDirectSaleConfig(
+        address _contractAddress,
+        uint256 _tokenId
+    ) external view returns (DirectSaleConfig memory) {
         return _marketplaceStorage().directSaleConfigs[_contractAddress][_tokenId];
     }
 
-    function getTokenAllowListConfig(address _contractAddress, uint256 _tokenId)
-        external
-        view
-        returns (AllowListConfig memory)
-    {
+    function getTokenAllowListConfig(
+        address _contractAddress,
+        uint256 _tokenId
+    ) external view returns (AllowListConfig memory) {
         return _marketplaceStorage().tokenAllowlistRoots[_contractAddress][_tokenId];
     }
 
@@ -454,11 +459,11 @@ contract RareERC1155Marketplace is
         return _marketplaceStorage().tokenMintLimit[_contractAddress][_tokenId];
     }
 
-    function getTokenMintsPerAddress(address _contractAddress, uint256 _tokenId, address _account)
-        external
-        view
-        returns (uint256)
-    {
+    function getTokenMintsPerAddress(
+        address _contractAddress,
+        uint256 _tokenId,
+        address _account
+    ) external view returns (uint256) {
         return _marketplaceStorage().tokenMintsPerAddress[_contractAddress][_tokenId][_account];
     }
 
@@ -466,27 +471,28 @@ contract RareERC1155Marketplace is
         return _marketplaceStorage().tokenTxLimit[_contractAddress][_tokenId];
     }
 
-    function getTokenTxsPerAddress(address _contractAddress, uint256 _tokenId, address _account)
-        external
-        view
-        returns (uint256)
-    {
+    function getTokenTxsPerAddress(
+        address _contractAddress,
+        uint256 _tokenId,
+        address _account
+    ) external view returns (uint256) {
         return _marketplaceStorage().tokenTxsPerAddress[_contractAddress][_tokenId][_account];
     }
 
-    function getSalePrice(address _contractAddress, uint256 _tokenId, address _seller)
-        external
-        view
-        returns (SalePrice memory)
-    {
+    function getSalePrice(
+        address _contractAddress,
+        uint256 _tokenId,
+        address _seller
+    ) external view returns (SalePrice memory) {
         return _marketplaceStorage().salePrices[_contractAddress][_tokenId][_seller];
     }
 
-    function getOffer(address _contractAddress, uint256 _tokenId, address _buyer, address _currencyAddress)
-        external
-        view
-        returns (Offer memory)
-    {
+    function getOffer(
+        address _contractAddress,
+        uint256 _tokenId,
+        address _buyer,
+        address _currencyAddress
+    ) external view returns (Offer memory) {
         return _marketplaceStorage().offers[_contractAddress][_tokenId][_buyer][_currencyAddress];
     }
 

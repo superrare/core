@@ -5,10 +5,10 @@ import {Script} from "forge-std/Script.sol";
 
 /// @notice Shared safety checks for scripts that configure ERC1155 marketplace execution modules.
 abstract contract RareERC1155ExecutionModuleScriptGuard is Script {
-    bytes32 private constant ERC1967_IMPLEMENTATION_SLOT =
+    bytes32 internal constant ERC1967_IMPLEMENTATION_SLOT =
         0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
-    bytes32 private constant ERC1967_BEACON_SLOT = 0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50;
-    bytes32 private constant ERC1967_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
+    bytes32 internal constant ERC1967_BEACON_SLOT = 0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50;
+    bytes32 internal constant ERC1967_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
 
     error ExecutionModuleHasNoCode(address _module);
     error ExecutionModuleCannotBeUpgradeableProxy(address _module, bytes32 _slot, bytes32 _value);
