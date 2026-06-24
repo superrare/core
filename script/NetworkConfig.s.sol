@@ -155,7 +155,15 @@ library NetworkConfig {
     config.erc20ApprovalManager = _addr(0xa837a7eAff154Ab837617Cf7250648D3Ec0A4436);
     config.erc721ApprovalManager = _addr(0x4bb0Deea6d1A30C601338aAB776d394C2AE5c0F8);
     config.erc1155ApprovalManager = _addr(0x6c88e19dB0d11939e283F3f876C6Dc3Cadf16a2F);
-    config.approvalManagerAdmin = _addr(0xdc005449848f65639D101A7D2B141c527E53f9d4);
+    config.rareErc1155TradeExecutionModule = _addr(0xFc5005ebe288869e6885a7b41B7Ad441eBE3DFDA);
+    config.rareErc1155CheckoutExecutionModule = _addr(0x6Eaaa5B24a42ef14704D4bB8A64B2E13F2138d76);
+    config.rareErc1155MarketplaceImplementation = _addr(0x14519442a98E2E55EE93Ac2b34e5c6BAcf2e3164);
+    config.rareErc1155MarketplaceProxy = _addr(0x0015F7659d86cd7F1049C039abE72AEd702De678);
+    config.rareErc1155ContractFactory = _addr(0x47d692D21Ee7DAb224Ce5587cE55fFA6A9563A93);
+    config.rareErc1155Implementation = _addr(0xED7aF5717fCb86C189Bf2554221e1372B7F2B41b);
+    config.rareErc1155ContractFactoryOwner = _addr(0x0bbF6fbB27645d6E587F63a260917EcD9B19b22F);
+    config.rareErc1155ContractFactoryDefaultMinter = _addr(0x0015F7659d86cd7F1049C039abE72AEd702De678);
+    config.approvalManagerAdmin = _addr(0x0bbF6fbB27645d6E587F63a260917EcD9B19b22F);
     config.rareBatchAuctionHouseProxy = _addr(0xdfce0a0569492c59f27B3715b81F1Bd25DdEbcE3);
     config.rareBatchAuctionHouseLogic = _addr(0xED45D28be67A99Fa83194Ed9568712775688b18C);
     config.rareBatchListingMarketplaceImplementation = _addr(0xE46Eab414D5aF20C18DfE3d276973D28126ceeAC);
