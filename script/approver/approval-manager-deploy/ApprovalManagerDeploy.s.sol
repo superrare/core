@@ -4,15 +4,15 @@ pragma solidity 0.8.18;
 import "forge-std/Script.sol";
 import {ERC20ApprovalManager} from "../../../src/v2/approver/ERC20/ERC20ApprovalManager.sol";
 import {ERC721ApprovalManager} from "../../../src/v2/approver/ERC721/ERC721ApprovalManager.sol";
+import {ERC1155ApprovalManager} from "../../../src/v2/approver/ERC1155/ERC1155ApprovalManager.sol";
 
 /// @title ApprovalManagerDeploy
-/// @notice Deployment script for ERC20ApprovalManager and ERC721ApprovalManager
+/// @notice Deployment script for ERC20ApprovalManager, ERC721ApprovalManager, and ERC1155ApprovalManager
 contract ApprovalManagerDeploy is Script {
   function run() external {
     // 1. Load private key and start broadcast
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     vm.startBroadcast(privateKey);
-    address deployer = vm.addr(privateKey);
 
     // 2. Deploy ERC20 Approval Manager
     ERC20ApprovalManager erc20ApprovalManager = new ERC20ApprovalManager();
@@ -20,9 +20,13 @@ contract ApprovalManagerDeploy is Script {
     // 3. Deploy ERC721 Approval Manager
     ERC721ApprovalManager erc721ApprovalManager = new ERC721ApprovalManager();
 
-    // 4. Log deployed addresses
+    // 4. Deploy ERC1155 Approval Manager
+    ERC1155ApprovalManager erc1155ApprovalManager = new ERC1155ApprovalManager();
+
+    // 5. Log deployed addresses
     console.log("ERC20ApprovalManager deployed at:", address(erc20ApprovalManager));
     console.log("ERC721ApprovalManager deployed at:", address(erc721ApprovalManager));
+    console.log("ERC1155ApprovalManager deployed at:", address(erc1155ApprovalManager));
 
     vm.stopBroadcast();
   }
