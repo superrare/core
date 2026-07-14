@@ -5,11 +5,15 @@ import {Test} from "forge-std/Test.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {IERC721Receiver} from "openzeppelin-contracts/token/ERC721/IERC721Receiver.sol";
 import {ERC721} from "openzeppelin-contracts/token/ERC721/ERC721.sol";
+import {ERC1155} from "openzeppelin-contracts/token/ERC1155/ERC1155.sol";
 import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
 import {IMarketplaceSettings} from "rareprotocol/aux/marketplace/IMarketplaceSettings.sol";
 import {IStakingSettings} from "rareprotocol/aux/marketplace/IStakingSettings.sol";
 import {ISpaceOperatorRegistry} from "rareprotocol/aux/registry/interfaces/ISpaceOperatorRegistry.sol";
 import {IApprovedTokenRegistry} from "rareprotocol/aux/registry/interfaces/IApprovedTokenRegistry.sol";
+import {IERC20ApprovalManager} from "../../v2/approver/ERC20/IERC20ApprovalManager.sol";
+import {MarketConfigV2} from "../../v2/utils/MarketConfigV2.sol";
+import {IRareERC1155MarketplaceTypes} from "../../marketplace/IRareERC1155MarketplaceTypes.sol";
 
 import {SuperRareBazaar} from "../../bazaar/SuperRareBazaar.sol";
 import {SuperRareBazaarERC20BuyProxy} from "../../bazaar/SuperRareBazaarERC20BuyProxy.sol";
@@ -110,6 +114,142 @@ contract CallbackCountingRareMinter {
   }
 }
 
+/// @notice Simulates a malicious collection/minter that reenters the proxy during mint settlement.
+contract ReenteringRareMinter {
+  SuperRareBazaarERC20BuyProxy private proxy;
+  bytes private reentryCall;
+  bool public reentryReverted;
+
+  function setProxy(SuperRareBazaarERC20BuyProxy _proxy) external {
+    proxy = _proxy;
+  }
+
+  function setReentryCall(bytes calldata _reentryCall) external {
+    reentryCall = _reentryCall;
+    reentryReverted = false;
+  }
+
+  function mintDirectSale(address _originContract, address, uint256, uint8, bytes32[] calldata) external {
+    TestMintNFT(_originContract).mintTo(msg.sender);
+
+    if (reentryCall.length == 0) {
+      return;
+    }
+
+    // Attempt a single reentry (cleared so the nested call cannot recurse forever).
+    bytes memory callData = reentryCall;
+    delete reentryCall;
+    (bool success,) = address(proxy).call(callData);
+    reentryReverted = !success;
+  }
+}
+
+contract PercentageMarketplaceSettings {
+  uint256 private immutable feePercentage;
+
+  constructor(uint256 _feePercentage) {
+    feePercentage = _feePercentage;
+  }
+
+  function calculateMarketplaceFee(uint256 _amount) external view returns (uint256) {
+    return (_amount * feePercentage) / 100;
+  }
+}
+
+contract PassthroughERC20ApprovalManager {
+  function transferFrom(address _token, address _from, address _to, uint256 _amount) external {
+    IERC20(_token).transferFrom(_from, _to, _amount);
+  }
+}
+
+contract MockERC1155Token is ERC1155 {
+  constructor() ERC1155("") {}
+
+  function mint(address _to, uint256 _id, uint256 _amount) external {
+    _mint(_to, _id, _amount, "");
+  }
+}
+
+contract SameTransaction1155Buyer {
+  function approveAndBuyBatch(
+    IERC20 _currency,
+    SuperRareBazaarERC20BuyProxy _proxy,
+    address _contractAddress,
+    address _seller,
+    uint256 _approvalAmount,
+    IRareERC1155MarketplaceTypes.BuyRequest[] calldata _requests,
+    address _recipient
+  ) external {
+    _currency.approve(address(_proxy), _approvalAmount);
+    _proxy.buyBatch(_contractAddress, _seller, address(_currency), _requests, _recipient);
+  }
+
+  function approveAndMintBatch(
+    IERC20 _currency,
+    SuperRareBazaarERC20BuyProxy _proxy,
+    address _contractAddress,
+    uint256 _approvalAmount,
+    IRareERC1155MarketplaceTypes.MintRequest[] calldata _requests,
+    address _recipient
+  ) external {
+    _currency.approve(address(_proxy), _approvalAmount);
+    _proxy.mintDirectSaleBatch(_contractAddress, address(_currency), _requests, _recipient);
+  }
+}
+
+/// @notice Minimal stand-in for RareERC1155Marketplace exercising the payment pull the proxy relies on.
+/// @dev Pulls funds from the caller (the proxy) through the ERC20 approval manager and delivers tokens to the
+/// recipient, mirroring the real marketplace's `buyBatch` / `mintDirectSaleBatch` settlement.
+contract MockERC1155Marketplace {
+  IMarketplaceSettings private immutable settings;
+  IERC20ApprovalManager private immutable approvalManager;
+  MockERC1155Token private immutable token;
+
+  constructor(address _settings, address _approvalManager, address _token) {
+    settings = IMarketplaceSettings(_settings);
+    approvalManager = IERC20ApprovalManager(_approvalManager);
+    token = MockERC1155Token(_token);
+  }
+
+  function getMarketConfig() external view returns (MarketConfigV2.Config memory config) {
+    config.marketplaceSettings = settings;
+    config.erc20ApprovalManager = approvalManager;
+  }
+
+  function buyBatch(
+    address,
+    address,
+    address _currencyAddress,
+    address _recipient,
+    IRareERC1155MarketplaceTypes.BuyRequest[] calldata _requests
+  ) external payable {
+    uint256 total = 0;
+    for (uint256 i = 0; i < _requests.length; i++) {
+      uint256 grossAmount = _requests[i].price * _requests[i].quantity;
+      total += grossAmount + settings.calculateMarketplaceFee(grossAmount);
+      token.mint(_recipient, _requests[i].tokenId, _requests[i].quantity);
+    }
+
+    approvalManager.transferFrom(_currencyAddress, msg.sender, address(this), total);
+  }
+
+  function mintDirectSaleBatch(
+    address,
+    address _currencyAddress,
+    address _recipient,
+    IRareERC1155MarketplaceTypes.MintRequest[] calldata _requests
+  ) external payable {
+    uint256 total = 0;
+    for (uint256 i = 0; i < _requests.length; i++) {
+      uint256 grossAmount = _requests[i].price * _requests[i].quantity;
+      total += grossAmount + settings.calculateMarketplaceFee(grossAmount);
+      token.mint(_recipient, _requests[i].tokenId, _requests[i].quantity);
+    }
+
+    approvalManager.transferFrom(_currencyAddress, msg.sender, address(this), total);
+  }
+}
+
 contract SuperRareBazaarERC20BuyProxyTest is Test {
   uint256 private constant SALE_PRICE = 100 ether;
   uint256 private constant MARKETPLACE_FEE = 3 ether;
@@ -119,6 +259,10 @@ contract SuperRareBazaarERC20BuyProxyTest is Test {
   uint8 private constant MINT_COUNT = 2;
   uint256 private constant MINT_TOTAL_PRICE = MINT_PRICE * MINT_COUNT;
   uint256 private constant MINT_REQUIRED_AMOUNT = MINT_TOTAL_PRICE + MARKETPLACE_FEE;
+  uint256 private constant ERC1155_FEE_PERCENTAGE = 3;
+  uint256 private constant ERC1155_TOKEN_ID = 7;
+  uint256 private constant ERC1155_PRICE = 40 ether;
+  uint256 private constant ERC1155_QUANTITY = 5;
 
   TestRare private currency;
   TestNFT private nft;
@@ -130,6 +274,11 @@ contract SuperRareBazaarERC20BuyProxyTest is Test {
   SuperRareBazaarERC20BuyProxy private proxy;
   SameTransactionBuyer private sameTransactionBuyer;
   SameTransactionMinter private sameTransactionMinter;
+  MockERC1155Marketplace private erc1155Marketplace;
+  PercentageMarketplaceSettings private erc1155MarketplaceSettings;
+  PassthroughERC20ApprovalManager private erc20ApprovalManager;
+  MockERC1155Token private erc1155Token;
+  SameTransaction1155Buyer private sameTransaction1155Buyer;
 
   address private marketplaceSettings = address(0xabadaba1);
   address private royaltyRegistry = address(0xabadaba2);
@@ -152,9 +301,16 @@ contract SuperRareBazaarERC20BuyProxyTest is Test {
     auctionHouse = new SuperRareAuctionHouse();
     bazaar = new SuperRareBazaar();
     rareMinter = new RareMinter();
-    proxy = new SuperRareBazaarERC20BuyProxy(address(bazaar), address(rareMinter));
+    erc1155MarketplaceSettings = new PercentageMarketplaceSettings(ERC1155_FEE_PERCENTAGE);
+    erc20ApprovalManager = new PassthroughERC20ApprovalManager();
+    erc1155Token = new MockERC1155Token();
+    erc1155Marketplace = new MockERC1155Marketplace(
+      address(erc1155MarketplaceSettings), address(erc20ApprovalManager), address(erc1155Token)
+    );
+    proxy = new SuperRareBazaarERC20BuyProxy(address(bazaar), address(rareMinter), address(erc1155Marketplace));
     sameTransactionBuyer = new SameTransactionBuyer();
     sameTransactionMinter = new SameTransactionMinter();
+    sameTransaction1155Buyer = new SameTransaction1155Buyer();
 
     Payments payments = new Payments();
     bazaar.initialize(
@@ -206,6 +362,7 @@ contract SuperRareBazaarERC20BuyProxyTest is Test {
 
     assertEq(currency.allowance(address(proxy), address(bazaar)), type(uint256).max);
     assertEq(currency.allowance(address(proxy), address(rareMinter)), type(uint256).max);
+    assertEq(currency.allowance(address(proxy), address(erc20ApprovalManager)), type(uint256).max);
   }
 
   function test_approveCurrency_onlyOwner() public {
@@ -253,12 +410,17 @@ contract SuperRareBazaarERC20BuyProxyTest is Test {
 
   function test_constructor_revertWhenBazaarZero() public {
     vm.expectRevert(SuperRareBazaarERC20BuyProxy.BazaarCannotBeZeroAddress.selector);
-    new SuperRareBazaarERC20BuyProxy(address(0), address(rareMinter));
+    new SuperRareBazaarERC20BuyProxy(address(0), address(rareMinter), address(erc1155Marketplace));
   }
 
   function test_constructor_revertWhenRareMinterZero() public {
     vm.expectRevert(SuperRareBazaarERC20BuyProxy.RareMinterCannotBeZeroAddress.selector);
-    new SuperRareBazaarERC20BuyProxy(address(bazaar), address(0));
+    new SuperRareBazaarERC20BuyProxy(address(bazaar), address(0), address(erc1155Marketplace));
+  }
+
+  function test_constructor_revertWhenERC1155MarketplaceZero() public {
+    vm.expectRevert(SuperRareBazaarERC20BuyProxy.ERC1155MarketplaceCannotBeZeroAddress.selector);
+    new SuperRareBazaarERC20BuyProxy(address(bazaar), address(rareMinter), address(0));
   }
 
   function test_mint_success_sameTransactionFunding() public {
@@ -300,7 +462,7 @@ contract SuperRareBazaarERC20BuyProxyTest is Test {
     MockBazaarSettings mockBazaar = new MockBazaarSettings(address(mockSettings));
     CallbackCountingRareMinter mismatchRareMinter = new CallbackCountingRareMinter(1, address(0), false);
     SuperRareBazaarERC20BuyProxy mismatchProxy =
-      new SuperRareBazaarERC20BuyProxy(address(mockBazaar), address(mismatchRareMinter));
+      new SuperRareBazaarERC20BuyProxy(address(mockBazaar), address(mismatchRareMinter), address(erc1155Marketplace));
     TestRare localCurrency = new TestRare();
     TestMintNFT localMintNft = new TestMintNFT();
 
@@ -323,7 +485,7 @@ contract SuperRareBazaarERC20BuyProxyTest is Test {
     CallbackCountingRareMinter gatedRareMinter =
       new CallbackCountingRareMinter(1, address(unrelatedMintNft), true);
     SuperRareBazaarERC20BuyProxy gatedProxy =
-      new SuperRareBazaarERC20BuyProxy(address(mockBazaar), address(gatedRareMinter));
+      new SuperRareBazaarERC20BuyProxy(address(mockBazaar), address(gatedRareMinter), address(erc1155Marketplace));
     TestRare localCurrency = new TestRare();
 
     gatedProxy.approveCurrency(address(localCurrency), type(uint256).max);
@@ -335,10 +497,138 @@ contract SuperRareBazaarERC20BuyProxyTest is Test {
     assertEq(unrelatedMintNft.ownerOf(1), address(gatedProxy));
   }
 
+  function test_mint_revertsOnReentrantCall() public {
+    MockMarketplaceSettings mockSettings = new MockMarketplaceSettings(MARKETPLACE_FEE);
+    MockBazaarSettings mockBazaar = new MockBazaarSettings(address(mockSettings));
+    ReenteringRareMinter reenteringRareMinter = new ReenteringRareMinter();
+    SuperRareBazaarERC20BuyProxy reentryProxy =
+      new SuperRareBazaarERC20BuyProxy(address(mockBazaar), address(reenteringRareMinter), address(erc1155Marketplace));
+    TestMintNFT localMintNft = new TestMintNFT();
+    TestRare localCurrency = new TestRare();
+
+    uint256 grossAmount = ERC1155_PRICE * ERC1155_QUANTITY;
+    uint256 marketplaceFee = (grossAmount * ERC1155_FEE_PERCENTAGE) / 100;
+    uint256 buyBatchRequiredAmount = grossAmount + marketplaceFee;
+
+    // Fund the reentering minter so a nested buyBatch would succeed without a reentrancy guard.
+    localCurrency.transfer(address(reenteringRareMinter), buyBatchRequiredAmount);
+    vm.prank(address(reenteringRareMinter));
+    localCurrency.approve(address(reentryProxy), buyBatchRequiredAmount);
+
+    IRareERC1155MarketplaceTypes.BuyRequest[] memory requests = _singleBuyRequest();
+    reenteringRareMinter.setProxy(reentryProxy);
+    reenteringRareMinter.setReentryCall(
+      abi.encodeWithSelector(
+        SuperRareBazaarERC20BuyProxy.buyBatch.selector,
+        address(erc1155Token),
+        seller,
+        address(localCurrency),
+        requests,
+        recipient
+      )
+    );
+
+    reentryProxy.approveCurrency(address(localCurrency), type(uint256).max);
+    localCurrency.approve(address(reentryProxy), MINT_PRICE + MARKETPLACE_FEE);
+
+    reentryProxy.mint(address(localMintNft), address(localCurrency), MINT_PRICE, 1, emptyProof, recipient);
+
+    assertTrue(reenteringRareMinter.reentryReverted());
+    assertEq(localMintNft.ownerOf(1), recipient);
+    assertEq(erc1155Token.balanceOf(recipient, ERC1155_TOKEN_ID), 0);
+  }
+
+  function test_buyBatch_success_sameTransactionFunding() public {
+    uint256 grossAmount = ERC1155_PRICE * ERC1155_QUANTITY;
+    uint256 marketplaceFee = (grossAmount * ERC1155_FEE_PERCENTAGE) / 100;
+    uint256 requiredAmount = grossAmount + marketplaceFee;
+
+    proxy.approveCurrency(address(currency), type(uint256).max);
+    currency.transfer(address(sameTransaction1155Buyer), requiredAmount);
+
+    IRareERC1155MarketplaceTypes.BuyRequest[] memory requests = _singleBuyRequest();
+
+    sameTransaction1155Buyer.approveAndBuyBatch(
+      IERC20(address(currency)), proxy, address(erc1155Token), seller, requiredAmount, requests, recipient
+    );
+
+    assertEq(erc1155Token.balanceOf(recipient, ERC1155_TOKEN_ID), ERC1155_QUANTITY);
+    assertEq(currency.balanceOf(address(erc1155Marketplace)), requiredAmount);
+    assertEq(currency.balanceOf(address(proxy)), 0);
+    assertEq(currency.balanceOf(address(sameTransaction1155Buyer)), 0);
+  }
+
+  function test_buyBatch_revertWhenCurrencyZero() public {
+    IRareERC1155MarketplaceTypes.BuyRequest[] memory requests = _singleBuyRequest();
+
+    vm.expectRevert(SuperRareBazaarERC20BuyProxy.CurrencyAddressCannotBeZero.selector);
+    proxy.buyBatch(address(erc1155Token), seller, address(0), requests, recipient);
+  }
+
+  function test_buyBatch_revertWhenRecipientZero() public {
+    IRareERC1155MarketplaceTypes.BuyRequest[] memory requests = _singleBuyRequest();
+
+    vm.expectRevert(SuperRareBazaarERC20BuyProxy.RecipientCannotBeZero.selector);
+    proxy.buyBatch(address(erc1155Token), seller, address(currency), requests, address(0));
+  }
+
+  function test_mintDirectSaleBatch_success_sameTransactionFunding() public {
+    uint256 grossAmount = ERC1155_PRICE * ERC1155_QUANTITY;
+    uint256 marketplaceFee = (grossAmount * ERC1155_FEE_PERCENTAGE) / 100;
+    uint256 requiredAmount = grossAmount + marketplaceFee;
+
+    proxy.approveCurrency(address(currency), type(uint256).max);
+    currency.transfer(address(sameTransaction1155Buyer), requiredAmount);
+
+    IRareERC1155MarketplaceTypes.MintRequest[] memory requests = _singleMintRequest();
+
+    sameTransaction1155Buyer.approveAndMintBatch(
+      IERC20(address(currency)), proxy, address(erc1155Token), requiredAmount, requests, recipient
+    );
+
+    assertEq(erc1155Token.balanceOf(recipient, ERC1155_TOKEN_ID), ERC1155_QUANTITY);
+    assertEq(currency.balanceOf(address(erc1155Marketplace)), requiredAmount);
+    assertEq(currency.balanceOf(address(proxy)), 0);
+    assertEq(currency.balanceOf(address(sameTransaction1155Buyer)), 0);
+  }
+
+  function test_mintDirectSaleBatch_revertWhenCurrencyZero() public {
+    IRareERC1155MarketplaceTypes.MintRequest[] memory requests = _singleMintRequest();
+
+    vm.expectRevert(SuperRareBazaarERC20BuyProxy.CurrencyAddressCannotBeZero.selector);
+    proxy.mintDirectSaleBatch(address(erc1155Token), address(0), requests, recipient);
+  }
+
+  function test_mintDirectSaleBatch_revertWhenRecipientZero() public {
+    IRareERC1155MarketplaceTypes.MintRequest[] memory requests = _singleMintRequest();
+
+    vm.expectRevert(SuperRareBazaarERC20BuyProxy.RecipientCannotBeZero.selector);
+    proxy.mintDirectSaleBatch(address(erc1155Token), address(currency), requests, address(0));
+  }
+
   function test_onERC721Received_success() public {
     bytes4 selector = proxy.onERC721Received(address(this), seller, TOKEN_ID, "");
 
     assertEq(selector, IERC721Receiver.onERC721Received.selector);
+  }
+
+  function _singleBuyRequest() internal pure returns (IRareERC1155MarketplaceTypes.BuyRequest[] memory requests) {
+    requests = new IRareERC1155MarketplaceTypes.BuyRequest[](1);
+    requests[0] = IRareERC1155MarketplaceTypes.BuyRequest({
+      tokenId: ERC1155_TOKEN_ID,
+      price: ERC1155_PRICE,
+      quantity: ERC1155_QUANTITY
+    });
+  }
+
+  function _singleMintRequest() internal pure returns (IRareERC1155MarketplaceTypes.MintRequest[] memory requests) {
+    requests = new IRareERC1155MarketplaceTypes.MintRequest[](1);
+    requests[0] = IRareERC1155MarketplaceTypes.MintRequest({
+      tokenId: ERC1155_TOKEN_ID,
+      price: ERC1155_PRICE,
+      quantity: ERC1155_QUANTITY,
+      proof: new bytes32[](0)
+    });
   }
 
   function _mockMarketDependencies() internal {

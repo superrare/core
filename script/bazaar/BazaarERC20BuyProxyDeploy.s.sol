@@ -15,12 +15,15 @@ contract BazaarERC20BuyProxyDeploy is Script {
 
     address bazaarAddress = vm.envAddress("BAZAAR_ADDRESS");
     address rareMinterAddress = vm.envAddress("RARE_MINTER_ADDRESS");
+    address erc1155MarketplaceAddress = vm.envAddress("ERC1155_MARKETPLACE_ADDRESS");
 
-    SuperRareBazaarERC20BuyProxy proxy = new SuperRareBazaarERC20BuyProxy(bazaarAddress, rareMinterAddress);
+    SuperRareBazaarERC20BuyProxy proxy =
+      new SuperRareBazaarERC20BuyProxy(bazaarAddress, rareMinterAddress, erc1155MarketplaceAddress);
 
     console.log("Deployer:", deployer);
     console.log("Bazaar:", bazaarAddress);
     console.log("RareMinter:", rareMinterAddress);
+    console.log("ERC1155Marketplace:", erc1155MarketplaceAddress);
     console.log("BazaarERC20BuyProxy deployed at:", address(proxy));
 
     vm.stopBroadcast();
