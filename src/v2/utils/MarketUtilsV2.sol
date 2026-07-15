@@ -296,8 +296,19 @@ library MarketUtilsV2 {
 
     // Calculate and pay out splits
     uint256[] memory splitAmounts = new uint256[](_splitRatios.length);
+    uint256 distributed = 0;
     for (uint256 i = 0; i < _splitRatios.length; i++) {
       splitAmounts[i] = (remainingAmount * _splitRatios[i]) / 100;
+      distributed += splitAmounts[i];
+    }
+
+    // Flooring each share can leave a rounding remainder so the per-recipient
+    // amounts sum to less than remainingAmount. performPayouts forwards
+    // remainingAmount as the total, and Payments.payout requires the total to
+    // equal the sum of the amounts -- so assign the remainder to the last
+    // recipient to keep them equal and distribute the full amount.
+    if (_splitRatios.length > 0) {
+      splitAmounts[_splitRatios.length - 1] += remainingAmount - distributed;
     }
 
     performPayouts(_config, _currencyAddress, remainingAmount, _splitAddrs, splitAmounts);

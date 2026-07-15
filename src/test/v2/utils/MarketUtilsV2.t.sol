@@ -885,6 +885,94 @@ contract MarketUtilsV2Test is Test {
     assertEq(bobBalanceAfter, bobExpectedBalance, "incorrect second split receiver balance after payout");
   }
 
+  function test_payout_multipleSplits_indivisibleAmount() public {
+    // Regression test for the split-payout rounding bug.
+    //
+    // payoutWithMarketplaceFee floors each recipient's cut
+    // (splitAmounts[i] = remainingAmount * ratio_i / 100) but passes the
+    // un-floored remainingAmount as the total to performPayouts. When the
+    // floors don't sum back to remainingAmount (the common case for non-round
+    // amounts), Payments.payout reverts with "payout::not enough sent",
+    // permanently bricking batch auction settlement / merkle-proof buys.
+    address originContract = address(0xaaaa);
+    uint256 tokenId = 1;
+    address currencyAddress = address(0);
+
+    // Odd-wei amount: a 50/50 split floors to (amount-1)/2 each, leaving the
+    // sum 1 wei short of remainingAmount.
+    uint256 amount = 1 ether + 1;
+
+    address payable[] memory splitAddrs = new address payable[](2);
+    uint8[] memory splitRatios = new uint8[](2);
+    splitAddrs[0] = payable(charlie);
+    splitAddrs[1] = payable(bob);
+    splitRatios[0] = 50;
+    splitRatios[1] = 50;
+
+    // setup getRewardAccumulatorAddressForUser call
+    vm.mockCall(
+      stakingRegistry,
+      abi.encodeWithSelector(IRareStakingRegistry.getRewardAccumulatorAddressForUser.selector, charlie),
+      abi.encode(address(0))
+    );
+
+    // setup calculateStakingFee call
+    vm.mockCall(
+      stakingSettings,
+      abi.encodeWithSelector(IStakingSettings.calculateStakingFee.selector, amount),
+      abi.encode(0)
+    );
+
+    // setup getMarketplaceFeePercentage call
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceFeePercentage.selector),
+      abi.encode(3)
+    );
+
+    // secondary sale so remainingAmount stays == amount (no primary fee)
+    vm.mockCall(
+      marketplaceSettings,
+      abi.encodeWithSelector(IMarketplaceSettings.hasERC721TokenSold.selector, originContract, 1),
+      abi.encode(true)
+    );
+
+    // no royalties -> remainingAmount is the full amount
+    vm.mockCall(
+      royaltyEngine,
+      abi.encodeWithSelector(IRoyaltyEngineV1.getRoyalty.selector, originContract, tokenId, amount),
+      abi.encode(new address payable[](0), new uint256[](0))
+    );
+
+    uint256 charlieBalanceBefore = charlie.balance;
+    uint256 bobBalanceBefore = bob.balance;
+
+    uint256 marketplaceFee = (amount * 3) / 100;
+
+    // Must not revert: the full remaining amount has to be distributable.
+    vm.prank(deployer);
+    tc.payout{value: amount + marketplaceFee}(
+      originContract,
+      tokenId,
+      currencyAddress,
+      amount,
+      charlie,
+      splitAddrs,
+      splitRatios
+    );
+
+    // First recipient gets its floored share; the last recipient absorbs the
+    // rounding remainder so the entire remaining amount is paid out.
+    uint256 charlieShare = (amount * 50) / 100;
+    uint256 bobShare = amount - charlieShare;
+
+    assertEq(charlie.balance, charlieBalanceBefore + charlieShare, "first split incorrect");
+    assertEq(bob.balance, bobBalanceBefore + bobShare, "last split should absorb remainder");
+    assertEq(charlieShare + bobShare, amount, "splits must sum to the full remaining amount");
+    // Nothing should be stranded in the market contract.
+    assertEq(address(tc).balance, 0, "no funds should remain in market contract");
+  }
+
   function test_payout_tooManyRoyaltyRecipients() public {
     address originContract = address(0xaaaa);
     uint256 tokenId = 1;
