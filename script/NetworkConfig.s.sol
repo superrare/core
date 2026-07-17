@@ -67,6 +67,10 @@ library NetworkConfig {
     address rareErc1155CheckoutExecutionModule;
     address rareErc1155MarketplaceImplementation;
     address rareErc1155MarketplaceProxy;
+    address physicalPrintErc1155TradeExecutionModule;
+    address physicalPrintErc1155CheckoutExecutionModule;
+    address physicalPrintErc1155MarketplaceImplementation;
+    address physicalPrintErc1155MarketplaceProxy;
     address rareErc1155ContractFactory;
     address rareErc1155Implementation;
     address rareErc1155ContractFactoryOwner;
@@ -84,6 +88,7 @@ library NetworkConfig {
     address royaltyEngineManifold;
     address lazySovereignBatchMintFactory;
     address superRareBazaarErc20BuyProxy;
+    address physicalPrintSuperRareBazaarErc20BuyProxy;
     address liquidFactory;
     address liquidRouter;
     address liquidRegistry;
@@ -175,7 +180,7 @@ library NetworkConfig {
     config.batchAuctionHouse = _addr(0xdfce0a0569492c59f27B3715b81F1Bd25DdEbcE3);
     config.royaltyEngineManifold = _addr(0x0385603ab55642cb4Dd5De3aE9e306809991804f);
     config.lazySovereignBatchMintFactory = _addr(0x40F9E4b420D5A8fF5aED32B5F72A37013c0739B6);
-    config.superRareBazaarErc20BuyProxy = _addr(0x9d7f4fbe053Fc5029AC17E67d6138980D6212Fa5);
+    config.superRareBazaarErc20BuyProxy = _addr(0x940d5AcDebc44eA545524AF1B3efDBa09D65F9eA);
     config.liquidFactory = _addr(0x25f993C222fE5e891128a782A5168f1C78629540);
     config.liquidRouter = _addr(0xEBd58EdA8408d9EA409f2c2bE8898BD9738f3583);
     config.liquidRegistry = _addr(0x4066052d6AAC25EcFB027fD0C1aD54A597Ce3A31);
@@ -233,6 +238,10 @@ library NetworkConfig {
     config.rareErc1155CheckoutExecutionModule = _addr(0x6fd762D5f5AdbBE12306c4A3DE46c03509aB0900);
     config.rareErc1155MarketplaceImplementation = _addr(0x9361023CB4249f68792caDC1615fd5FE280147AC);
     config.rareErc1155MarketplaceProxy = _addr(0xb26DE57230913a44F37AcE78F5b7eB2Efec474eE);
+    config.physicalPrintErc1155TradeExecutionModule = _addr(0x294eD4f5c5AfCcC695E10FD52d9fcaeDed7df17a);
+    config.physicalPrintErc1155CheckoutExecutionModule = _addr(0x4f8D6291B315dE4Fc97219b3355262f05A97E563);
+    config.physicalPrintErc1155MarketplaceImplementation = _addr(0x8E5192ffD6902CEF359C0320056CDEf298A4ccf7);
+    config.physicalPrintErc1155MarketplaceProxy = _addr(0x18d88f294AB481a3891A37A011c7Af84B6738493);
     config.rareErc1155ContractFactory = _addr(0xF8FF48ca6022138C58e2eDD680a02d7Cd394B957);
     config.rareErc1155Implementation = _addr(0x8442874bD9bC64286C1b01EedEb98cd70F467E84);
     config.rareErc1155ContractFactoryOwner = _addr(0x3B9C3C5EA16E7d3c9C0bb293a549aFa4066dc162);
@@ -246,7 +255,8 @@ library NetworkConfig {
     config.sovereignBatchMintImplementation = _addr(0xB9530FbA6cA19990E0E838D47c5AF0e4396A386e);
     config.royaltyEngineManifold = _addr(0xEF770dFb6D5620977213f55f99bfd781D04BBE15);
     config.lazySovereignBatchMintFactory = _addr(0xE5efBA88D556aDA98124654fE505465b8d494858);
-    config.superRareBazaarErc20BuyProxy = _addr(0xC68D3f1D951DEb15c384E6534d82fb4dd9e87717);
+    config.superRareBazaarErc20BuyProxy = _addr(0xE9232a537712A8d2325aD6D55627053b6A122f9c);
+    config.physicalPrintSuperRareBazaarErc20BuyProxy = _addr(0x6E1d3C09b1C1d82313623d11C311ee3E290F2733);
     config.liquidFactory = _addr(0xb1777091C953fa2aC1fD67f2b3e2f61343F5Ce5e);
     config.liquidRouter = _addr(0x429c3Ee66E7f6CDA12C5BadE4104aF3277aA2305);
     config.liquidRegistry = _addr(0x979C2FB02B8cF352eBeD15872B76b8bE78B64Ebc);

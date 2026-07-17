@@ -15,7 +15,7 @@ interface IBazaarSettings {
 
 contract SuperRareBazaarERC20BuyProxySepolia is Test {
   address private constant BAZAAR = 0xC8Edc7049b233641ad3723D6C60019D1c8771612;
-  address private constant PROXY = 0xC68D3f1D951DEb15c384E6534d82fb4dd9e87717;
+  address private constant PROXY = 0xE9232a537712A8d2325aD6D55627053b6A122f9c;
   address private constant RARE_MINTER = 0xd28Dc0B89104d7BBd902F338a0193fF063617ccE;
   address private constant USDC = 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238;
   address private constant NFT_CONTRACT = 0xf07956E787177912543Fe52e687Fd8b8706F1E3C;
