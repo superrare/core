@@ -180,7 +180,7 @@ library NetworkConfig {
     config.batchAuctionHouse = _addr(0xdfce0a0569492c59f27B3715b81F1Bd25DdEbcE3);
     config.royaltyEngineManifold = _addr(0x0385603ab55642cb4Dd5De3aE9e306809991804f);
     config.lazySovereignBatchMintFactory = _addr(0x40F9E4b420D5A8fF5aED32B5F72A37013c0739B6);
-    config.superRareBazaarErc20BuyProxy = _addr(0x9d7f4fbe053Fc5029AC17E67d6138980D6212Fa5);
+    config.superRareBazaarErc20BuyProxy = _addr(0x940d5AcDebc44eA545524AF1B3efDBa09D65F9eA);
     config.liquidFactory = _addr(0x25f993C222fE5e891128a782A5168f1C78629540);
     config.liquidRouter = _addr(0xEBd58EdA8408d9EA409f2c2bE8898BD9738f3583);
     config.liquidRegistry = _addr(0x4066052d6AAC25EcFB027fD0C1aD54A597Ce3A31);
