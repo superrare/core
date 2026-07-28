@@ -50,9 +50,10 @@ contract TestContract is SuperRareBazaarBase {
     uint256 _amount,
     address _seller,
     address payable[] memory _splitAddrs,
-    uint8[] memory _splitRatios
+    uint16[] memory _splitRatios,
+    address _app
   ) public payable {
-    _payout(_originContract, _tokenId, _currencyAddress, _amount, _seller, _splitAddrs, _splitRatios);
+    _payout(_originContract, _tokenId, _currencyAddress, _amount, _seller, _splitAddrs, _splitRatios, _app);
   }
 }
 
@@ -133,8 +134,8 @@ contract RareBazaarBaseTest is Test {
     address currencyAddress = address(0);
     uint256 amount = 1 ether;
     address payable[] memory splitAddrs = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     splitAddrs[0] = payable(charlie);
 
     // setup getRewardAccumulatorAddressForUser call -- 3%
@@ -165,38 +166,26 @@ contract RareBazaarBaseTest is Test {
       abi.encode((amount * 3) / 100)
     );
 
-    // setup has hasERC721TokenSold -- false
+    // setup getRoyalty -- empty (new payout uses royalty engine only)
     vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IMarketplaceSettings.hasERC721TokenSold.selector, originContract, 1),
-      abi.encode(false)
-    );
-    // setup has isApprovedSpaceOperator -- false
-    vm.mockCall(
-      spaceOperatorRegistry,
-      abi.encodeWithSelector(ISpaceOperatorRegistry.isApprovedSpaceOperator.selector, charlie),
-      abi.encode(false)
-    );
-
-    // setup has getERC721ContractPrimarySaleFeePercentage -- 15%
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IMarketplaceSettings.getERC721ContractPrimarySaleFeePercentage.selector, originContract),
-      abi.encode(15)
+      royaltyEngine,
+      abi.encodeWithSelector(IRoyaltyEngineV1.getRoyalty.selector, originContract, 1, amount),
+      abi.encode(new address payable[](0), new uint256[](0))
     );
     uint256 balanceBefore = charlie.balance;
     vm.prank(deployer);
-    tc.payout{value: amount + ((amount * 3) / 100)}(
+    tc.payout{value: amount}(
       originContract,
       tokenId,
       currencyAddress,
       amount,
       charlie,
       splitAddrs,
-      splitRatios
+      splitRatios,
+      address(0)
     );
     uint256 balanceAfter = charlie.balance;
-    uint256 expectedBalance = balanceBefore + ((amount * 85) / 100);
+    uint256 expectedBalance = balanceBefore + amount; // new payout: royalty only, no primary sale commission
     if (balanceAfter != expectedBalance) {
       emit log_named_uint("Expected: balanceAfter", expectedBalance);
       emit log_named_uint("Actual: balanceAfter", balanceAfter);
@@ -210,70 +199,30 @@ contract RareBazaarBaseTest is Test {
     address currencyAddress = address(0);
     uint256 amount = 1 ether;
     address payable[] memory splitAddrs = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     splitAddrs[0] = payable(charlie);
 
-    // setup getRewardAccumulatorAddressForUser call -- 3%
+    // setup getRoyalty -- empty (new payout: spaces deprecated)
     vm.mockCall(
-      stakingRegistry,
-      abi.encodeWithSelector(IRareStakingRegistry.getRewardAccumulatorAddressForUser.selector, charlie),
-      abi.encode(address(0))
-    );
-
-    // setup calculateMarketplacePayoutFee call -- 3%
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IStakingSettings.calculateMarketplacePayoutFee.selector, amount),
-      abi.encode((amount * 3) / 100)
-    );
-
-    // setup calculateStakingFee call -- 0%
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IStakingSettings.calculateStakingFee.selector, amount),
-      abi.encode(0)
-    );
-
-    // setup calculateMarketplaceFee call -- 3%
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IMarketplaceSettings.calculateMarketplaceFee.selector, amount),
-      abi.encode((amount * 3) / 100)
-    );
-
-    // setup hasERC721TokenSold -- false
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IMarketplaceSettings.hasERC721TokenSold.selector, originContract, 1),
-      abi.encode(false)
-    );
-    // setup isApprovedSpaceOperator -- true
-    vm.mockCall(
-      spaceOperatorRegistry,
-      abi.encodeWithSelector(ISpaceOperatorRegistry.isApprovedSpaceOperator.selector, charlie),
-      abi.encode(true)
-    );
-
-    // setup getPlatformCommission -- 5%
-    vm.mockCall(
-      spaceOperatorRegistry,
-      abi.encodeWithSelector(ISpaceOperatorRegistry.getPlatformCommission.selector, charlie),
-      abi.encode(5)
+      royaltyEngine,
+      abi.encodeWithSelector(IRoyaltyEngineV1.getRoyalty.selector, originContract, 1, amount),
+      abi.encode(new address payable[](0), new uint256[](0))
     );
     uint256 balanceBefore = charlie.balance;
     vm.prank(deployer);
-    tc.payout{value: amount + ((amount * 3) / 100)}(
+    tc.payout{value: amount}(
       originContract,
       tokenId,
       currencyAddress,
       amount,
       charlie,
       splitAddrs,
-      splitRatios
+      splitRatios,
+      address(0)
     );
     uint256 balanceAfter = charlie.balance;
-    uint256 expectedBalance = balanceBefore + ((amount * 95) / 100);
+    uint256 expectedBalance = balanceBefore + amount;
     if (balanceAfter != expectedBalance) {
       emit log_named_uint("Expected: balanceAfter", expectedBalance);
       emit log_named_uint("Actual: balanceAfter", balanceAfter);
@@ -287,50 +236,15 @@ contract RareBazaarBaseTest is Test {
     address currencyAddress = address(0);
     uint256 amount = 1 ether;
     address payable[] memory splitAddrs = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     splitAddrs[0] = payable(charlie);
     address payable[] memory royaltyReceiverAddrs = new address payable[](1);
     uint256[] memory royaltyAmounts = new uint256[](1);
     royaltyReceiverAddrs[0] = payable(alice);
     royaltyAmounts[0] = (amount * 10) / 100;
 
-    // setup calculateMarketplaceFee call -- 3%
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IMarketplaceSettings.calculateMarketplaceFee.selector, amount),
-      abi.encode((amount * 3) / 100)
-    );
-
-    // setup getRewardAccumulatorAddressForUser call -- 3%
-    vm.mockCall(
-      stakingRegistry,
-      abi.encodeWithSelector(IRareStakingRegistry.getRewardAccumulatorAddressForUser.selector, charlie),
-      abi.encode(address(0))
-    );
-
-    // setup calculateMarketplacePayoutFee call -- 3%
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IStakingSettings.calculateMarketplacePayoutFee.selector, amount),
-      abi.encode((amount * 3) / 100)
-    );
-
-    // setup calculateStakingFee call -- 3%
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IStakingSettings.calculateStakingFee.selector, amount),
-      abi.encode(0)
-    );
-
-    // setup has hasERC721TokenSold -- false
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IMarketplaceSettings.hasERC721TokenSold.selector, originContract, 1),
-      abi.encode(true)
-    );
-
-    // setup has getRoyalty -- 10%
+    // setup getRoyalty -- 10% to alice
     vm.mockCall(
       royaltyEngine,
       abi.encodeWithSelector(IRoyaltyEngineV1.getRoyalty.selector, originContract, 1, amount),
@@ -340,14 +254,15 @@ contract RareBazaarBaseTest is Test {
     uint256 balanceBefore = charlie.balance;
     uint256 aliceBalanceBefore = alice.balance;
     vm.prank(deployer);
-    tc.payout{value: amount + ((amount * 3) / 100)}(
+    tc.payout{value: amount}(
       originContract,
       tokenId,
       currencyAddress,
       amount,
       charlie,
       splitAddrs,
-      splitRatios
+      splitRatios,
+      address(0)
     );
     uint256 balanceAfter = charlie.balance;
     uint256 expectedBalance = balanceBefore + ((amount * 90) / 100);
@@ -358,7 +273,7 @@ contract RareBazaarBaseTest is Test {
       emit log_named_uint("Actual: balanceAfter", balanceAfter);
       revert("incorrect balance after on payout");
     }
-    if (balanceAfter != expectedBalance) {
+    if (aliceBalanceAfter != aliceExpectedBalance) {
       emit log_named_uint("Expected: aliceExpectedBalance", aliceExpectedBalance);
       emit log_named_uint("Actual: aliceBalanceAfter", aliceBalanceAfter);
       revert("incorrect balance after on payout");
@@ -371,70 +286,30 @@ contract RareBazaarBaseTest is Test {
     address currencyAddress = address(0);
     uint256 amount = 1 ether;
     address payable[] memory splitAddrs = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     splitAddrs[0] = payable(charlie);
 
-    // setup getRewardAccumulatorAddressForUser call -- 3%
+    // setup getRoyalty -- empty (new payout: no staking, charlie gets full amount)
     vm.mockCall(
-      stakingRegistry,
-      abi.encodeWithSelector(IRareStakingRegistry.getRewardAccumulatorAddressForUser.selector, charlie),
-      abi.encode(rewardPool)
+      royaltyEngine,
+      abi.encodeWithSelector(IRoyaltyEngineV1.getRoyalty.selector, originContract, 1, amount),
+      abi.encode(new address payable[](0), new uint256[](0))
     );
-
-    // setup calculateMarketplacePayoutFee call -- 3%
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IStakingSettings.calculateMarketplacePayoutFee.selector, amount),
-      abi.encode((amount * 2) / 100)
-    );
-
-    // setup calculateStakingFee call -- 1%
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IStakingSettings.calculateStakingFee.selector, amount),
-      abi.encode(amount / 100)
-    );
-
-    // setup calculateMarketplaceFee call -- 3%
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IMarketplaceSettings.calculateMarketplaceFee.selector, amount),
-      abi.encode((amount * 3) / 100)
-    );
-
-    // setup has hasERC721TokenSold -- false
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IMarketplaceSettings.hasERC721TokenSold.selector, originContract, 1),
-      abi.encode(false)
-    );
-    // setup has isApprovedSpaceOperator -- false
-    vm.mockCall(
-      spaceOperatorRegistry,
-      abi.encodeWithSelector(ISpaceOperatorRegistry.isApprovedSpaceOperator.selector, charlie),
-      abi.encode(false)
-    );
-
-    // setup has getERC721ContractPrimarySaleFeePercentage -- 15%
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IMarketplaceSettings.getERC721ContractPrimarySaleFeePercentage.selector, originContract),
-      abi.encode(15)
-    );
-    uint256 balanceBefore = rewardPool.balance;
+    uint256 balanceBefore = charlie.balance;
     vm.prank(deployer);
-    tc.payout{value: amount + ((amount * 3) / 100)}(
+    tc.payout{value: amount}(
       originContract,
       tokenId,
       currencyAddress,
       amount,
       charlie,
       splitAddrs,
-      splitRatios
+      splitRatios,
+      address(0)
     );
-    uint256 balanceAfter = rewardPool.balance;
-    uint256 expectedBalance = balanceBefore + (amount / 100);
+    uint256 balanceAfter = charlie.balance;
+    uint256 expectedBalance = balanceBefore + amount;
     if (balanceAfter != expectedBalance) {
       emit log_named_uint("Expected: balanceAfter", expectedBalance);
       emit log_named_uint("Actual: balanceAfter", balanceAfter);
@@ -448,69 +323,30 @@ contract RareBazaarBaseTest is Test {
     address currencyAddress = address(0);
     uint256 amount = 1 ether;
     address payable[] memory splitAddrs = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     splitAddrs[0] = payable(charlie);
 
-    // setup getRewardAccumulatorAddressForUser call -- 3%
+    // setup getRoyalty -- empty (new payout: charlie gets full amount)
     vm.mockCall(
-      stakingRegistry,
-      abi.encodeWithSelector(IRareStakingRegistry.getRewardAccumulatorAddressForUser.selector, charlie),
-      abi.encode(address(0))
+      royaltyEngine,
+      abi.encodeWithSelector(IRoyaltyEngineV1.getRoyalty.selector, originContract, 1, amount),
+      abi.encode(new address payable[](0), new uint256[](0))
     );
-
-    // setup calculateMarketplacePayoutFee call -- 3%
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IStakingSettings.calculateMarketplacePayoutFee.selector, amount),
-      abi.encode((amount * 2) / 100)
-    );
-
-    // setup calculateStakingFee call -- 1%
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IStakingSettings.calculateStakingFee.selector, amount),
-      abi.encode(amount / 100)
-    );
-
-    // setup calculateMarketplaceFee call -- 3%
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IMarketplaceSettings.calculateMarketplaceFee.selector, amount),
-      abi.encode((amount * 3) / 100)
-    );
-
-    // setup has hasERC721TokenSold -- false
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IMarketplaceSettings.hasERC721TokenSold.selector, originContract, 1),
-      abi.encode(false)
-    );
-    // setup has isApprovedSpaceOperator -- false
-    vm.mockCall(
-      spaceOperatorRegistry,
-      abi.encodeWithSelector(ISpaceOperatorRegistry.isApprovedSpaceOperator.selector, charlie),
-      abi.encode(false)
-    );
-
-    // setup has getERC721ContractPrimarySaleFeePercentage -- 15%
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IMarketplaceSettings.getERC721ContractPrimarySaleFeePercentage.selector, originContract),
-      abi.encode(15)
-    );
+    uint256 balanceBefore = charlie.balance;
     vm.prank(deployer);
-    tc.payout{value: amount + ((amount * 3) / 100)}(
+    tc.payout{value: amount}(
       originContract,
       tokenId,
       currencyAddress,
       amount,
       charlie,
       splitAddrs,
-      splitRatios
+      splitRatios,
+      address(0)
     );
-    uint256 balanceAfter = rewardPool.balance;
-    uint256 expectedBalance = balanceAfter;
+    uint256 balanceAfter = charlie.balance;
+    uint256 expectedBalance = balanceBefore + amount;
     if (balanceAfter != expectedBalance) {
       emit log_named_uint("Expected: balanceAfter", expectedBalance);
       emit log_named_uint("Actual: balanceAfter", balanceAfter);
@@ -523,60 +359,19 @@ contract RareBazaarBaseTest is Test {
     address currencyAddress = address(rare);
     uint256 amount = 1 ether;
     address payable[] memory splitAddrs = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     splitAddrs[0] = payable(charlie);
 
-    // setup getRewardAccumulatorAddressForUser call -- 3%
+    // setup getRoyalty -- empty (new payout: charlie gets full amount, no network beneficiary fee)
     vm.mockCall(
-      stakingRegistry,
-      abi.encodeWithSelector(IRareStakingRegistry.getRewardAccumulatorAddressForUser.selector, charlie),
-      abi.encode(address(0))
-    );
-
-    // setup calculateMarketplacePayoutFee call -- 3%
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IStakingSettings.calculateMarketplacePayoutFee.selector, amount),
-      abi.encode((amount * 2) / 100)
-    );
-
-    // setup calculateStakingFee call -- 1%
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IStakingSettings.calculateStakingFee.selector, amount),
-      abi.encode(amount / 100)
-    );
-
-    // setup calculateMarketplaceFee call -- 3%
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IMarketplaceSettings.calculateMarketplaceFee.selector, amount),
-      abi.encode((amount * 3) / 100)
-    );
-
-    // setup has hasERC721TokenSold -- false
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IMarketplaceSettings.hasERC721TokenSold.selector, originContract, 1),
-      abi.encode(false)
-    );
-    // setup has isApprovedSpaceOperator -- false
-    vm.mockCall(
-      spaceOperatorRegistry,
-      abi.encodeWithSelector(ISpaceOperatorRegistry.isApprovedSpaceOperator.selector, charlie),
-      abi.encode(false)
-    );
-
-    // setup has getERC721ContractPrimarySaleFeePercentage -- 15%
-    vm.mockCall(
-      marketplaceSettings,
-      abi.encodeWithSelector(IMarketplaceSettings.getERC721ContractPrimarySaleFeePercentage.selector, originContract),
-      abi.encode(15)
+      royaltyEngine,
+      abi.encodeWithSelector(IRoyaltyEngineV1.getRoyalty.selector, originContract, 1, amount),
+      abi.encode(new address payable[](0), new uint256[](0))
     );
     vm.prank(deployer);
-    rare.transfer(address(tc), amount + ((amount * 3) / 100));
-    uint256 nbBalanceBefore = rare.balanceOf(networkBeneficiary);
+    rare.transfer(address(tc), amount);
+    uint256 charlieBalanceBefore = rare.balanceOf(charlie);
     tc.payout(
       originContract,
       tokenId,
@@ -584,22 +379,15 @@ contract RareBazaarBaseTest is Test {
       amount,
       charlie,
       splitAddrs,
-      splitRatios
+      splitRatios,
+      address(0)
     );
-    uint256 balanceAfter = rewardPool.balance;
-    uint256 expectedBalance = balanceAfter;
-    if (balanceAfter != expectedBalance) {
-      emit log_named_uint("Expected: balanceAfter", expectedBalance);
-      emit log_named_uint("Actual: balanceAfter", balanceAfter);
+    uint256 charlieBalanceAfter = rare.balanceOf(charlie);
+    uint256 expectedBalance = charlieBalanceBefore + amount;
+    if (charlieBalanceAfter != expectedBalance) {
+      emit log_named_uint("Expected: charlieBalanceAfter", expectedBalance);
+      emit log_named_uint("Actual: charlieBalanceAfter", charlieBalanceAfter);
       revert("incorrect balance after on payout");
-    }
-
-    uint256 nbBalanceAfter = rare.balanceOf(networkBeneficiary);
-    uint256 nbExpectedBalance = nbBalanceBefore + ((amount * (15 + 3)) / 100);
-    if (nbBalanceAfter != nbExpectedBalance) {
-      emit log_named_uint("Expected: nbBalanceAfter", nbExpectedBalance);
-      emit log_named_uint("Actual: nbBalanceAfter", nbBalanceAfter);
-      revert("incorrect balance for network beneficiary after on payout");
     }
   }
 }

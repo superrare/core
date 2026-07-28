@@ -9,7 +9,7 @@ contract RoyaltyRegistry is Ownable, AccessControl, IRareRoyaltyRegistry {
     bytes32 public constant ROYALTY_FEE_SETTER_ROLE =
         keccak256("ROYALTY_FEE_SETTER_ROLE");
 
-    mapping(address => uint8) public contractRoyaltyPercentage;
+    mapping(address => uint16) public contractRoyaltyPercentage;
 
     mapping(address => bool) public contractRoyaltyPercentageSet;
 
@@ -45,35 +45,35 @@ contract RoyaltyRegistry is Ownable, AccessControl, IRareRoyaltyRegistry {
     function getERC721TokenRoyaltyPercentage(
         address _contractAddress,
         uint256 //_tokenId
-    ) public view override returns (uint8) {
+    ) public view override returns (uint16) {
         return
             contractRoyaltyPercentageSet[_contractAddress]
                 ? contractRoyaltyPercentage[_contractAddress]
-                : 10;
+                : 1000;
     }
 
     function getPercentageForSetERC721ContractRoyalty(address _contractAddress)
         external
         view
-        returns (uint8)
+        returns (uint16)
     {
         return
             contractRoyaltyPercentageSet[_contractAddress]
                 ? contractRoyaltyPercentage[_contractAddress]
-                : 10;
+                : 1000;
     }
 
     function setPercentageForSetERC721ContractRoyalty(
         address _contractAddress,
-        uint8 _percentage
+        uint16 _percentage
     ) external override {
         require(
             hasRole(ROYALTY_FEE_SETTER_ROLE, _msgSender()),
             "setPercentageForSetERC721ContractRoyalty::Caller must have royalty fee setter role"
         );
         require(
-            _percentage <= 100,
-            "setPercentageForSetERC721ContractRoyalty::_percentage must be <= 100"
+            _percentage <= 10000,
+            "setPercentageForSetERC721ContractRoyalty::_percentage must be <= 10000"
         );
         contractRoyaltyPercentage[_contractAddress] = _percentage;
         contractRoyaltyPercentageSet[_contractAddress] = true;
@@ -87,7 +87,7 @@ contract RoyaltyRegistry is Ownable, AccessControl, IRareRoyaltyRegistry {
         return
             (_amount *
                 getERC721TokenRoyaltyPercentage(_contractAddress, _tokenId)) /
-            100;
+            10000;
     }
 
     function tokenCreator(address _contractAddress, uint256 _tokenId)

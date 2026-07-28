@@ -64,7 +64,7 @@ contract RareBatchListingMarketplaceTest is Test {
 
   // Constants
   uint256 public constant SALE_PRICE = 1 ether;
-  uint8 public constant SPLIT_RATIO = 100;
+  uint16 public constant SPLIT_RATIO = 10000;
 
   function setUp() public {
     // Setup test users
@@ -122,8 +122,8 @@ contract RareBatchListingMarketplaceTest is Test {
     // Setup sale price config
     address payable[] memory splitAddresses = new address payable[](1);
     splitAddresses[0] = payable(makeAddr("splitRecipient"));
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
 
     salePriceConfig = IRareBatchListingMarketplace.MerkleSalePriceConfig({
       currency: address(currencyContract),
@@ -155,7 +155,7 @@ contract RareBatchListingMarketplaceTest is Test {
     vm.mockCall(
       _marketplaceSettings,
       abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceFeePercentage.selector),
-      abi.encode(uint8(3))
+      abi.encode(uint16(300))
     );
     vm.mockCall(
       _marketplaceSettings,
@@ -352,17 +352,17 @@ contract RareBatchListingMarketplaceTest is Test {
     // Create fresh tokens and Merkle tree
     (bytes32 root, , , ) = _createFreshMerkleTree(3);
 
-    // Create invalid splits (ratios don't sum to 100)
+    // Create invalid splits (ratios don't sum to 10000)
     address payable[] memory invalidSplitAddresses = new address payable[](2);
     invalidSplitAddresses[0] = payable(makeAddr("splitRecipient1"));
     invalidSplitAddresses[1] = payable(makeAddr("splitRecipient2"));
-    uint8[] memory invalidSplitRatios = new uint8[](2);
-    invalidSplitRatios[0] = 60;
-    invalidSplitRatios[1] = 60; // Total 120%, should fail
+    uint16[] memory invalidSplitRatios = new uint16[](2);
+    invalidSplitRatios[0] = 6000;
+    invalidSplitRatios[1] = 6000; // Total 120%, should fail
 
     // Try to register with invalid splits
     vm.startPrank(creator);
-    vm.expectRevert("checkSplits::Total must be equal to 100");
+    vm.expectRevert("checkSplits::Total must be equal to 10000");
     marketplace.registerSalePriceMerkleRoot(
       root,
       address(currencyContract),

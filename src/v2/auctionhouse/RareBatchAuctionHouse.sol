@@ -108,8 +108,8 @@ contract RareBatchAuctionHouse is
       _erc721ApprovalManager
     );
 
-    // Initialize auction settings
-    minimumBidIncreasePercentage = 1;
+    // Initialize auction settings (100 = 1% in basis points)
+    minimumBidIncreasePercentage = 100;
     maxAuctionLength = 7 days;
     auctionLengthExtension = 15 minutes;
 
@@ -197,9 +197,9 @@ contract RareBatchAuctionHouse is
                       ADMIN FUNCTIONS 
   //////////////////////////////////////////////////////////////*/
 
-  /// @notice Sets the minimum bid increase percentage
-  /// @param _minimumBidIncreasePercentage The new minimum bid increase percentage
-  function setMinimumBidIncreasePercentage(uint8 _minimumBidIncreasePercentage) external onlyOwner {
+  /// @notice Sets the minimum bid increase percentage in basis points (100 = 1%)
+  /// @param _minimumBidIncreasePercentage The new minimum bid increase in basis points
+  function setMinimumBidIncreasePercentage(uint16 _minimumBidIncreasePercentage) external onlyOwner {
     minimumBidIncreasePercentage = _minimumBidIncreasePercentage;
   }
 
@@ -258,7 +258,7 @@ contract RareBatchAuctionHouse is
 
     // If not first bid, verify minimum increase percentage
     if (previousBidder != address(0)) {
-      uint256 minBidIncrease = (currentBid.amount * minimumBidIncreasePercentage) / 100;
+      uint256 minBidIncrease = (currentBid.amount * minimumBidIncreasePercentage) / 10000;
       require(_amount >= currentBid.amount + minBidIncrease, "Must increase bid by minimum percentage");
     }
 
@@ -361,7 +361,7 @@ contract RareBatchAuctionHouse is
     external
     view
     override
-    returns (address, uint32, uint64, uint64, address, uint128, address payable[] memory, uint8[] memory)
+    returns (address, uint32, uint64, uint64, address, uint128, address payable[] memory, uint16[] memory)
   {
     Auction memory auction = tokenAuctions[_originContract][_tokenId];
 
@@ -389,7 +389,7 @@ contract RareBatchAuctionHouse is
     uint128 _startingAmount,
     uint64 _duration,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external override {
     // Check if currency is approved
     marketConfig.checkIfCurrencyIsApproved(_currency);
@@ -589,7 +589,7 @@ contract RareBatchAuctionHouse is
     external
     view
     override
-    returns (address bidder, address currencyAddress, uint128 amount, uint8 marketplaceFeeAtTime)
+    returns (address bidder, address currencyAddress, uint128 amount, uint16 marketplaceFeeAtTime)
   {
     Bid memory auctionBid = auctionBids[_originContract][_tokenId];
     Auction memory auction = tokenAuctions[_originContract][_tokenId];

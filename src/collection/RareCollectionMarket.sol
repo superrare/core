@@ -141,7 +141,7 @@ contract RareCollectionMarket is
           requiredAmount = 0;
         } else {
           // otherwise, set required amount to the difference of what was in the original offer.
-          requiredAmount = requiredAmount - (offer.amount + ((offer.amount * offer.marketplaceFee) / 100));
+          requiredAmount = requiredAmount - (offer.amount + ((offer.amount * offer.marketplaceFee) / 10000));
         }
       } else {
         // refund whole amount if currencies or fee percentages do not match.
@@ -170,7 +170,7 @@ contract RareCollectionMarket is
     address _currencyAddress,
     uint256 _amount,
     address payable[] calldata _splitAddrs,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external override nonReentrant notPaused {
     MarketUtils.senderMustBeTokenOwner(_originContract, _tokenId);
     MarketUtils.addressMustHaveMarketplaceApprovedForNFT(msg.sender, _originContract);
@@ -215,7 +215,7 @@ contract RareCollectionMarket is
     address _currencyAddress,
     uint256 _amount,
     address payable[] calldata _splitAddrs,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external override notPaused {
     marketConfig.checkIfCurrencyIsApproved(_currencyAddress);
     MarketUtils.addressMustHaveMarketplaceApprovedForNFT(msg.sender, _originContract);

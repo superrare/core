@@ -35,8 +35,9 @@ contract SuperRareBazaarStorage {
     address payable buyer;
     uint256 amount;
     uint256 timestamp;
-    uint8 marketplaceFee;
+    uint16 marketplaceFee;
     bool convertible;
+    address app; // app the buyer used when placing offer; address(0) = no app fee
   }
 
   // The Sale Price struct for a given token:
@@ -49,7 +50,8 @@ contract SuperRareBazaarStorage {
     address currencyAddress;
     uint256 amount;
     address payable[] splitRecipients;
-    uint8[] splitRatios;
+    uint16[] splitRatios;
+    address app; // app that facilitated the listing; address(0) = no app fee
   }
 
   // Structure of an Auction:
@@ -70,14 +72,15 @@ contract SuperRareBazaarStorage {
     uint256 minimumBid;
     bytes32 auctionType;
     address payable[] splitRecipients;
-    uint8[] splitRatios;
+    uint16[] splitRatios;
+    address app; // app that facilitated the auction; address(0) = no app fee on settlement
   }
 
   struct Bid {
     address payable bidder;
     address currencyAddress;
     uint256 amount;
-    uint8 marketplaceFee;
+    uint16 marketplaceFee;
   }
 
   /////////////////////////////////////////////////////////////////////////
@@ -89,7 +92,10 @@ contract SuperRareBazaarStorage {
     address indexed _seller,
     address _currencyAddress,
     uint256 _amount,
-    uint256 _tokenId
+    uint256 _tokenId,
+    address _app,
+    uint256 _appFee,
+    uint256 _protocolFee
   );
 
   event SetSalePrice(
@@ -99,7 +105,7 @@ contract SuperRareBazaarStorage {
     uint256 _amount,
     uint256 _tokenId,
     address payable[] _splitRecipients,
-    uint8[] _splitRatios
+    uint16[] _splitRatios
   );
 
   event OfferPlaced(
@@ -119,7 +125,10 @@ contract SuperRareBazaarStorage {
     uint256 _amount,
     uint256 _tokenId,
     address payable[] _splitAddresses,
-    uint8[] _splitRatios
+    uint16[] _splitRatios,
+    address _app,
+    uint256 _appFee,
+    uint256 _protocolFee
   );
 
   event CancelOffer(
@@ -159,7 +168,10 @@ contract SuperRareBazaarStorage {
     address _seller,
     uint256 indexed _tokenId,
     address _currencyAddress,
-    uint256 _amount
+    uint256 _amount,
+    address _app,
+    uint256 _appFee,
+    uint256 _protocolFee
   );
 
   /////////////////////////////////////////////////////////////////////////
@@ -196,8 +208,8 @@ contract SuperRareBazaarStorage {
   // Address of the network beneficiary
   address public networkBeneficiary;
 
-  // A minimum increase in bid amount when out bidding someone.
-  uint8 public minimumBidIncreasePercentage; // 10 = 10%
+  // A minimum increase in bid amount when out bidding someone (basis points, 1000 = 10%).
+  uint16 public minimumBidIncreasePercentage;
 
   // Maximum length that an auction can be.
   uint256 public maxAuctionLength;
@@ -220,6 +232,9 @@ contract SuperRareBazaarStorage {
   // Mapping from contract to mapping of tokenId to Bid.
   mapping(address => mapping(uint256 => Bid)) public auctionBids;
 
-  uint256[50] private __gap;
+  // Reference to the app registry
+  address public appRegistry;
+
+  uint256[49] private __gap;
   /// ALL NEW STORAGE MUST COME AFTER THIS
 }

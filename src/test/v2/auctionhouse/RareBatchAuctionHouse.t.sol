@@ -37,7 +37,7 @@ contract RareBatchAuctionHouseTest is Test {
     address bidder,
     uint128 amount,
     address currencyAddress,
-    uint8 marketplaceFee
+    uint16 marketplaceFee
   );
 
   RareBatchAuctionHouse public auctionHouse;
@@ -76,7 +76,7 @@ contract RareBatchAuctionHouseTest is Test {
   // Constants
   uint64 public constant AUCTION_DURATION = 1 days;
   uint128 public constant STARTING_AMOUNT = 1 ether;
-  uint8 public constant SPLIT_RATIO = 100;
+  uint16 public constant SPLIT_RATIO = 10000;
 
   function setUp() public {
     // Setup test users
@@ -129,8 +129,8 @@ contract RareBatchAuctionHouseTest is Test {
     // Setup auction config
     address payable[] memory splitAddresses = new address payable[](1);
     splitAddresses[0] = payable(makeAddr("splitRecipient"));
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
 
     auctionConfig = IRareBatchAuctionHouse.MerkleAuctionConfig({
       currency: address(currencyContract),
@@ -163,7 +163,7 @@ contract RareBatchAuctionHouseTest is Test {
     vm.mockCall(
       marketplaceSettings,
       abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceFeePercentage.selector),
-      abi.encode(uint8(3))
+      abi.encode(uint16(300))
     );
     vm.mockCall(
       marketplaceSettings,
@@ -233,7 +233,7 @@ contract RareBatchAuctionHouseTest is Test {
     vm.mockCall(
       spaceOperatorRegistry,
       abi.encodeWithSelector(ISpaceOperatorRegistry.getPlatformCommission.selector),
-      abi.encode(uint8(0))
+      abi.encode(uint16(0))
     );
 
     // Mock approved token registry
@@ -343,8 +343,8 @@ contract RareBatchAuctionHouseTest is Test {
     // Setup split addresses and ratios
     address payable[] memory splitAddresses = new address payable[](1);
     splitAddresses[0] = payable(makeAddr("splitRecipient"));
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
 
     // Mock isApprovedToken to return false for the invalid currency
     vm.mockCall(
@@ -372,8 +372,8 @@ contract RareBatchAuctionHouseTest is Test {
     // Setup split addresses and ratios
     address payable[] memory splitAddresses = new address payable[](1);
     splitAddresses[0] = payable(makeAddr("splitRecipient"));
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
 
     // Try to register with zero duration
     vm.startPrank(auctionCreator);
@@ -397,8 +397,8 @@ contract RareBatchAuctionHouseTest is Test {
     // Setup split addresses and ratios
     address payable[] memory splitAddresses = new address payable[](1);
     splitAddresses[0] = payable(makeAddr("splitRecipient"));
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
 
     // Register with minimum valid duration (1 second)
     vm.startPrank(auctionCreator);
@@ -821,7 +821,7 @@ contract RareBatchAuctionHouseTest is Test {
     vm.mockCall(
       address(spaceOperatorRegistry),
       abi.encodeWithSelector(ISpaceOperatorRegistry.getPlatformCommission.selector, auctionCreator),
-      abi.encode(uint8(0))
+      abi.encode(uint16(0))
     );
     vm.mockCall(
       marketplaceSettings,
@@ -1034,7 +1034,7 @@ contract RareBatchAuctionHouseTest is Test {
     vm.mockCall(
       address(spaceOperatorRegistry),
       abi.encodeWithSelector(ISpaceOperatorRegistry.getPlatformCommission.selector, auctionCreator),
-      abi.encode(uint8(0))
+      abi.encode(uint16(0))
     );
 
     vm.startPrank(bidder);
@@ -1835,8 +1835,8 @@ contract RareBatchAuctionHouseTest is Test {
 
     // Setup: Approve the auction house to spend bidder's tokens
     vm.startPrank(bidder);
-    uint8 originalFeePercentage = 3; // 3% fee at bid time
-    uint128 originalMarketplaceFee = uint128((STARTING_AMOUNT * originalFeePercentage) / 100);
+    uint16 originalFeePercentage = 300; // 3% fee at bid time (300 bp)
+    uint128 originalMarketplaceFee = uint128((STARTING_AMOUNT * originalFeePercentage) / 10000);
     uint128 requiredAmount = STARTING_AMOUNT + originalMarketplaceFee;
     currencyContract.approve(address(erc20ApprovalManager), requiredAmount);
 
@@ -1853,11 +1853,11 @@ contract RareBatchAuctionHouseTest is Test {
     vm.stopPrank();
 
     // Verify the bid was recorded with the original marketplace fee percentage
-    (, , , uint8 storedMarketplaceFeeAtTime) = auctionHouse.getCurrentBid(address(nftContract), firstTokenId);
+    (, , , uint16 storedMarketplaceFeeAtTime) = auctionHouse.getCurrentBid(address(nftContract), firstTokenId);
     assertEq(storedMarketplaceFeeAtTime, originalFeePercentage, "Stored marketplace fee should be 3%");
 
     // Simulate malicious admin changing marketplace fee to 100% after auction ends
-    uint8 maliciousNewFeePercentage = 100; // 100% fee - malicious change
+    uint16 maliciousNewFeePercentage = 10000; // 100% fee - malicious change (10000 bp)
     vm.mockCall(
       marketplaceSettings,
       abi.encodeWithSelector(IMarketplaceSettings.getMarketplaceFeePercentage.selector),
@@ -1901,7 +1901,7 @@ contract RareBatchAuctionHouseTest is Test {
 
     // Additional verification: Check that the stored marketplace fee is still the original one
     // This verifies that our fix preserves the original fee percentage in the event
-    (, , , uint8 finalStoredFee) = auctionHouse.getCurrentBid(address(nftContract), firstTokenId);
+    (, , , uint16 finalStoredFee) = auctionHouse.getCurrentBid(address(nftContract), firstTokenId);
     // Note: After settlement, the bid is deleted, so this will return 0
     // But the event should have emitted the correct stored fee
   }

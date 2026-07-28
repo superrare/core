@@ -26,7 +26,7 @@ interface IRareBatchAuctionHouse {
   function getAuctionDetails(
     address _originContract,
     uint256 _tokenId
-  ) external view returns (address, uint32, uint64, uint64, address, uint128, address payable[] memory, uint8[] memory);
+  ) external view returns (address, uint32, uint64, uint64, address, uint128, address payable[] memory, uint16[] memory);
 
   /// @notice Gets the current bid details for a specific token
   /// @param _originContract Contract address of the asset
@@ -38,7 +38,7 @@ interface IRareBatchAuctionHouse {
   function getCurrentBid(
     address _originContract,
     uint256 _tokenId
-  ) external view returns (address bidder, address currencyAddress, uint128 amount, uint8 marketplaceFeeAtTime);
+  ) external view returns (address bidder, address currencyAddress, uint128 amount, uint16 marketplaceFeeAtTime);
 
   // Merkle Auction Functions
 
@@ -55,7 +55,7 @@ interface IRareBatchAuctionHouse {
     uint128 _startingAmount,
     uint64 _duration,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external;
 
   /// @notice Cancels a previously registered Merkle root
@@ -134,14 +134,14 @@ interface IRareBatchAuctionHouse {
     uint64 lengthOfAuction; // 8 bytes
     uint128 minimumBid; // 16 bytes
     address payable[] splitRecipients; // dynamic
-    uint8[] splitRatios; // dynamic
+    uint16[] splitRatios; // dynamic
   }
 
   /// @notice Struct for storing bid information
   struct Bid {
     address bidder; // 20 bytes
     uint128 amount; // 16 bytes
-    uint8 marketplaceFeeAtTime; // 1 byte (percentage or basis points, capped at 255)
+    uint16 marketplaceFeeAtTime; // 2 bytes (basis points 0-10000)
   }
 
   /// @notice Struct for storing Merkle auction configuration
@@ -151,7 +151,7 @@ interface IRareBatchAuctionHouse {
     uint64 duration; // 8 bytes (e.g., up to ~584 billion years in seconds)
     uint32 nonce; // 4 bytes (allows 4B Merkle roots per creator)
     address payable[] splitAddresses; // dynamic
-    uint8[] splitRatios; // dynamic
+    uint16[] splitRatios; // dynamic
   }
   // Events
 
@@ -162,7 +162,7 @@ interface IRareBatchAuctionHouse {
     uint256 indexed tokenId,
     address currencyAddress,
     uint128 amount,
-    uint8 marketplaceFee,
+    uint16 marketplaceFee,
     address previousBidder
   );
 
@@ -174,7 +174,7 @@ interface IRareBatchAuctionHouse {
     address bidder,
     uint128 amount,
     address currencyAddress,
-    uint8 marketplaceFee
+    uint16 marketplaceFee
   );
 
   /// @notice Emitted when a Merkle auction root is registered

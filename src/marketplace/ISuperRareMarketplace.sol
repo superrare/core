@@ -11,12 +11,14 @@ interface ISuperRareMarketplace {
   /// @param _currencyAddress Address of the token being offered.
   /// @param _amount Amount being offered (excluding marketplace fee).
   /// @param _convertible If the offer can be converted into an auction
+  /// @param _app App facilitating the offer; address(0) = no app fee on acceptance
   function offer(
     address _originContract,
     uint256 _tokenId,
     address _currencyAddress,
     uint256 _amount,
-    bool _convertible
+    bool _convertible,
+    address _app
   ) external payable;
 
   /// @notice Purchases the token for the current sale price.
@@ -49,6 +51,7 @@ interface ISuperRareMarketplace {
   /// @param _target Address of the person this sale price is target to.
   /// @param _splitAddresses Addresses to split the sellers commission with.
   /// @param _splitRatios The ratio for the split corresponding to each of the addresses being split with.
+  /// @param _app App facilitating the listing; address(0) = no app fee on buy
   function setSalePrice(
     address _originContract,
     uint256 _tokenId,
@@ -56,7 +59,8 @@ interface ISuperRareMarketplace {
     uint256 _listPrice,
     address _target,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios,
+    address _app
   ) external;
 
   /// @notice Removes the current sale price of an asset for _target for the given currency.
@@ -82,6 +86,6 @@ interface ISuperRareMarketplace {
     address _currencyAddress,
     uint256 _amount,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external;
 }

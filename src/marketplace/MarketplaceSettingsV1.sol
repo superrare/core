@@ -25,11 +25,11 @@ contract MarketplaceSettingsV1 is Ownable, AccessControl, IMarketplaceSettings {
     // Min wei value within the marketplace
     uint256 private minValue;
 
-    // Percentage fee for the marketplace, 3 == 3%
-    uint8 private marketplaceFeePercentage;
+    // Marketplace fee in basis points (0-10000). 0 = 0%.
+    uint16 private marketplaceFeePercentage;
 
-    // Mapping of ERC721 contract to the primary sale fee. If primary sale fee is 0 for an origin contract then primary sale fee is ignored. 1 == 1%
-    mapping(address => uint8) private primarySaleFees;
+    // Mapping of ERC721 contract to the primary sale fee in basis points (0-10000). 0 = ignored.
+    mapping(address => uint16) private primarySaleFees;
 
     // Mapping of ERC721 contract to mapping of token ID to whether the token has been sold before.
     mapping(address => mapping(uint256 => bool)) private soldTokens;
@@ -46,7 +46,7 @@ contract MarketplaceSettingsV1 is Ownable, AccessControl, IMarketplaceSettings {
 
         minValue = 1000; // all amounts must be greater than 1000 Wei.
 
-        marketplaceFeePercentage = 3; // 3% marketplace fee on all txs.
+        marketplaceFeePercentage = 0; // Protocol base fee is zero; RareAppRegistry handles app fees.
 
         _setupRole(AccessControl.DEFAULT_ADMIN_ROLE, owner());
         grantRole(TOKEN_MARK_ROLE, owner());
@@ -115,14 +115,14 @@ contract MarketplaceSettingsV1 is Ownable, AccessControl, IMarketplaceSettings {
     // getMarketplaceFeePercentage
     /////////////////////////////////////////////////////////////////////////
     /**
-     * @dev Get the marketplace fee percentage.
-     * @return uint8 wei fee.
+     * @dev Get the marketplace fee percentage in basis points (0-10000).
+     * @return uint16 basis points fee.
      */
     function getMarketplaceFeePercentage()
         external
         view
         override
-        returns (uint8)
+        returns (uint16)
     {
         return marketplaceFeePercentage;
     }
@@ -131,15 +131,15 @@ contract MarketplaceSettingsV1 is Ownable, AccessControl, IMarketplaceSettings {
     // setMarketplaceFeePercentage
     /////////////////////////////////////////////////////////////////////////
     /**
-     * @dev Set the marketplace fee percentage.
+     * @dev Set the marketplace fee percentage in basis points (0-10000).
      * Requirements:
-     * - `_percentage` must be <= 100.
-     * @param _percentage uint8 percentage fee.
+     * - `_percentage` must be <= 10000.
+     * @param _percentage uint16 basis points fee.
      */
-    function setMarketplaceFeePercentage(uint8 _percentage) external onlyOwner {
+    function setMarketplaceFeePercentage(uint16 _percentage) external onlyOwner {
         require(
-            _percentage <= 100,
-            "setMarketplaceFeePercentage::_percentage must be <= 100"
+            _percentage <= 10000,
+            "setMarketplaceFeePercentage::_percentage must be <= 10000"
         );
         marketplaceFeePercentage = _percentage;
     }
@@ -158,22 +158,22 @@ contract MarketplaceSettingsV1 is Ownable, AccessControl, IMarketplaceSettings {
         override
         returns (uint256)
     {
-        return (_amount * marketplaceFeePercentage) / 100;
+        return (_amount * marketplaceFeePercentage) / 10000;
     }
 
     /////////////////////////////////////////////////////////////////////////
     // getERC721ContractPrimarySaleFeePercentage
     /////////////////////////////////////////////////////////////////////////
     /**
-     * @dev Get the primary sale fee percentage for a specific ERC721 contract.
+     * @dev Get the primary sale fee percentage for a specific ERC721 contract in basis points (0-10000).
      * @param _contractAddress address ERC721Contract address.
-     * @return uint8 wei primary sale fee.
+     * @return uint16 basis points primary sale fee.
      */
     function getERC721ContractPrimarySaleFeePercentage(address _contractAddress)
         external
         view
         override
-        returns (uint8)
+        returns (uint16)
     {
         return primarySaleFees[_contractAddress];
     }
@@ -182,21 +182,21 @@ contract MarketplaceSettingsV1 is Ownable, AccessControl, IMarketplaceSettings {
     // setERC721ContractPrimarySaleFeePercentage
     /////////////////////////////////////////////////////////////////////////
     /**
-     * @dev Set the primary sale fee percentage for a specific ERC721 contract.
+     * @dev Set the primary sale fee percentage for a specific ERC721 contract in basis points (0-10000).
      * Requirements:
      *
      * - `_contractAddress` cannot be the zero address.
-     * - `_percentage` must be <= 100.
+     * - `_percentage` must be <= 10000.
      * @param _contractAddress address ERC721Contract address.
-     * @param _percentage uint8 percentage fee for the ERC721 contract.
+     * @param _percentage uint16 basis points fee for the ERC721 contract.
      */
     function setERC721ContractPrimarySaleFeePercentage(
         address _contractAddress,
-        uint8 _percentage
+        uint16 _percentage
     ) external override onlyOwner {
         require(
-            _percentage <= 100,
-            "setERC721ContractPrimarySaleFeePercentage::_percentage must be <= 100"
+            _percentage <= 10000,
+            "setERC721ContractPrimarySaleFeePercentage::_percentage must be <= 10000"
         );
         primarySaleFees[_contractAddress] = _percentage;
     }
@@ -216,7 +216,7 @@ contract MarketplaceSettingsV1 is Ownable, AccessControl, IMarketplaceSettings {
         override
         returns (uint256)
     {
-        return (_amount * primarySaleFees[_contractAddress]) / 100;
+        return (_amount * primarySaleFees[_contractAddress]) / 10000;
     }
 
     /////////////////////////////////////////////////////////////////////////

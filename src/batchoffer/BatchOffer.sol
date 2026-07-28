@@ -121,7 +121,7 @@ contract BatchOfferCreator is
     address _contractAddress,
     uint256 _tokenId,
     address payable[] calldata _splitRecipients,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external payable nonReentrant {
     IERC721 erc721 = IERC721(_contractAddress);
     address tokenOwner = erc721.ownerOf(_tokenId);

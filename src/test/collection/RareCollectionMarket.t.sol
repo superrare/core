@@ -313,8 +313,8 @@ contract TestRareCollectionMarket is Test {
 
     address payable[] memory splitAddrs = new address payable[](1);
     splitAddrs[0] = payable(charlie);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     vm.startPrank(alice);
     market.acceptCollectionOffer(charlie, originContract, tokenId, zeroAddress, amount, splitAddrs, splitRatios);
     vm.stopPrank();
@@ -346,8 +346,8 @@ contract TestRareCollectionMarket is Test {
 
     address payable[] memory splitAddrs = new address payable[](2);
     splitAddrs[0] = payable(charlie);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     vm.startPrank(alice);
     vm.expectRevert(bytes("checkSplits::Splits and ratios must be equal"));
     market.acceptCollectionOffer(charlie, originContract, tokenId, zeroAddress, amount, splitAddrs, splitRatios);
@@ -375,8 +375,8 @@ contract TestRareCollectionMarket is Test {
 
     address payable[] memory splitAddrs = new address payable[](1);
     splitAddrs[0] = payable(charlie);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     vm.startPrank(alice);
     vm.expectRevert(
       abi.encodeWithSelector(IRareCollectionMarket.NoOfferExistsForBuyer.selector, originContract, charlie)
@@ -411,8 +411,8 @@ contract TestRareCollectionMarket is Test {
 
     address payable[] memory splitAddrs = new address payable[](1);
     splitAddrs[0] = payable(charlie);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     vm.startPrank(alice);
     vm.expectRevert(bytes("sender must be the token owner"));
     market.acceptCollectionOffer(charlie, originContract, tokenId, zeroAddress, amount, splitAddrs, splitRatios);
@@ -445,8 +445,8 @@ contract TestRareCollectionMarket is Test {
 
     address payable[] memory splitAddrs = new address payable[](1);
     splitAddrs[0] = payable(charlie);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     vm.startPrank(alice);
     vm.expectRevert(bytes("owner must have approved contract"));
     market.acceptCollectionOffer(charlie, originContract, tokenId, zeroAddress, amount, splitAddrs, splitRatios);
@@ -479,8 +479,8 @@ contract TestRareCollectionMarket is Test {
 
     address payable[] memory splitAddrs = new address payable[](1);
     splitAddrs[0] = payable(charlie);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     vm.startPrank(alice);
     vm.expectRevert(abi.encodeWithSelector(IRareCollectionMarket.IncorrectAmount.selector, amount, amount + 1));
     market.acceptCollectionOffer(charlie, originContract, tokenId, zeroAddress, amount + 1, splitAddrs, splitRatios);
@@ -513,8 +513,8 @@ contract TestRareCollectionMarket is Test {
 
     address payable[] memory splitAddrs = new address payable[](1);
     splitAddrs[0] = payable(charlie);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     vm.startPrank(alice);
     vm.expectRevert(
       abi.encodeWithSelector(IRareCollectionMarket.CurrencyMismatch.selector, currencyAddress, zeroAddress)
@@ -577,8 +577,8 @@ contract TestRareCollectionMarket is Test {
 
     address payable[] memory splitAddrs = new address payable[](1);
     splitAddrs[0] = payable(alice);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     vm.startPrank(alice);
     market.setCollectionSalePrice(originContract, zeroAddress, amount, splitAddrs, splitRatios);
     vm.stopPrank();
@@ -605,8 +605,8 @@ contract TestRareCollectionMarket is Test {
 
     address payable[] memory splitAddrs = new address payable[](1);
     splitAddrs[0] = payable(alice);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     vm.startPrank(alice);
     vm.expectRevert(bytes("Not approved currency"));
     market.setCollectionSalePrice(originContract, currencyAddress, amount, splitAddrs, splitRatios);
@@ -621,8 +621,8 @@ contract TestRareCollectionMarket is Test {
 
     address payable[] memory splitAddrs = new address payable[](1);
     splitAddrs[0] = payable(alice);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     vm.startPrank(alice);
     vm.expectRevert(bytes("owner must have approved contract"));
     market.setCollectionSalePrice(originContract, zeroAddress, amount, splitAddrs, splitRatios);
@@ -637,8 +637,8 @@ contract TestRareCollectionMarket is Test {
 
     address payable[] memory splitAddrs = new address payable[](2);
     splitAddrs[0] = payable(alice);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     vm.startPrank(alice);
     vm.expectRevert(bytes("checkSplits::Splits and ratios must be equal"));
     market.setCollectionSalePrice(originContract, zeroAddress, amount, splitAddrs, splitRatios);
@@ -653,8 +653,8 @@ contract TestRareCollectionMarket is Test {
 
     address payable[] memory splitAddrs = new address payable[](1);
     splitAddrs[0] = payable(alice);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     vm.startPrank(alice);
     vm.expectRevert(IRareCollectionMarket.AmountCantBeZero.selector);
     market.setCollectionSalePrice(originContract, zeroAddress, 0, splitAddrs, splitRatios);
@@ -669,8 +669,8 @@ contract TestRareCollectionMarket is Test {
 
     address payable[] memory splitAddrs = new address payable[](1);
     splitAddrs[0] = payable(alice);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
 
     vm.startPrank(alice);
     market.setCollectionSalePrice(originContract, zeroAddress, amount, splitAddrs, splitRatios);
@@ -692,8 +692,8 @@ contract TestRareCollectionMarket is Test {
 
     address payable[] memory splitAddrs = new address payable[](1);
     splitAddrs[0] = payable(alice);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
     vm.startPrank(alice);
     market.setCollectionSalePrice(originContract, zeroAddress, amount, splitAddrs, splitRatios);
     vm.stopPrank();
@@ -733,8 +733,8 @@ contract TestRareCollectionMarket is Test {
 
     address payable[] memory splitAddrs = new address payable[](1);
     splitAddrs[0] = payable(alice);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
 
     vm.startPrank(alice);
     market.setCollectionSalePrice(originContract, zeroAddress, amount, splitAddrs, splitRatios);
@@ -762,8 +762,8 @@ contract TestRareCollectionMarket is Test {
 
     address payable[] memory splitAddrs = new address payable[](1);
     splitAddrs[0] = payable(alice);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
 
     vm.startPrank(alice);
     // Mocks for: MarketUtils.addressMustHaveMarketplaceApprovedForNFT(msg.sender, _originContract);
@@ -803,8 +803,8 @@ contract TestRareCollectionMarket is Test {
 
     address payable[] memory splitAddrs = new address payable[](1);
     splitAddrs[0] = payable(alice);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
 
     vm.startPrank(charlie);
     vm.expectRevert(abi.encodeWithSelector(IRareCollectionMarket.SalePriceDoesntExist.selector, alice, originContract));
@@ -835,8 +835,8 @@ contract TestRareCollectionMarket is Test {
 
     address payable[] memory splitAddrs = new address payable[](1);
     splitAddrs[0] = payable(alice);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
 
     vm.startPrank(alice);
     market.setCollectionSalePrice(originContract, zeroAddress, amount, splitAddrs, splitRatios);
@@ -871,8 +871,8 @@ contract TestRareCollectionMarket is Test {
 
     address payable[] memory splitAddrs = new address payable[](1);
     splitAddrs[0] = payable(alice);
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100;
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000;
 
     vm.startPrank(alice);
     market.setCollectionSalePrice(originContract, zeroAddress, amount, splitAddrs, splitRatios);
@@ -936,11 +936,11 @@ contract TestRareCollectionMarket is Test {
       abi.encode(false)
     );
 
-    // setup has getERC721ContractPrimarySaleFeePercentage -- 15%
+    // setup has getERC721ContractPrimarySaleFeePercentage -- 15% (1500 bp)
     vm.mockCall(
       marketplaceSettings,
       abi.encodeWithSelector(IMarketplaceSettings.getERC721ContractPrimarySaleFeePercentage.selector, originContract),
-      abi.encode(15)
+      abi.encode(uint16(1500))
     );
 
   }

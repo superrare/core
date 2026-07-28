@@ -15,7 +15,7 @@ interface IRareBatchListingMarketplace {
     address currency;
     uint256 amount;
     address payable[] splitRecipients;
-    uint8[] splitRatios;
+    uint16[] splitRatios;
     uint256 nonce;
   }
 
@@ -72,7 +72,7 @@ interface IRareBatchListingMarketplace {
     address _currency,
     uint256 _amount,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external;
 
   /// @notice Cancels a previously registered sale price Merkle root

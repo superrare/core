@@ -16,12 +16,14 @@ interface ISuperRareBazaar {
   /// @param _currencyAddress Address of the token being offered.
   /// @param _amount Amount being offered.
   /// @param _convertible If the offer can be converted into an auction
+  /// @param _app App facilitating the offer; address(0) = no app fee on acceptance
   function offer(
     address _originContract,
     uint256 _tokenId,
     address _currencyAddress,
     uint256 _amount,
-    bool _convertible
+    bool _convertible,
+    address _app
   ) external payable;
 
   /// @notice Purchases the token for the current sale price.
@@ -47,6 +49,7 @@ interface ISuperRareBazaar {
   /// @param _target Address of the person this sale price is target to.
   /// @param _splitAddresses Addresses to split the sellers commission with.
   /// @param _splitRatios The ratio for the split corresponding to each of the addresses being split with.
+  /// @param _app App facilitating the listing; address(0) = no app fee on buy
   function setSalePrice(
     address _originContract,
     uint256 _tokenId,
@@ -54,7 +57,8 @@ interface ISuperRareBazaar {
     uint256 _listPrice,
     address _target,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios,
+    address _app
   ) external;
 
   /// @notice Removes the current sale price of an asset for the given currency.
@@ -76,7 +80,7 @@ interface ISuperRareBazaar {
     address _currencyAddress,
     uint256 _amount,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external;
 
   // Auction House
@@ -107,6 +111,7 @@ interface ISuperRareBazaar {
   /// @param _lengthOfAuction The amount of time in seconds that the auction is configured for.
   /// @param _splitAddresses Addresses to split the sellers commission with.
   /// @param _splitRatios The ratio for the split corresponding to each of the addresses being split with.
+  /// @param _app App facilitating the auction; address(0) = no app fee on settlement
   function configureAuction(
     bytes32 _auctionType,
     address _originContract,
@@ -116,7 +121,8 @@ interface ISuperRareBazaar {
     uint256 _lengthOfAuction,
     uint256 _startTime,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios,
+    address _app
   ) external;
 
   /// @notice Cancels a configured Auction that has not started.
@@ -139,7 +145,7 @@ interface ISuperRareBazaar {
     uint256 _amount,
     uint256 _lengthOfAuction,
     address payable[] calldata _splitAddresses,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external;
 
   /// @notice Grabs the current auction details for a token.
@@ -163,14 +169,14 @@ interface ISuperRareBazaar {
       uint256,
       bytes32,
       address payable[] calldata,
-      uint8[] calldata
+      uint16[] calldata
     );
 
   function getSalePrice(
     address _originContract,
     uint256 _tokenId,
     address _target
-  ) external view returns (address, address, uint256, address payable[] memory, uint8[] memory);
+  ) external view returns (address, address, uint256, address payable[] memory, uint16[] memory);
 
   // // Merkle Auction Functions
 

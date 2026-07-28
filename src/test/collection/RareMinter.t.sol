@@ -64,7 +64,7 @@ contract TestRareMinter is Test {
   address zeroAddress = address(0);
   bytes32[] emptyProof = new bytes32[](0);
   uint256 tokenId = 1;
-  uint8 marketplaceFeePercentage = 3;
+  uint16 marketplaceFeePercentage = 300;
 
   address currencyAddress;
 
@@ -104,6 +104,13 @@ contract TestRareMinter is Test {
     vm.etch(spaceOperatorRegistry, address(rareMinter).code);
     vm.etch(approvedTokenRegistry, address(rareMinter).code);
 
+    // Mock approved token for ERC20 currency
+    vm.mockCall(
+      approvedTokenRegistry,
+      abi.encodeWithSelector(IApprovedTokenRegistry.isApprovedToken.selector, currencyAddress),
+      abi.encode(true)
+    );
+
     vm.stopPrank();
   }
 
@@ -116,9 +123,9 @@ contract TestRareMinter is Test {
 
     // Prep args
     address payable[] memory splitRecipients = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
+    uint16[] memory splitRatios = new uint16[](1);
     splitRecipients[0] = payable(alice);
-    splitRatios[0] = 100;
+    splitRatios[0] = 10000;
     uint256 startTime = block.timestamp + 60;
 
     vm.startPrank(alice);
@@ -183,9 +190,9 @@ contract TestRareMinter is Test {
     currency.approve(address(rareMinter), amount + (amount * 3) / 100);
     // Prepare the mint
     address payable[] memory splitRecipients = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
+    uint16[] memory splitRatios = new uint16[](1);
     splitRecipients[0] = payable(alice);
-    splitRatios[0] = 100;
+    splitRatios[0] = 10000;
     uint256 startTime = block.timestamp + 60;
 
     vm.startPrank(alice);
@@ -250,9 +257,9 @@ contract TestRareMinter is Test {
 
     // Prepare the mint
     address payable[] memory splitRecipients = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
+    uint16[] memory splitRatios = new uint16[](1);
     splitRecipients[0] = payable(alice);
-    splitRatios[0] = 100;
+    splitRatios[0] = 10000;
     uint256 startTime = block.timestamp + 60;
 
     vm.startPrank(alice);
@@ -326,9 +333,9 @@ contract TestRareMinter is Test {
 
     // Prepare the mint
     address payable[] memory splitRecipients = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
+    uint16[] memory splitRatios = new uint16[](1);
     splitRecipients[0] = payable(alice);
-    splitRatios[0] = 100;
+    splitRatios[0] = 10000;
     uint256 startTime = block.timestamp + 60;
 
     vm.startPrank(alice);
@@ -385,9 +392,9 @@ contract TestRareMinter is Test {
 
     // Prepare the mint
     address payable[] memory splitRecipients = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
+    uint16[] memory splitRatios = new uint16[](1);
     splitRecipients[0] = payable(alice);
-    splitRatios[0] = 100;
+    splitRatios[0] = 10000;
     uint256 startTime = block.timestamp + 60;
 
     vm.startPrank(alice);
@@ -444,9 +451,9 @@ contract TestRareMinter is Test {
 
     // Prepare the mint
     address payable[] memory splitRecipients = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
+    uint16[] memory splitRatios = new uint16[](1);
     splitRecipients[0] = payable(alice);
-    splitRatios[0] = 100;
+    splitRatios[0] = 10000;
     uint256 startTime = block.timestamp + 60;
 
     vm.startPrank(alice);
@@ -487,9 +494,9 @@ contract TestRareMinter is Test {
 
     // Prepare the mint
     address payable[] memory splitRecipients = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
+    uint16[] memory splitRatios = new uint16[](1);
     splitRecipients[0] = payable(alice);
-    splitRatios[0] = 100;
+    splitRatios[0] = 10000;
     uint256 startTime = block.timestamp + 60;
 
     vm.startPrank(alice);
@@ -514,25 +521,24 @@ contract TestRareMinter is Test {
     vm.prank(deployer);
     testErc721.transferOwnership(alice);
 
-    // Prepare the mint
+    // Prepare the mint with ETH (address(0))
     address payable[] memory splitRecipients = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
+    uint16[] memory splitRatios = new uint16[](1);
     splitRecipients[0] = payable(alice);
-    splitRatios[0] = 100;
+    splitRatios[0] = 10000;
     uint256 startTime = block.timestamp + 60;
 
     vm.startPrank(alice);
     rareMinter.prepareMintDirectSale(address(testErc721), address(0), price, startTime, 0, splitRecipients, splitRatios);
-    vm.expectRevert();
     vm.stopPrank();
 
     // Warp to start time
     vm.warp(startTime);
 
-    vm.startPrank(charlie);
-    vm.expectRevert();
+    // Try to mint with wrong currency (ERC20 instead of ETH) - should revert
+    vm.prank(charlie);
+    vm.expectRevert("mintDirectSale::Currency does not match required currency");
     rareMinter.mintDirectSale(address(testErc721), currencyAddress, price, 3, emptyProof);
-    vm.stopPrank();
   }
 
   function test_mintDirectSale_fail_unapproved_currency() public {
@@ -546,9 +552,9 @@ contract TestRareMinter is Test {
 
     // Prepare the mint
     address payable[] memory splitRecipients = new address payable[](1);
-    uint8[] memory splitRatios = new uint8[](1);
+    uint16[] memory splitRatios = new uint16[](1);
     splitRecipients[0] = payable(alice);
-    splitRatios[0] = 100;
+    splitRatios[0] = 10000;
     uint256 startTime = block.timestamp + 60;
 
     vm.startPrank(alice);
@@ -614,14 +620,14 @@ contract TestRareMinter is Test {
       abi.encode(false)
     );
 
-    // setup has getERC721ContractPrimarySaleFeePercentage -- 15%
+    // setup has getERC721ContractPrimarySaleFeePercentage -- 15% (1500 bp)
     vm.mockCall(
       marketplaceSettings,
       abi.encodeWithSelector(
         IMarketplaceSettings.getERC721ContractPrimarySaleFeePercentage.selector,
         address(testErc721)
       ),
-      abi.encode(15)
+      abi.encode(uint16(1500))
     );
   }
 }

@@ -16,7 +16,7 @@ interface IRareMinter {
     uint256 startTime;
     uint256 maxMints;
     address payable[] splitRecipients;
-    uint8[] splitRatios;
+    uint16[] splitRatios;
   }
 
   /// @notice Allow list config
@@ -43,7 +43,7 @@ interface IRareMinter {
     uint256 _startTime,
     uint256 _maxMints,
     address payable[] splitRecipients,
-    uint8[] splitRatios
+    uint16[] splitRatios
   );
 
   /// @notice Event emitted when a contract is prepared for direct sale
@@ -127,7 +127,7 @@ interface IRareMinter {
     uint256 _startTime,
     uint256 _maxMints,
     address payable[] calldata _splitRecipients,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external;
 
   /// @notice Mints a token to the buyer

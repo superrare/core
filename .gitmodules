@@ -41,3 +41,6 @@
 	path = lib/murky
 	url = https://github.com/dmfxyz/murky
 	branch = main
+[submodule "lib/libraries-solidity"]
+	path = lib/libraries-solidity
+	url = https://github.com/manifoldxyz/libraries-solidity

@@ -29,12 +29,12 @@ contract SpaceOperatorRegistry is
         external
         pure
         override
-        returns (uint8)
+        returns (uint16)
     {
-        return 5;
+        return 500;
     }
 
-    function setPlatformCommission(address, uint8) external override {}
+    function setPlatformCommission(address, uint16) external override {}
 
     function isApprovedSpaceOperator(address _operator)
         external

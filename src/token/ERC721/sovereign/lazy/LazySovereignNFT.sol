@@ -102,7 +102,7 @@ contract LazySovereignNFT is
         uint256 _maxTokens
     ) public initializer {
         require(_creator != address(0), "creator cannot be null address");
-        _setDefaultRoyaltyPercentage(10);
+        _setDefaultRoyaltyPercentage(1000);
         disabled = false;
         maxTokens = _maxTokens;
 

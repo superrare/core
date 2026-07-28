@@ -22,14 +22,14 @@ contract MarketplaceSettingsV2 is Ownable, AccessControl, IMarketplaceSettings {
     uint256 private maxValue;
     uint256 private minValue;
 
-    uint8 private marketplaceFeePercentage;
-    uint8 private primarySaleFeePercentage;
+    uint16 private marketplaceFeePercentage;
+    uint16 private primarySaleFeePercentage;
 
     constructor(address newOwner, address oldSettings) {
         maxValue = 2 ** 254;
         minValue = 1000;
-        marketplaceFeePercentage = 3;
-        primarySaleFeePercentage = 15;
+        marketplaceFeePercentage = 0;
+        primarySaleFeePercentage = 0;
 
         require(
             newOwner != address(0),
@@ -61,7 +61,7 @@ contract MarketplaceSettingsV2 is Ownable, AccessControl, IMarketplaceSettings {
     }
 
     function setPrimarySaleFeePercentage(
-        uint8 _primarySaleFeePercentage
+        uint16 _primarySaleFeePercentage
     ) external onlyOwner {
         primarySaleFeePercentage = _primarySaleFeePercentage;
     }
@@ -82,15 +82,15 @@ contract MarketplaceSettingsV2 is Ownable, AccessControl, IMarketplaceSettings {
         external
         view
         override
-        returns (uint8)
+        returns (uint16)
     {
         return marketplaceFeePercentage;
     }
 
-    function setMarketplaceFeePercentage(uint8 _percentage) external onlyOwner {
+    function setMarketplaceFeePercentage(uint16 _percentage) external onlyOwner {
         require(
-            _percentage <= 100,
-            "setMarketplaceFeePercentage::_percentage must be <= 100"
+            _percentage <= 10000,
+            "setMarketplaceFeePercentage::_percentage must be <= 10000"
         );
         marketplaceFeePercentage = _percentage;
     }
@@ -98,25 +98,25 @@ contract MarketplaceSettingsV2 is Ownable, AccessControl, IMarketplaceSettings {
     function calculateMarketplaceFee(
         uint256 _amount
     ) external view override returns (uint256) {
-        return (_amount * marketplaceFeePercentage) / 100;
+        return (_amount * marketplaceFeePercentage) / 10000;
     }
 
     function getERC721ContractPrimarySaleFeePercentage(
         address
-    ) external view override returns (uint8) {
+    ) external view override returns (uint16) {
         return primarySaleFeePercentage;
     }
 
     function setERC721ContractPrimarySaleFeePercentage(
         address _contractAddress,
-        uint8 _percentage
+        uint16 _percentage
     ) external override {}
 
     function calculatePrimarySaleFee(
         address,
         uint256 _amount
     ) external view override returns (uint256) {
-        return (_amount * primarySaleFeePercentage) / 100;
+        return (_amount * primarySaleFeePercentage) / 10000;
     }
 
     function hasERC721TokenSold(

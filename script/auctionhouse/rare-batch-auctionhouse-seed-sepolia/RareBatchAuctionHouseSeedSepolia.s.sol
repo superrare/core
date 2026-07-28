@@ -62,8 +62,8 @@ contract RareBatchAuctionHouseSeedSepolia is Script {
     // Register the Merkle root with the auction house
     address payable[] memory splitAddresses = new address payable[](1);
     splitAddresses[0] = payable(deployer); // Set the deployer as the recipient
-    uint8[] memory splitRatios = new uint8[](1);
-    splitRatios[0] = 100; // 100% to the deployer
+    uint16[] memory splitRatios = new uint16[](1);
+    splitRatios[0] = 10000; // 100% to the deployer
 
     // Register the Merkle root for the auction
     rareBatchAuctionHouse.registerAuctionMerkleRoot(

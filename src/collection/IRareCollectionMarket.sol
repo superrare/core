@@ -22,7 +22,7 @@ interface IRareCollectionMarket {
     address currencyAddress;
     uint256 amount;
     address payable[] splitRecipients;
-    uint8[] splitRatios;
+    uint16[] splitRatios;
   }
 
   /*//////////////////////////////////////////////////////////////////////////
@@ -132,7 +132,7 @@ interface IRareCollectionMarket {
     address _currencyAddress,
     uint256 _amount,
     address payable[] calldata _splitAddrs,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external;
 
   /// @notice Cancels an existing collection offer the sender has placed.
@@ -150,7 +150,7 @@ interface IRareCollectionMarket {
     address _currencyAddress,
     uint256 _amount,
     address payable[] calldata _splitAddrs,
-    uint8[] calldata _splitRatios
+    uint16[] calldata _splitRatios
   ) external;
 
   /// @notice Cancels an existing collection sale price set by the sender.

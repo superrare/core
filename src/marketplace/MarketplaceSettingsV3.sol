@@ -15,7 +15,7 @@ contract MarketplaceSettingsV3 is
     IMarketplaceSettings,
     IStakingSettings
 {
-    uint8 private stakingFeePercentage;
+    uint16 private stakingFeePercentage;
     bytes32 public constant TOKEN_MARK_ROLE = keccak256("TOKEN_MARK_ROLE");
 
     // This is meant to be the MarketplaceSettings contract located in the V1 folder
@@ -30,14 +30,14 @@ contract MarketplaceSettingsV3 is
     uint256 private maxValue;
     uint256 private minValue;
 
-    uint8 private marketplaceFeePercentage;
-    uint8 private primarySaleFeePercentage;
+    uint16 private marketplaceFeePercentage;
+    uint16 private primarySaleFeePercentage;
 
     constructor(address newOwner, address oldSettings) {
         maxValue = 2**254;
         minValue = 1000;
-        marketplaceFeePercentage = 3;
-        primarySaleFeePercentage = 15;
+        marketplaceFeePercentage = 0;
+        primarySaleFeePercentage = 0;
         stakingFeePercentage = 0;
 
         require(
@@ -69,7 +69,7 @@ contract MarketplaceSettingsV3 is
         return maxValue;
     }
 
-    function setPrimarySaleFeePercentage(uint8 _primarySaleFeePercentage)
+    function setPrimarySaleFeePercentage(uint16 _primarySaleFeePercentage)
         external
         onlyOwner
     {
@@ -88,44 +88,46 @@ contract MarketplaceSettingsV3 is
         minValue = _minValue;
     }
 
+    /// @dev Deprecated: RareAppRegistry handles fees. Returns 0 for interface compatibility.
     function getMarketplaceFeePercentage()
         external
         view
         override
-        returns (uint8)
+        returns (uint16)
     {
-        return marketplaceFeePercentage;
+        return 0;
     }
 
-    function setMarketplaceFeePercentage(uint8 _percentage) external onlyOwner {
+    function setMarketplaceFeePercentage(uint16 _percentage) external onlyOwner {
         require(
-            _percentage <= 100,
-            "setMarketplaceFeePercentage::_percentage must be <= 100"
+            _percentage <= 10000,
+            "setMarketplaceFeePercentage::_percentage must be <= 10000"
         );
         marketplaceFeePercentage = _percentage;
     }
 
-    function calculateMarketplaceFee(uint256 _amount)
+    /// @dev Deprecated: RareAppRegistry handles fees. Returns 0 for interface compatibility.
+    function calculateMarketplaceFee(uint256)
         external
-        view
+        pure
         override
         returns (uint256)
     {
-        return (_amount * marketplaceFeePercentage) / 100;
+        return 0;
     }
 
     function getERC721ContractPrimarySaleFeePercentage(address)
         external
         view
         override
-        returns (uint8)
+        returns (uint16)
     {
         return primarySaleFeePercentage;
     }
 
     function setERC721ContractPrimarySaleFeePercentage(
         address _contractAddress,
-        uint8 _percentage
+        uint16 _percentage
     ) external override {}
 
     function calculatePrimarySaleFee(address, uint256 _amount)
@@ -134,7 +136,7 @@ contract MarketplaceSettingsV3 is
         override
         returns (uint256)
     {
-        return (_amount * primarySaleFeePercentage) / 100;
+        return (_amount * primarySaleFeePercentage) / 10000;
     }
 
     function hasERC721TokenSold(address _contractAddress, uint256 _tokenId)
@@ -201,11 +203,11 @@ contract MarketplaceSettingsV3 is
         return oldMarketplaceSettings.markContractAsSold(_contractAddress);
     }
 
-    function getStakingFeePercentage() external view override returns (uint8) {
+    function getStakingFeePercentage() external view override returns (uint16) {
         return stakingFeePercentage;
     }
 
-    function setStakingFeePercentage(uint8 _percentage) external onlyOwner {
+    function setStakingFeePercentage(uint16 _percentage) external onlyOwner {
         require(
             _percentage <= marketplaceFeePercentage,
             "setStakingFeePercentage::_percentage must be <= marketplaceFeePercentage"
@@ -213,22 +215,23 @@ contract MarketplaceSettingsV3 is
         stakingFeePercentage = _percentage;
     }
 
-    function calculateStakingFee(uint256 _amount)
+    /// @dev Deprecated: RareAppRegistry handles fees. Returns 0 for interface compatibility.
+    function calculateStakingFee(uint256)
         external
-        view
+        pure
         override
         returns (uint256)
     {
-        return (_amount * stakingFeePercentage) / 100;
+        return 0;
     }
 
-    function calculateMarketplacePayoutFee(uint256 _amount)
+    /// @dev Deprecated: RareAppRegistry handles fees. Returns 0 for interface compatibility.
+    function calculateMarketplacePayoutFee(uint256)
         external
-        view
+        pure
         override
         returns (uint256)
     {
-        return
-            (_amount * (marketplaceFeePercentage - stakingFeePercentage)) / 100;
+        return 0;
     }
 }

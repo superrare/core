@@ -24,10 +24,10 @@ interface IMarketplaceSettings {
     // Marketplace Fee
     /////////////////////////////////////////////////////////////////////////
     /**
-     * @dev Get the marketplace fee percentage.
-     * @return uint8 wei fee.
+     * @dev Get the marketplace fee percentage in basis points (0-10000).
+     * @return uint16 basis points fee.
      */
-    function getMarketplaceFeePercentage() external view returns (uint8);
+    function getMarketplaceFeePercentage() external view returns (uint16);
 
     /**
      * @dev Utility function for calculating the marketplace fee for given amount of wei.
@@ -43,14 +43,14 @@ interface IMarketplaceSettings {
     // Primary Sale Fee
     /////////////////////////////////////////////////////////////////////////
     /**
-     * @dev Get the primary sale fee percentage for a specific ERC721 contract.
+     * @dev Get the primary sale fee percentage for a specific ERC721 contract in basis points (0-10000).
      * @param _contractAddress address ERC721Contract address.
-     * @return uint8 wei primary sale fee.
+     * @return uint16 basis points primary sale fee.
      */
     function getERC721ContractPrimarySaleFeePercentage(address _contractAddress)
         external
         view
-        returns (uint8);
+        returns (uint16);
 
     /**
      * @dev Utility function for calculating the primary sale fee for given amount of wei
@@ -91,6 +91,6 @@ interface IMarketplaceSettings {
 
     function setERC721ContractPrimarySaleFeePercentage(
         address _contractAddress,
-        uint8 _percentage
+        uint16 _percentage
     ) external;
 }

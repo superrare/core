@@ -1,0 +1,22 @@
+{
+  "approvedTokenRegistry": "0x861bB2EB55A1604F288fAa45667C7d2ccb903495",
+  "chainId": 11155111,
+  "creatorRegistry": "0xaBf7837627537cCe9a8C42DC9b87ff3C435eb109",
+  "deployer": "0x3B9C3C5EA16E7d3c9C0bb293a549aFa4066dc162",
+  "marketplaceSettingsV3": "0x11309daFfD91F822b08809F89814361Dd7E3Ccad",
+  "payments": "0x18cf9dcdadDaf03E1D4Bdcf6833d8a2e8cf88146",
+  "rareAppRegistry": "0x3ad7694F899804206076F9A8E6F06719E360A90b",
+  "rareMinter": "0xf689b3344090DdE8b7a2C6b942730fF05De29451",
+  "rareMinterImpl": "0x695be76C315108fAb8D03f88a19d8e077D8df037",
+  "rareRoyaltyRegistry": "0x4B2B0b2807d5bD24be254cccccfD3282a689d29A",
+  "rareToken": "0x197FaeF3f59eC80113e773Bb6206a17d183F97CB",
+  "royaltyEngineV1": "0xbb503BE3a7c457566Cc3d806F54Cd0c1fB654e23",
+  "sovereignNFTContractFactory": "0xeF4aac03af2684bE0BE2B07c451949CC4246085F",
+  "spaceOperatorRegistry": "0xeE6440256d31cD009BA1A1d32e986A33A5a1603C",
+  "stakingRegistryStub": "0xDfF2f86F2C7A48b73E87f7938C79e924807d43bb",
+  "superRareAdmin": "0x3D2f4EDdB7F8A63C68BaB6Ed46DCFD97FF12a36A",
+  "superRareAuctionHouse": "0xA40024deeaB7Dc6089cBa91f8c7e7EbB7932A7a9",
+  "superRareBazaar": "0xCE999aeF38E1316A510615b80713b494658807c6",
+  "superRareBazaarImpl": "0xE145336615decc8dB40CF27B102fBe84E9b32094",
+  "superRareMarketplace": "0xA1194D90522334E01cb5192f7c758B2EdA2773a4"
+}

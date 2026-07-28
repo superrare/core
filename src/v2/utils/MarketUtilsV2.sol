@@ -46,10 +46,10 @@ library MarketUtilsV2 {
   /// @notice Verifies that the splits supplied are valid.
   /// @dev A valid split has the same number of splits and ratios.
   /// @dev There can only be a max of 5 parties split with.
-  /// @dev Total of the ratios should be 100 which is relative.
+  /// @dev Total of the ratios should be 10000 (basis points) which is relative.
   /// @param _splitAddrs The addresses the amount is being split with.
-  /// @param _splitRatios The ratios each address in _splits is getting.
-  function checkSplits(address payable[] calldata _splitAddrs, uint8[] calldata _splitRatios) internal pure {
+  /// @param _splitRatios The ratios each address in _splits is getting (basis points).
+  function checkSplits(address payable[] calldata _splitAddrs, uint16[] calldata _splitRatios) internal pure {
     require(_splitAddrs.length > 0, "checkSplits::Must have at least 1 split");
     require(_splitAddrs.length <= 5, "checkSplits::Split exceeded max size");
     require(_splitAddrs.length == _splitRatios.length, "checkSplits::Splits and ratios must be equal");
@@ -59,7 +59,7 @@ library MarketUtilsV2 {
       totalRatio += _splitRatios[i];
     }
 
-    require(totalRatio == 100, "checkSplits::Total must be equal to 100");
+    require(totalRatio == 10000, "checkSplits::Total must be equal to 10000");
   }
 
   /// @notice Checks to see if the approval manager has approval to transfer tokens
@@ -130,7 +130,7 @@ library MarketUtilsV2 {
       return;
     }
 
-    uint256 requiredAmount = _amount + ((_amount * _marketplaceFee) / 100);
+    uint256 requiredAmount = _amount + ((_amount * _marketplaceFee) / 10000);
 
     if (_currencyAddress == address(0)) {
       (bool success, bytes memory data) = address(_config.payments).call{value: requiredAmount}(
@@ -156,7 +156,7 @@ library MarketUtilsV2 {
   /// @param _amount Total amount to be paid out.
   /// @param _seller Address of the person selling the asset.
   /// @param _splitAddrs Addresses that funds need to be split against.
-  /// @param _splitRatios Ratios for split pertaining to each address.
+  /// @param _splitRatios Ratios for split pertaining to each address (basis points).
   function payout(
     MarketConfigV2.Config storage _config,
     address _originContract,
@@ -165,7 +165,7 @@ library MarketUtilsV2 {
     uint256 _amount,
     address _seller,
     address payable[] memory _splitAddrs,
-    uint8[] memory _splitRatios
+    uint16[] memory _splitRatios
   ) internal {
     payoutWithMarketplaceFee(
       _config,
@@ -192,7 +192,7 @@ library MarketUtilsV2 {
   /// @param _seller Address of the person selling the asset.
   /// @param _splitAddrs Addresses that funds need to be split against.
   /// @param _splitRatios Ratios for split pertaining to each address.
-  /// @param _marketplaceFeePercentage The marketplace fee percentage to use for this payout.
+  /// @param _marketplaceFeePercentage The marketplace fee percentage in basis points to use for this payout.
   function payoutWithMarketplaceFee(
     MarketConfigV2.Config storage _config,
     address _originContract,
@@ -201,8 +201,8 @@ library MarketUtilsV2 {
     uint256 _amount,
     address _seller,
     address payable[] memory _splitAddrs,
-    uint8[] memory _splitRatios,
-    uint8 _marketplaceFeePercentage
+    uint16[] memory _splitRatios,
+    uint16 _marketplaceFeePercentage
   ) internal {
     require(_splitAddrs.length == _splitRatios.length, "Number of split addresses and ratios must be equal.");
 
@@ -218,8 +218,8 @@ library MarketUtilsV2 {
 
     uint256 remainingAmount = _amount;
 
-    // Marketplace fee - use the provided fee percentage instead of current settings
-    uint256 marketplaceFee = (_amount * _marketplaceFeePercentage) / 100;
+    // Marketplace fee - use the provided fee percentage (basis points) instead of current settings
+    uint256 marketplaceFee = (_amount * _marketplaceFeePercentage) / 10000;
 
     address payable[] memory mktFeeRecip = new address payable[](2);
     mktFeeRecip[0] = payable(_config.networkBeneficiary);
@@ -243,9 +243,9 @@ library MarketUtilsV2 {
       if (_config.spaceOperatorRegistry.isApprovedSpaceOperator(_seller)) {
         uint256 platformCommission = _config.spaceOperatorRegistry.getPlatformCommission(_seller);
 
-        remainingAmount = remainingAmount - ((_amount * platformCommission) / 100);
+        remainingAmount = remainingAmount - ((_amount * platformCommission) / 10000);
 
-        platformFee[0] = (_amount * platformCommission) / 100;
+        platformFee[0] = (_amount * platformCommission) / 10000;
 
         performPayouts(_config, _currencyAddress, platformFee[0], platformRecip, platformFee);
       } else {
@@ -253,9 +253,9 @@ library MarketUtilsV2 {
           _originContract
         );
 
-        remainingAmount = remainingAmount - ((_amount * platformCommission) / 100);
+        remainingAmount = remainingAmount - ((_amount * platformCommission) / 10000);
 
-        platformFee[0] = (_amount * platformCommission) / 100;
+        platformFee[0] = (_amount * platformCommission) / 10000;
 
         performPayouts(_config, _currencyAddress, platformFee[0], platformRecip, platformFee);
       }
@@ -297,7 +297,7 @@ library MarketUtilsV2 {
     // Calculate and pay out splits
     uint256[] memory splitAmounts = new uint256[](_splitRatios.length);
     for (uint256 i = 0; i < _splitRatios.length; i++) {
-      splitAmounts[i] = (remainingAmount * _splitRatios[i]) / 100;
+      splitAmounts[i] = (remainingAmount * _splitRatios[i]) / 10000;
     }
 
     performPayouts(_config, _currencyAddress, remainingAmount, _splitAddrs, splitAmounts);

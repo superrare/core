@@ -41,7 +41,7 @@ abstract contract ERC2981Upgradeable is IERC2981, ERC165Upgradeable {
                     ? royaltyPercentages[_tokenId]
                     : defaultRoyaltyPercentage
             )
-            .div(100);
+            .div(10000);
     }
 
     function _setDefaultRoyaltyReceiver(address _receiver) internal {

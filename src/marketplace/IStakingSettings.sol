@@ -6,10 +6,10 @@ pragma solidity ^0.8.0;
  */
 interface IStakingSettings {
     /**
-     * @dev Get the staking percentage.
-     * @return uint8 wei staking fee percentage.
+     * @dev Get the staking percentage in basis points (0-10000).
+     * @return uint16 basis points staking fee percentage.
      */
-    function getStakingFeePercentage() external view returns (uint8);
+    function getStakingFeePercentage() external view returns (uint16);
 
     /**
      * @dev Utility function for calculating the staking fee for given amount of wei.
