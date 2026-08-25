@@ -71,6 +71,7 @@ struct OrderLine {
 struct PayoutRoute {
     bytes commands;
     bytes[] inputs;
+    uint256 routerValue;
 }
 
 struct FulfillmentAction {
@@ -192,16 +193,15 @@ Native ETH is represented by `address(0)` and is supported as input or settlemen
 - ERC-20 input requires `msg.value == 0` and calls `transferFrom(msg.sender, Cart,
   order.paymentAmount)` against the caller's ordinary Cart allowance.
 - Fee-on-transfer and rebasing currencies are unsupported.
-- Payment and settlement currencies are supplied by the client and authorized by the platform-signed order; native ETH is represented by `address(0)`. Intermediate route-token selection is backend-owned and is covered by the platform signature; Cart enforces that every command starts in the payment currency and ends in one of the signed settlement currencies.
+- Payment and settlement currencies are supplied by the client and authorized by the platform-signed order; native ETH is represented by `address(0)`. The client owns pool selection, path construction, exact-input/output semantics, slippage, refunds, and sweep placement. Cart forwards the opaque, platform-signed Universal Router command program and verifies only the resulting supported-currency settlement outcomes.
 - Each order carries one `PayoutRoute` for the complete order.
-- If every line settles in the payment currency, commands and inputs must both be empty. Mixed direct and routed lines use one route for the routed settlement-token basket.
+- `routerValue` is signed with the route and is forwarded exactly to Universal Router. Native payment requires `msg.value == paymentAmount` and `routerValue <= paymentAmount`; ERC-20 payment requires both values to be zero.
+- If every line settles in the payment currency, commands and inputs may be empty. Mixed direct and routed lines use one route for the order-wide settlement basket.
 - The order-wide route contains at most 32 commands and 32 command inputs.
-- Swap mode is derived only from the validated Universal Router commands.
-- New orders carry one order-wide route. Exact-input plans fix input spend, require each aggregate
-  settlement currency to meet the signed line basket, and send favorable output surplus to the
-  configured protocol recipient. The client quotes and signs the complete command sequence.
-- Exact-output routes require each aggregate settlement-token obligation and send unused input to the
-  configured protocol recipient as Protocol Spread.
+- Cart's route policy is intentionally shallow: it allows only Permit2 transfer-from, sweep, wrap/unwrap, V2/V3 swaps, and V4 swap command families, with no command flags. It does not decode command inputs, paths, recipients, payer flags, V4 actions, or exact-input/output semantics.
+- Cart snapshots native ETH, WETH, the payment token, and every non-native settlement currency named by the order. ETH and WETH remain distinct payout currencies but share one incremental solvency family.
+- After routing, each non-native settlement delta must cover its signed obligations without consuming the snapshot baseline. ETH and WETH deltas are checked together, then converted only as needed to deliver exact ETH and WETH payouts.
+- Exact-input excess output, exact-output refunds, and any other positive supported-currency delta above exact payouts are Protocol Spread.
 - The protocol surplus recipient is initialized to the Cart owner and can be rotated by the owner;
   it receives output-token surplus, while line recipients receive exactly their signed amounts.
 - The signed `paymentAmount` is the final customer charge. Exact-input excess output and exact-output
@@ -212,11 +212,11 @@ The Universal Router and Permit2 are configured once with no runtime dependency 
 
 ### CartRoutePolicy
 
-`CartRoutePolicy` adapts the Liquid Router's proven default-deny policy. It is command-shape restricted: it accepts explicitly decoded V2/V3 exact-input and exact-output swaps plus V4 swap plans containing exactly one swap, one `SETTLE_ALL`, and one `TAKE_ALL` action. Every other Universal Router command or nested V4 action is rejected. It rejects command flags and partial failure, constrains outputs to the cart, requires the cart as payer, and enforces that each path starts in the payment currency and ends in one of the signed settlement currencies. Intermediate route-token selection is a backend responsibility covered by the platform signature. V3 and V4 exact-output paths are validated in their required reverse order.
+`CartRoutePolicy` is a shallow default-deny boundary around Universal Router. It accepts only Permit2 transfer-from, sweep, wrap ETH, unwrap WETH, V2/V3 exact-input and exact-output swaps, and V4 swap commands. It rejects command flags, unsupported command families, empty programs, input-count mismatches, and oversized programs. It deliberately treats every command input as opaque; Universal Router remains responsible for decoding and validating paths, recipients, payer flags, V4 actions, settlement/refund behavior, and exact-input/output semantics.
 
 The policy is deployed as its own stateless contract and referenced by a cart implementation immutable rather than compiled into the cart. The call boundary keeps the policy out of the cart's EIP-170 budget and gives the cart a `try`/`catch` seam that attributes a rejected route to the Order Line that produced it. Because the reference is an immutable rather than storage, replacing the policy still requires an audited implementation upgrade.
 
-Permit2 configuration is performed by the cart, not embedded in route commands. Temporary token and Permit2 allowances are limited to transaction-local funds, cleared after routing, and verified as zero. A successful Purchase Order restores the signed payment and line settlement currency balances in Cart to their pre-transaction baselines, preventing accidental Cart funds from subsidizing a purchase. Universal Router balances for those same currencies may decrease, allowing a route to consume publicly extractable pre-existing router funds, but may not increase; the transaction may not strand new ETH or settlement currencies in the router. Intermediate route tokens are not part of Cart's on-chain balance surveillance.
+Permit2 configuration is performed by Cart, not embedded in route commands. The only temporary approval is the exact fixed quote for the payment token: Cart approves Permit2, Permit2 approves Universal Router, and both are revoked immediately after routing. Nonzero pre-existing approvals are rejected before either layer is changed, preserving approval state. A successful Purchase Order restores every tracked Cart balance to its pre-transaction baseline, preventing accidental Cart funds from subsidizing a purchase. Universal Router is shared infrastructure, so its incidental ETH and token balances are not production invariants; client route templates and fork simulations must ensure refunds and outputs return to Cart rather than strand value there.
 
 The Universal Router address is configured once. Supporting another router version or command layout requires an audited cart implementation upgrade.
 
@@ -315,10 +315,11 @@ Implementation acceptance includes unit, invariant, fuzz, and fork coverage for:
   re-listing with a fresh `listingId`, partial fills, duplicate Listing references, races for final
   inventory, and fill rollback.
 - Every Fulfillment kind, ownership transition, approval loss, mint incompatibility, recipient splitting, and the 20-operation cap.
-- Empty direct routes and allowed V2/V3 exact-input and exact-output routes.
-- Default rejection of every other Universal Router command, flag, nested action, recipient, currency, and route shape.
+- Empty direct routes and opaque V2/V3/V4, wrap/unwrap, sweep, and Permit2 transfer-from command programs.
+- Shallow default rejection of unsupported Universal Router command families, command flags, input-count mismatches, and oversized programs; Universal Router owns nested-action, path, recipient, currency, and route-content validation.
 - Native/ERC-20 inputs and outputs, exact signed funding, output and input Protocol Spread, failed native recipients, fee-on-transfer tokens, temporary allowance cleanup, and balance isolation.
+- Stateful repeated-purchase invariants for supported Cart baselines, ETH/WETH custody, and both temporary approval layers.
 - Indexed error attribution for every line, action, and failure stage.
 - Event completeness and off-chain idempotency keys.
 - Pause behavior, seller invalidation while paused, signer rotation, UUPS authorization, storage preservation, and EIP-712 compatibility across upgrades.
-- Mainnet and target-chain fork execution against the configured Universal Router, Permit2, and WETH.
+- End-to-end mainnet fork execution through Cart against the pinned Universal Router, Permit2, and WETH deployment, including V2/V3/V4 mixed plans, native/WETH transitions, exact-output refunds, payouts, spread capture, baseline restoration, and allowance cleanup.

@@ -54,13 +54,24 @@ contract CartTestRouter {
     uint256 public executeCalls;
     address[] internal multiOutputTokens;
     uint256[] internal multiOutputAmounts;
+    address[] internal multiOutputRecipients;
     bool internal multiMode;
+    address public observedPermit2;
+    address public observedToken;
+    uint256 public observedCartAllowance;
+    uint160 public observedPermit2Allowance;
+    uint256 public lastRouterValue;
+    bytes public lastCommands;
+    uint256 public lastInputCount;
+    bool internal revertExecution;
 
     function configure(address token, uint256 output, uint256 retained, bool useExisting) external {
         outputToken = ICartTestMintableToken(token);
         outputAmount = output;
         retainedAmount = retained;
         useExistingBalance = useExisting;
+        multiMode = false;
+        settlementMode = false;
     }
 
     function configureSettlement(
@@ -78,12 +89,14 @@ contract CartTestRouter {
         outputToken = ICartTestMintableToken(outputToken_);
         outputAmount = outputAmount_;
         settlementMode = true;
+        multiMode = false;
     }
 
     function configureMulti(address[] calldata tokens, uint256[] calldata amounts) external {
         require(tokens.length == amounts.length, "length mismatch");
         delete multiOutputTokens;
         delete multiOutputAmounts;
+        delete multiOutputRecipients;
         for (uint256 i = 0; i < tokens.length; ++i) {
             multiOutputTokens.push(tokens[i]);
             multiOutputAmounts.push(amounts[i]);
@@ -92,12 +105,52 @@ contract CartTestRouter {
         settlementMode = false;
     }
 
-    function execute(bytes calldata commands, bytes[] calldata inputs, uint256) external {
+    function configureMultiTo(address[] calldata tokens, uint256[] calldata amounts, address[] calldata recipients)
+        external
+    {
+        require(tokens.length == amounts.length && tokens.length == recipients.length, "length mismatch");
+        delete multiOutputTokens;
+        delete multiOutputAmounts;
+        delete multiOutputRecipients;
+        for (uint256 i = 0; i < tokens.length; ++i) {
+            multiOutputTokens.push(tokens[i]);
+            multiOutputAmounts.push(amounts[i]);
+            multiOutputRecipients.push(recipients[i]);
+        }
+        multiMode = true;
+        settlementMode = false;
+    }
+
+    function configureApprovalObservation(address permit2_, address token_) external {
+        observedPermit2 = permit2_;
+        observedToken = token_;
+    }
+
+    function configureRevert(bool value) external {
+        revertExecution = value;
+    }
+
+    function execute(bytes calldata commands, bytes[] calldata inputs, uint256) external payable {
         executeCalls++;
+        lastRouterValue = msg.value;
+        lastCommands = commands;
+        lastInputCount = inputs.length;
+        if (observedPermit2 != address(0)) {
+            observedCartAllowance = IERC20(observedToken).allowance(msg.sender, observedPermit2);
+            (observedPermit2Allowance,,) =
+                IPermit2Cart(observedPermit2).allowance(msg.sender, observedToken, address(this));
+        }
+        if (revertExecution) revert("router reverted");
         if (multiMode) {
             require(commands.length == inputs.length && commands.length != 0, "unexpected route");
             for (uint256 i = 0; i < multiOutputTokens.length; ++i) {
-                ICartTestMintableToken(multiOutputTokens[i]).mint(msg.sender, multiOutputAmounts[i]);
+                address recipient = multiOutputRecipients.length == 0 ? msg.sender : multiOutputRecipients[i];
+                if (multiOutputTokens[i] == address(0)) {
+                    (bool success,) = recipient.call{value: multiOutputAmounts[i]}("");
+                    require(success, "native output failed");
+                } else {
+                    ICartTestMintableToken(multiOutputTokens[i]).mint(recipient, multiOutputAmounts[i]);
+                }
             }
             return;
         }
@@ -130,6 +183,8 @@ contract CartTestRouter {
         }
         if (retainedAmount != 0) outputToken.mint(address(this), retainedAmount);
     }
+
+    receive() external payable {}
 }
 
 contract CartTestToken is ERC20 {
@@ -156,6 +211,20 @@ contract CartTestRevertingTransferToken is ERC20 {
     function transfer(address to, uint256 amount) public override returns (bool) {
         require(to != rejectingRecipient, "rejected recipient");
         return super.transfer(to, amount);
+    }
+}
+
+contract CartTestFeeOnTransferToken is ERC20 {
+    constructor() ERC20("Fee Token", "FEE") {}
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+
+    function _transfer(address from, address to, uint256 amount) internal override {
+        uint256 fee = amount == 0 ? 0 : 1;
+        if (fee != 0) _burn(from, fee);
+        super._transfer(from, to, amount - fee);
     }
 }
 
@@ -892,7 +961,7 @@ contract CartTest is Test {
         path[1] = address(outputToken);
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = abi.encode(address(1), 1 ether, 1.25 ether, path, true);
-        routes[0] = ICart.PayoutRoute({commands: hex"09", inputs: inputs});
+        routes[0] = ICart.PayoutRoute({commands: hex"09", inputs: inputs, routerValue: 0});
 
         ICart.FulfillmentAction[] memory actions = new ICart.FulfillmentAction[](0);
         ICart.PurchaseOrder memory order = _order("permit2-exact-output", lines, routes, actions);
@@ -1108,7 +1177,7 @@ contract CartTest is Test {
         assertEq(inputToken.allowance(address(cart), address(permit2)), 0);
     }
 
-    function testUniversalRouterCannotRetainNewSettlementCurrency() public {
+    function testIncidentalUniversalRouterTokenBalanceDoesNotBlockSettlement() public {
         (CartTestToken inputToken, CartTestToken outputToken, ICart.Listing memory listing) =
             _routedTokensAndListing("router-retention");
         router.configure(address(outputToken), 1 ether, 1 ether, false);
@@ -1125,18 +1194,14 @@ contract CartTest is Test {
         inputToken.mint(payer, 1 ether);
         vm.prank(payer);
         inputToken.approve(address(cart), 1 ether);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ICart.UnexpectedRouterBalance.selector, address(outputToken), uint256(0), uint256(1 ether)
-            )
-        );
         vm.prank(payer);
         cart.executePurchase(
             order, lines, authorizationListings, authorization, _combineRoutes(routes), actions, platformSignature
         );
 
-        assertEq(outputToken.balanceOf(address(router)), 0);
-        assertEq(outputToken.balanceOf(sellerPayout), 0);
+        assertEq(outputToken.balanceOf(address(router)), 1 ether);
+        assertEq(outputToken.balanceOf(sellerPayout), 1 ether);
+        assertEq(outputToken.balanceOf(address(cart)), 0);
     }
 
     function testAtomicNftFulfillmentRollsBackOnPayoutFailure() public {
@@ -1683,7 +1748,7 @@ contract CartTest is Test {
         path[1] = outputToken;
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = abi.encode(address(1), 1 ether, 1 ether, path, true);
-        routes[0] = ICart.PayoutRoute({commands: hex"08", inputs: inputs});
+        routes[0] = ICart.PayoutRoute({commands: hex"08", inputs: inputs, routerValue: 0});
     }
 
     function _listingDigest(ICart.Listing memory listing) internal view returns (bytes32) {
@@ -1697,7 +1762,7 @@ contract CartTest is Test {
     function _emptyRoutes(uint256 count) internal pure returns (ICart.PayoutRoute[] memory routes) {
         routes = new ICart.PayoutRoute[](count);
         for (uint256 i = 0; i < count; ++i) {
-            routes[i] = ICart.PayoutRoute({commands: bytes(""), inputs: new bytes[](0)});
+            routes[i] = ICart.PayoutRoute({commands: bytes(""), inputs: new bytes[](0), routerValue: 0});
         }
     }
 
@@ -1707,6 +1772,7 @@ contract CartTest is Test {
         for (uint256 i = 0; i < routes.length; ++i) {
             commandLength += routes[i].commands.length;
             inputCount += routes[i].inputs.length;
+            route.routerValue += routes[i].routerValue;
         }
         route.commands = new bytes(commandLength);
         route.inputs = new bytes[](inputCount);

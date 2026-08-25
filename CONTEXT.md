@@ -27,6 +27,18 @@ price, not an unsigned spending limit. Every Order Line recipient receives its s
 any favorable routing variance becomes Protocol Spread.
 _Avoid_: Maximum payment, payment cap
 
+**Sale Price**:
+The customer-facing price assigned to merchandise. It may fund both Seller Proceeds and explicit
+fees, so it need not equal the seller's proceeds floor. It is distinct from the Fixed Quote, which
+is the final price for the complete Purchase Order, and from Protocol Spread, which arises only
+from favorable route execution.
+_Avoid_: Seller price, Listing amount
+
+**Seller Proceeds Floor**:
+The minimum proceeds per unit a seller authorizes for a Listing, denominated in its settlement
+currency. A Purchase Order may pay the seller more than this floor but never less.
+_Avoid_: Sale Price, gross price
+
 **Currency Swap**:
 A listing-less Order Line that exchanges part of the Purchase Order's payment currency for a
 different settlement currency through the order-wide Universal Router route. Its amount and

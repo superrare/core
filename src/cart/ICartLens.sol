@@ -12,8 +12,6 @@ interface ICartLensTarget {
     function platformSigner() external view returns (address);
     /// @notice Returns the immutable route policy address.
     function routePolicy() external view returns (address);
-    /// @notice Returns the WETH address used for native currency.
-    function weth() external view returns (address);
     /// @notice Returns whether the seller cancelled one listing.
     function cancelledListings(address seller, bytes32 listingDigest) external view returns (bool);
     /// @notice Returns the EIP-712 domain separator used by Cart.
@@ -40,8 +38,6 @@ interface ICartLens {
         INVALID_LISTING_NONCE,
         LISTING_QUANTITY_EXCEEDED,
         ASSET_UNAVAILABLE,
-        ROUTE_REQUIRED,
-        ROUTE_UNEXPECTED,
         ROUTE_REJECTED,
         INVALID_ROOT,
         INVALID_ROOT_SIGNATURE,
@@ -83,19 +79,11 @@ interface ICartLens {
     }
 
     struct RoutePreview {
-        /// @dev True when the route policy accepts the route.
+        /// @dev True when the shallow route policy accepts the command program.
         bool valid;
         /// @dev Stable reason code for the route result.
         ValidationCode code;
-        /// @dev True when input and output use the same token.
-        bool direct;
-        /// @dev True when the route uses exact-input commands.
-        bool exactInput;
-        /// @dev Total route input amount.
-        uint256 inputAmount;
-        /// @dev Total exact output amount for exact-output routes.
-        uint256 outputAmount;
-        /// @dev Policy revert data or encoded local error details.
+        /// @dev Policy revert data or encoded local structural error details.
         bytes reason;
     }
 
@@ -128,11 +116,9 @@ interface ICartLens {
         uint256 requestedQuantity
     ) external view returns (ValidationResult memory result);
 
-    /// @notice Summarises an order-wide route against a basket of allowed output currencies.
-    function previewRoute(
-        address cart,
-        address inputCurrency,
-        address[] calldata outputCurrencies,
-        ICart.PayoutRoute calldata route
-    ) external view returns (RoutePreview memory preview);
+    /// @notice Checks only the shallow command-family structure of an order-wide route.
+    function previewRoute(address cart, ICart.PayoutRoute calldata route)
+        external
+        view
+        returns (RoutePreview memory preview);
 }

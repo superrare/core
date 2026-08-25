@@ -77,6 +77,8 @@ interface ICart {
         bytes commands;
         /// @dev ABI-encoded input for each command, in the same order as `commands`.
         bytes[] inputs;
+        /// @dev Native ETH forwarded from Cart to Universal Router for this plan.
+        uint256 routerValue;
     }
 
     struct FulfillmentAction {
@@ -188,9 +190,9 @@ interface ICart {
     error InvalidOrderLinesHash();
     error InvalidPayoutRouteHash();
     error AllowanceNotCleared(address token, address spender);
+    error PreexistingAllowance(address token, address spender, uint256 amount);
     error PreexistingBalanceConsumed(address token, uint256 baseline, uint256 current);
     error UnexpectedCartBalance(address token, uint256 baseline, uint256 current);
-    error UnexpectedRouterBalance(address token, uint256 baseline, uint256 current);
     /// @param signer Platform signer or ListingRoot seller whose authorization did not verify.
     error InvalidSignature(address signer, bytes32 digest);
     error ListingNotFound(bytes32 listingHash);
@@ -198,8 +200,7 @@ interface ICart {
     error ListingTermsMismatch(uint256 lineIndex);
     error MaxFulfillmentOperationsExceeded();
     error NativeValueMismatch();
-    error RouteRequired(uint256 lineIndex);
-    error RouteUnexpected(uint256 lineIndex);
+    error RouteValueWithoutCommands();
     error RouteTooManyCommands(uint256 count);
     error RouteTooManyInputs(uint256 count);
     error OrderLineFailed(uint256 lineIndex, FailureStage stage, bytes reason);

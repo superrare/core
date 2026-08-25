@@ -10,14 +10,11 @@ interface ICartPayments {
     struct AssetSnapshot {
         address token;
         uint256 cartBalance;
-        uint256 routerBalance;
     }
 
     struct PaymentState {
         AssetSnapshot[] assetSnapshots;
-        uint256 inputBaseline;
         uint256 nativeBaseline;
-        uint256 routerNativeBaseline;
     }
 
     function begin(

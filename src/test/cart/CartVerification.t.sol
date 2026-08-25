@@ -99,8 +99,8 @@ contract CartVerificationTest is CartTest {
         listings[1] = second;
         ICart.ListingPurchaseAuthorization memory authorization = _rootAuthorization(listings, SELLER_PK);
         ICart.PayoutRoute[] memory routes = new ICart.PayoutRoute[](2);
-        routes[0] = ICart.PayoutRoute({commands: bytes(""), inputs: new bytes[](0)});
-        routes[1] = ICart.PayoutRoute({commands: bytes(""), inputs: new bytes[](0)});
+        routes[0] = ICart.PayoutRoute({commands: bytes(""), inputs: new bytes[](0), routerValue: 0});
+        routes[1] = ICart.PayoutRoute({commands: bytes(""), inputs: new bytes[](0), routerValue: 0});
         ICart.FulfillmentAction[] memory actions = _noActions();
         ICart.PurchaseOrder memory order = _order("multi-line-accounting", lines, routes, actions);
         uint256 fixedQuote = 6 ether;
@@ -157,7 +157,7 @@ contract CartVerificationTest is CartTest {
             path[1] = address(outputToken);
             bytes[] memory inputs = new bytes[](1);
             inputs[0] = abi.encode(address(1), 1 ether, 1 ether, path, true);
-            routes[i] = ICart.PayoutRoute({commands: hex"09", inputs: inputs});
+            routes[i] = ICart.PayoutRoute({commands: hex"09", inputs: inputs, routerValue: 0});
         }
         ICart.PurchaseOrder memory order = _order("grouped-route", lines, routes, _noActions());
         order.paymentCurrency = address(inputToken);
@@ -202,8 +202,8 @@ contract CartVerificationTest is CartTest {
         listings[0] = listing;
         ICart.ListingPurchaseAuthorization memory authorization = _rootAuthorization(listings, SELLER_PK);
         ICart.PayoutRoute[] memory routes = new ICart.PayoutRoute[](2);
-        routes[0] = ICart.PayoutRoute({commands: bytes(""), inputs: new bytes[](0)});
-        routes[1] = ICart.PayoutRoute({commands: bytes(""), inputs: new bytes[](0)});
+        routes[0] = ICart.PayoutRoute({commands: bytes(""), inputs: new bytes[](0), routerValue: 0});
+        routes[1] = ICart.PayoutRoute({commands: bytes(""), inputs: new bytes[](0), routerValue: 0});
         ICart.FulfillmentAction[] memory actions = _noActions();
         ICart.PurchaseOrder memory firstOrder = _order("accounting-aggregate-first", lines, routes, actions);
         bytes memory firstPlatformSignature = _sign(PLATFORM_PK, _orderDigest(firstOrder));
@@ -492,7 +492,7 @@ contract CartVerificationTest is CartTest {
         path[1] = address(outputToken);
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = abi.encode(address(1), 1 ether, 1 ether, path, true);
-        routes[0] = ICart.PayoutRoute({commands: hex"09", inputs: inputs});
+        routes[0] = ICart.PayoutRoute({commands: hex"09", inputs: inputs, routerValue: 0});
         ICart.FulfillmentAction[] memory actions = _noActions();
         ICart.PurchaseOrder memory order = _order("accounting-failed-route", lines, routes, actions);
         order.paymentCurrency = address(inputToken);
@@ -511,7 +511,10 @@ contract CartVerificationTest is CartTest {
         router.configureSettlement(
             address(permit2), address(0x6002), address(inputToken), address(outputToken), 1 ether, 2 ether
         );
-        vm.expectRevert();
+        bytes memory routerReason = abi.encodeWithSignature("Error(string)", "unexpected output");
+        vm.expectRevert(
+            abi.encodeWithSelector(ICart.OrderLineFailed.selector, 0, ICart.FailureStage.ROUTING, routerReason)
+        );
         vm.prank(payer);
         cart.executePurchase(
             order,
@@ -670,6 +673,28 @@ contract CartVerificationTest is CartTest {
             purchase.actions,
             purchase.platformSignature
         );
+    }
+
+    function testMutatedRouterValueIsRejectedBeforeFunding() public {
+        ICart.Listing memory listing =
+            _listing(keccak256("mutated-router-value"), ICart.FulfillmentKind.NONE, address(0), 0, sellerPayout);
+        NativePurchase memory purchase = _nativePurchase(listing, "mutated-router-value-order", 1, _noActions());
+        purchase.routes[0].routerValue = 1;
+
+        vm.deal(payer, purchase.amount);
+        vm.expectRevert(ICart.InvalidPayoutRouteHash.selector);
+        vm.prank(payer);
+        cart.executePurchase{value: purchase.amount}(
+            purchase.order,
+            purchase.lines,
+            purchase.listings,
+            purchase.authorization,
+            _combineRoutes(purchase.routes),
+            purchase.actions,
+            purchase.platformSignature
+        );
+
+        assertEq(payer.balance, purchase.amount);
     }
 
     function testMutatedFulfillmentActionsAreRejectedBeforeFunding() public {

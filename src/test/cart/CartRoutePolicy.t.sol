@@ -1,160 +1,91 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.18;
 
-import "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 
 import {CartRoutePolicy} from "../../cart/CartRoutePolicy.sol";
 import {ICartRoutePolicy} from "../../cart/ICartRoutePolicy.sol";
 
+/// @notice Tests for Cart's shallow Universal Router command-family boundary.
+/// @dev Inputs are intentionally opaque here. Universal Router owns their decoding and semantics.
 contract CartRoutePolicyTest is Test {
     CartRoutePolicy internal policy;
-
-    address internal constant INPUT = address(0x1002);
-    address internal constant OUTPUT = address(0x1003);
 
     function setUp() public {
         policy = new CartRoutePolicy();
     }
 
-    function testExactOutputSummaryUsesOutputAndInputMaximum() public {
+    function testAcceptsEverySupportedCommandWithOpaqueInputs() public {
+        bytes memory commands = hex"0001020408090b0c10";
+        bytes[] memory inputs = new bytes[](commands.length);
+        for (uint256 i = 0; i < inputs.length; ++i) {
+            inputs[i] = abi.encodePacked(bytes32(uint256(i + 1)), hex"deadbeef");
+        }
+
+        policy.validate(commands, inputs);
+    }
+
+    function testAcceptsMalformedOpaqueV3Input() public {
         bytes[] memory inputs = new bytes[](1);
-        // V3 exact-output paths are encoded from output token back to input token.
-        bytes memory path = abi.encodePacked(OUTPUT, uint24(3000), INPUT);
-        inputs[0] = abi.encode(address(1), 7 ether, 11 ether, path, true);
+        inputs[0] = hex"01";
 
-        ICartRoutePolicy.Summary memory summary = policy.validate(hex"01", inputs, INPUT, _outputs());
-
-        assertFalse(summary.exactInput);
-        assertEq(summary.inputAmount, 11 ether);
-        assertEq(summary.outputAmount, 7 ether);
+        policy.validate(hex"00", inputs);
     }
 
-    function testExactInputSummaryAccumulatesInputAmount() public {
+    function testAcceptsMalformedOpaqueV4Input() public {
         bytes[] memory inputs = new bytes[](1);
-        address[] memory path = new address[](2);
-        path[0] = INPUT;
-        path[1] = OUTPUT;
-        inputs[0] = abi.encode(address(1), 5 ether, 1 ether, path, true);
+        inputs[0] = abi.encodePacked(bytes4(0xdeadbeef), hex"00");
 
-        ICartRoutePolicy.Summary memory summary = policy.validate(hex"08", inputs, INPUT, _outputs());
-
-        assertTrue(summary.exactInput);
-        assertEq(summary.inputAmount, 5 ether);
-        assertEq(summary.outputAmount, 0);
+        policy.validate(hex"10", inputs);
     }
 
-    function testSummaryAccumulatesInputAcrossCommands() public {
-        bytes[] memory inputs = new bytes[](2);
-        address[] memory path = new address[](2);
-        path[0] = INPUT;
-        path[1] = OUTPUT;
-        inputs[0] = abi.encode(address(1), 2 ether, 1 ether, path, true);
-        inputs[1] = abi.encode(address(1), 3 ether, 1 ether, path, true);
-
-        ICartRoutePolicy.Summary memory summary = policy.validate(hex"0808", inputs, INPUT, _outputs());
-
-        assertEq(summary.inputAmount, 5 ether);
-    }
-
-    function testOrderPlanAcceptsMultipleSignedOutputTokens() public {
-        address outputB = address(0x1004);
-        bytes[] memory inputs = new bytes[](2);
-        address[] memory pathA = new address[](2);
-        pathA[0] = INPUT;
-        pathA[1] = OUTPUT;
-        address[] memory pathB = new address[](2);
-        pathB[0] = INPUT;
-        pathB[1] = outputB;
-        inputs[0] = abi.encode(address(1), 2 ether, 1 ether, pathA, true);
-        inputs[1] = abi.encode(address(1), 3 ether, 1 ether, pathB, true);
-        address[] memory expectedOutputs = new address[](2);
-        expectedOutputs[0] = OUTPUT;
-        expectedOutputs[1] = outputB;
-
-        ICartRoutePolicy.Summary memory summary = policy.validate(hex"0808", inputs, INPUT, expectedOutputs);
-
-        assertTrue(summary.exactInput);
-        assertEq(summary.inputAmount, 5 ether);
-    }
-
-    function testOrderPlanRejectsOutputOutsideSignedBasket() public {
+    function testAcceptsOpaqueRecipientAndPayerFields() public {
         bytes[] memory inputs = new bytes[](1);
-        address[] memory path = new address[](2);
-        path[0] = INPUT;
-        path[1] = address(0x9999);
-        inputs[0] = abi.encode(address(1), 1 ether, 1 ether, path, true);
-        address[] memory expectedOutputs = new address[](1);
-        expectedOutputs[0] = OUTPUT;
+        inputs[0] = abi.encode(address(0x9999), false, address(0x8888), uint256(7));
 
-        vm.expectRevert(
-            abi.encodeWithSelector(ICartRoutePolicy.RouteEndpointMismatch.selector, 0, address(0x9999), OUTPUT)
-        );
-        policy.validate(hex"08", inputs, INPUT, expectedOutputs);
+        policy.validate(hex"08", inputs);
     }
 
-    function testV4ExactInputSingleSummary() public {
-        CartRoutePolicy.PoolKey memory poolKey = CartRoutePolicy.PoolKey({
-            currency0: INPUT, currency1: OUTPUT, fee: 3000, tickSpacing: 60, hooks: address(0)
-        });
-        CartRoutePolicy.ExactInputSingleParams memory swap = CartRoutePolicy.ExactInputSingleParams({
-            poolKey: poolKey, zeroForOne: true, amountIn: 5 ether, amountOutMinimum: 4 ether, hookData: bytes("")
-        });
-        bytes[] memory actions = new bytes[](3);
-        actions[0] = abi.encode(swap);
-        actions[1] = abi.encode(OUTPUT, 4 ether);
-        actions[2] = abi.encode(INPUT, 5 ether);
+    function testRejectsEmptyRoute() public {
+        vm.expectRevert(ICartRoutePolicy.EmptyRoute.selector);
+        policy.validate(bytes(""), new bytes[](0));
+    }
+
+    function testRejectsCommandInputLengthMismatch() public {
+        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.CommandInputLengthMismatch.selector, 1, 0));
+        policy.validate(hex"08", new bytes[](0));
+    }
+
+    function testRejectsTooManyCommands() public {
+        bytes memory commands = new bytes(33);
+        bytes[] memory inputs = new bytes[](commands.length);
+        for (uint256 i = 0; i < inputs.length; ++i) {
+            inputs[i] = bytes("");
+        }
+
+        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.RouteTooManyCommands.selector, commands.length));
+        policy.validate(commands, inputs);
+    }
+
+    function testRejectsTooManyInputs() public {
+        bytes[] memory inputs = new bytes[](33);
+        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.RouteTooManyInputs.selector, 33));
+        policy.validate(hex"08", inputs);
+    }
+
+    function testRejectsUnsupportedCommand() public {
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(hex"060f0c", actions);
+        inputs[0] = bytes("");
 
-        ICartRoutePolicy.Summary memory summary = policy.validate(hex"10", inputs, INPUT, _outputs());
-
-        assertTrue(summary.exactInput);
-        assertEq(summary.inputAmount, 5 ether);
-        assertEq(summary.outputAmount, 0);
+        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.CommandNotAllowed.selector, 0, bytes1(0x03)));
+        policy.validate(hex"03", inputs);
     }
 
-    function testV4RejectsRecipientBearingTakeAction() public {
-        CartRoutePolicy.PoolKey memory poolKey = CartRoutePolicy.PoolKey({
-            currency0: INPUT, currency1: OUTPUT, fee: 3000, tickSpacing: 60, hooks: address(0)
-        });
-        CartRoutePolicy.ExactInputSingleParams memory swap = CartRoutePolicy.ExactInputSingleParams({
-            poolKey: poolKey, zeroForOne: true, amountIn: 5 ether, amountOutMinimum: 4 ether, hookData: bytes("")
-        });
-        bytes[] memory actions = new bytes[](3);
-        actions[0] = abi.encode(swap);
-        actions[1] = abi.encode(OUTPUT, address(0x9999), 4 ether);
-        actions[2] = abi.encode(INPUT, 5 ether);
+    function testRejectsCommandFlags() public {
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(hex"060e0c", actions);
+        inputs[0] = bytes("");
 
-        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.CommandNotAllowed.selector, 0, bytes1(0x0e)));
-        policy.validate(hex"10", inputs, INPUT, _outputs());
-    }
-
-    function testRejectsRouterCommandFlags() public {
-        bytes[] memory inputs = new bytes[](1);
-        address[] memory path = new address[](2);
-        path[0] = INPUT;
-        path[1] = OUTPUT;
-        inputs[0] = abi.encode(address(1), 1 ether, 1 ether, path, true);
-
-        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.CommandFlagsNotAllowed.selector, 0, bytes1(0x89)));
-        policy.validate(hex"89", inputs, INPUT, _outputs());
-    }
-
-    function testRejectsRecipientOtherThanCartSentinel() public {
-        bytes[] memory inputs = new bytes[](1);
-        address[] memory path = new address[](2);
-        path[0] = INPUT;
-        path[1] = OUTPUT;
-        inputs[0] = abi.encode(address(0x9999), 1 ether, 1 ether, path, true);
-
-        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.InvalidRouteRecipient.selector, 0, address(0x9999)));
-        policy.validate(hex"08", inputs, INPUT, _outputs());
-    }
-
-    function _outputs() internal pure returns (address[] memory outputs) {
-        outputs = new address[](1);
-        outputs[0] = OUTPUT;
+        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.CommandFlagsNotAllowed.selector, 0, bytes1(0x80)));
+        policy.validate(hex"80", inputs);
     }
 }

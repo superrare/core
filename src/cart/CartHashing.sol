@@ -16,7 +16,8 @@ library CartHashing {
     bytes32 internal constant ORDER_LINE_TYPEHASH = keccak256(
         "OrderLine(bytes32 sku,bytes32 listingHash,uint8 fulfillmentKind,uint256 quantity,address settlementCurrency,uint256 amount,address paymentRecipient)"
     );
-    bytes32 internal constant ROUTE_TYPEHASH = keccak256("PayoutRoute(bytes commands,bytes[] inputs)");
+    bytes32 internal constant ROUTE_TYPEHASH =
+        keccak256("PayoutRoute(bytes commands,bytes[] inputs,uint256 routerValue)");
     bytes32 internal constant ACTION_TYPEHASH =
         keccak256("FulfillmentAction(uint256 lineIndex,uint256 quantity,address recipient)");
     bytes32 internal constant LISTING_ROOT_TYPEHASH =
@@ -80,7 +81,9 @@ library CartHashing {
     }
 
     function hashPayoutRoute(ICart.PayoutRoute calldata route) internal pure returns (bytes32) {
-        return keccak256(abi.encode(ROUTE_TYPEHASH, keccak256(route.commands), _hashBytesArray(route.inputs)));
+        return keccak256(
+            abi.encode(ROUTE_TYPEHASH, keccak256(route.commands), _hashBytesArray(route.inputs), route.routerValue)
+        );
     }
 
     function hashFulfillmentActions(ICart.FulfillmentAction[] calldata actions) internal pure returns (bytes32) {

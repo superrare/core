@@ -212,10 +212,10 @@ library NetworkConfig {
     config.permit2 = _addr(0x000000000022D473030F116dDEE9F6B43aC78BA3);
     config.universalRouter = _addr(0x3A9D48AB9751398BbFa63ad67599Bb04e4BdF98b);
     config.cartProxy = _addr(0x1EBF35b3A76caEf60a009d2786A66A91D42A38Bc);
-    config.cartImplementation = _addr(0xac0D52d232BB3A529ae0b1C3D3454e6A3E250e0E);
-    config.cartRoutePolicy = _addr(0x614e96dcCc3591fffFA540C44656bA1B2D9a9E7F);
-    config.cartPaymentExecutor = _addr(0xe3c257aB50d8E92654fe8237cFa80760079E1EF4);
-    config.cartLens = _addr(0x1Af760FD56e0e41a45173E954D44C865F7A7F29e);
+    config.cartImplementation = _addr(0x4d277706Af368afb26422708f59756dF390FF82E);
+    config.cartRoutePolicy = _addr(0x43B3aA230d75651103475cE3871Ea48e77807EF7);
+    config.cartPaymentExecutor = _addr(0x239D4CFF9F34f1773cCCd525EEf08Ce2Ecf93113);
+    config.cartLens = _addr(0x27dE8e7Ef6d8a24451F512eAa0c2D73A8dB90993);
     config.superRareV1 = _addr(0x4eb420094a17f243878896e274D67A04F916C214);
     config.superRareV2 = _addr(0x6C7C4879dd37Bdf2B57f128b344DeF62DA0Ca34e);
     config.creatorRegistry = _addr(0x38302C717F793dD7EA5C0a2F215494409EaD3ce0);

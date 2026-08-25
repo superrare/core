@@ -189,38 +189,34 @@ contract CartLens is ICartLens {
         return _success();
     }
 
-    function previewRoute(
-        address cart,
-        address inputCurrency,
-        address[] calldata outputCurrencies,
-        ICart.PayoutRoute calldata route
-    ) external view override returns (RoutePreview memory preview) {
+    function previewRoute(address cart, ICart.PayoutRoute calldata route)
+        external
+        view
+        override
+        returns (RoutePreview memory preview)
+    {
         ICartLensTarget config = ICartLensTarget(cart);
-        address[] memory outputs = new address[](outputCurrencies.length);
-        address weth = config.weth();
-        for (uint256 i = 0; i < outputCurrencies.length; ++i) {
-            outputs[i] = outputCurrencies[i] == address(0) ? weth : outputCurrencies[i];
-        }
-        address inputToken = inputCurrency == address(0) ? weth : inputCurrency;
-        if (outputs.length == 0) {
-            preview.direct = true;
-            preview.exactInput = true;
-            preview.valid = route.commands.length == 0 && route.inputs.length == 0;
-            preview.code = preview.valid ? ValidationCode.OK : ValidationCode.ROUTE_UNEXPECTED;
+        if (route.commands.length == 0 && route.inputs.length == 0 && route.routerValue == 0) {
+            preview.valid = true;
+            preview.code = ValidationCode.OK;
             return preview;
         }
         if (route.commands.length == 0) {
-            preview.code = ValidationCode.ROUTE_REQUIRED;
+            preview.code = ValidationCode.ROUTE_REJECTED;
+            if (route.inputs.length != 0) {
+                preview.reason = abi.encodeWithSelector(
+                    ICartRoutePolicy.CommandInputLengthMismatch.selector, route.commands.length, route.inputs.length
+                );
+            } else {
+                preview.reason = route.routerValue == 0
+                    ? abi.encodeWithSelector(ICartRoutePolicy.EmptyRoute.selector)
+                    : abi.encodeWithSelector(ICart.RouteValueWithoutCommands.selector);
+            }
             return preview;
         }
-        try ICartRoutePolicy(config.routePolicy()).validate(route.commands, route.inputs, inputToken, outputs) returns (
-            ICartRoutePolicy.Summary memory summary
-        ) {
+        try ICartRoutePolicy(config.routePolicy()).validate(route.commands, route.inputs) {
             preview.valid = true;
             preview.code = ValidationCode.OK;
-            preview.exactInput = summary.exactInput;
-            preview.inputAmount = summary.inputAmount;
-            preview.outputAmount = summary.outputAmount;
         } catch (bytes memory reason) {
             preview.code = ValidationCode.ROUTE_REJECTED;
             preview.reason = reason;

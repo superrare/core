@@ -4,74 +4,62 @@ pragma solidity 0.8.18;
 import {ICartRoutePolicy} from "../../cart/ICartRoutePolicy.sol";
 import {CartRoutePolicyTest} from "./CartRoutePolicy.t.sol";
 
-/// @notice Default-deny coverage for malformed and unsupported Universal Router plans.
+/// @notice Verification-oriented boundary tests for the opaque route policy.
 contract CartRoutePolicyVerificationTest is CartRoutePolicyTest {
-    function testRejectsCommandInputLengthMismatch() public {
-        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.CommandInputLengthMismatch.selector, 1, 0));
-        policy.validate(hex"08", new bytes[](0), INPUT, _outputs());
+    function testGuardDoesNotDecodeV3Path() public {
+        bytes[] memory inputs = new bytes[](1);
+        inputs[0] = abi.encode(address(0x9999), type(uint256).max, hex"01", address(0x7777), false);
+
+        policy.validate(hex"00", inputs);
     }
 
-    function testRejectsUnsupportedCommand() public {
+    function testGuardDoesNotDecodeV4Actions() public {
+        bytes[] memory inputs = new bytes[](1);
+        inputs[0] = abi.encode(hex"ffffffffffffffff", address(0x9999), type(uint256).max);
+
+        policy.validate(hex"10", inputs);
+    }
+
+    function testGuardDoesNotValidateRecipient() public {
+        bytes[] memory inputs = new bytes[](1);
+        inputs[0] = abi.encode(address(0x9999), type(uint256).max, address(0x8888));
+
+        policy.validate(hex"04", inputs);
+    }
+
+    function testMalformedOpaqueInputReachesRouterBoundary() public {
+        bytes[] memory inputs = new bytes[](1);
+        inputs[0] = hex"00";
+
+        // The policy accepts the command family; a real Universal Router call owns the next
+        // validation boundary and is expected to reject malformed command input.
+        policy.validate(hex"09", inputs);
+    }
+
+    function testRejectsAllowRevertFlagEvenForSupportedCommand() public {
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = bytes("");
 
-        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.CommandNotAllowed.selector, 0, bytes1(0x04)));
-        policy.validate(hex"04", inputs, INPUT, _outputs());
+        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.CommandFlagsNotAllowed.selector, 0, bytes1(0x89)));
+        policy.validate(hex"89", inputs);
     }
 
-    function testRejectsPermit2RouterPayerMode() public {
+    function testRejectsPositionAndPoolInitializationCommands() public {
         bytes[] memory inputs = new bytes[](1);
-        address[] memory path = _v2Path(INPUT, OUTPUT);
-        inputs[0] = abi.encode(address(1), 1 ether, 1 ether, path, false);
+        inputs[0] = bytes("");
 
-        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.InvalidPayer.selector, 0));
-        policy.validate(hex"08", inputs, INPUT, _outputs());
+        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.CommandNotAllowed.selector, 0, bytes1(0x03)));
+        policy.validate(hex"03", inputs);
+
+        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.CommandNotAllowed.selector, 0, bytes1(0x13)));
+        policy.validate(hex"13", inputs);
     }
 
-    function testRejectsMixedExactInputAndExactOutputCommands() public {
-        bytes[] memory inputs = new bytes[](2);
-        address[] memory path = _v2Path(INPUT, OUTPUT);
-        inputs[0] = abi.encode(address(1), 1 ether, 1 ether, path, true);
-        inputs[1] = abi.encode(address(1), 1 ether, 1 ether, path, true);
-
-        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.InvalidRouteMode.selector, 1));
-        policy.validate(hex"0809", inputs, INPUT, _outputs());
-    }
-
-    function testRejectsUnexpectedInputEndpoint() public {
-        address wrongInput = address(0x2001);
+    function testRejectsSubPlanCommand() public {
         bytes[] memory inputs = new bytes[](1);
-        address[] memory path = _v2Path(wrongInput, OUTPUT);
-        inputs[0] = abi.encode(address(1), 1 ether, 1 ether, path, true);
+        inputs[0] = bytes("");
 
-        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.RouteEndpointMismatch.selector, 0, wrongInput, INPUT));
-        policy.validate(hex"08", inputs, INPUT, _outputs());
-    }
-
-    function testAcceptsUnapprovedIntermediateToken() public {
-        address intermediate = address(0x2002);
-        bytes[] memory inputs = new bytes[](1);
-        address[] memory path = new address[](3);
-        path[0] = INPUT;
-        path[1] = intermediate;
-        path[2] = OUTPUT;
-        inputs[0] = abi.encode(address(1), 1 ether, 1 ether, path, true);
-
-        ICartRoutePolicy.Summary memory summary = policy.validate(hex"08", inputs, INPUT, _outputs());
-        assertEq(summary.inputAmount, 1 ether);
-    }
-
-    function testRejectsMalformedV3Path() public {
-        bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(address(1), 1 ether, 1 ether, abi.encodePacked(INPUT), true);
-
-        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.InvalidPath.selector, 0));
-        policy.validate(hex"00", inputs, INPUT, _outputs());
-    }
-
-    function _v2Path(address input, address output) private pure returns (address[] memory path) {
-        path = new address[](2);
-        path[0] = input;
-        path[1] = output;
+        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.CommandNotAllowed.selector, 0, bytes1(0x21)));
+        policy.validate(hex"21", inputs);
     }
 }

@@ -11,16 +11,18 @@ import {NetworkConfig} from "../../../../../script/NetworkConfig.s.sol";
 
 /// @notice Ethereum Mainnet deployment guard for Cart's immutable external dependencies.
 /// @dev This fork test is intentionally outside the default unit-test path. Run it with
-///      RPC_URL set to an Ethereum Mainnet endpoint.
+///      ETH_MAINNET_RPC_URL set to an archive-capable Ethereum Mainnet endpoint.
 contract CartDependencyEthereumTest is Test {
     uint256 private constant ETHEREUM_MAINNET = 1;
+    uint256 private constant FORK_BLOCK = 25_800_000;
     address private constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
     address private constant UNIVERSAL_ROUTER = 0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af;
     address private constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
     function setUp() public {
-        vm.createSelectFork(vm.envString("RPC_URL"));
+        vm.createSelectFork(vm.envString("ETH_MAINNET_RPC_URL"), FORK_BLOCK);
         require(block.chainid == ETHEREUM_MAINNET, "This test must run on Ethereum Mainnet");
+        assertEq(block.number, FORK_BLOCK, "Unexpected fork block");
     }
 
     function testEthereumPinnedDependenciesHaveCodeAndCartAcceptsThem() public {

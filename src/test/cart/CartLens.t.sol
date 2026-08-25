@@ -10,16 +10,7 @@ import {ICartLens} from "../../cart/ICartLens.sol";
 import {ICartRoutePolicy} from "../../cart/ICartRoutePolicy.sol";
 
 contract CartLensTestPolicy is ICartRoutePolicy {
-    function validate(bytes calldata, bytes[] calldata, address, address[] calldata)
-        external
-        pure
-        override
-        returns (Summary memory summary)
-    {
-        summary.exactInput = true;
-        summary.inputAmount = 7 ether;
-        summary.outputAmount = 6 ether;
-    }
+    function validate(bytes calldata, bytes[] calldata) external pure override {}
 }
 
 contract CartLensTestSigner {
@@ -38,7 +29,6 @@ contract CartLensTestState {
     bool public paused;
     address public platformSigner;
     address public routePolicy;
-    address public weth;
     bytes32 private domainSeparator;
 
     mapping(bytes32 => bool) public executedOrderIds;
@@ -51,8 +41,7 @@ contract CartLensTestState {
         return domainSeparator;
     }
 
-    function setConfig(address weth_, address routePolicy_) external {
-        weth = weth_;
+    function setConfig(address routePolicy_) external {
         routePolicy = routePolicy_;
     }
 
@@ -93,9 +82,6 @@ contract CartLensTest is Test {
     CartLensTestSigner internal signer;
 
     address internal constant SELLER = address(0x1001);
-    address internal constant WETH = address(0x1002);
-    address internal constant TOKEN_A = address(0x1003);
-    address internal constant TOKEN_B = address(0x1004);
     bytes32 internal constant DOMAIN_SEPARATOR = keccak256("cart-lens-domain");
 
     function setUp() public {
@@ -103,7 +89,7 @@ contract CartLensTest is Test {
         hashes = new CartHashes();
         cart = new CartLensTestState();
         signer = new CartLensTestSigner();
-        cart.setConfig(WETH, address(0));
+        cart.setConfig(address(0));
         cart.setSigner(address(signer), DOMAIN_SEPARATOR);
     }
 
@@ -176,14 +162,22 @@ contract CartLensTest is Test {
 
     function testPreviewRouteAndEnvelopeRemainStateless() public {
         CartLensTestPolicy policy = new CartLensTestPolicy();
-        cart.setConfig(WETH, address(policy));
-        ICart.PayoutRoute memory route = ICart.PayoutRoute({commands: hex"08", inputs: new bytes[](1)});
-        address[] memory outputCurrencies = new address[](1);
-        outputCurrencies[0] = TOKEN_B;
-        ICartLens.RoutePreview memory preview = lens.previewRoute(address(cart), TOKEN_A, outputCurrencies, route);
+        cart.setConfig(address(policy));
+        ICart.PayoutRoute memory route = ICart.PayoutRoute({commands: hex"08", inputs: new bytes[](1), routerValue: 0});
+        ICartLens.RoutePreview memory preview = lens.previewRoute(address(cart), route);
         assertTrue(preview.valid);
-        assertEq(preview.inputAmount, 7 ether);
-        assertEq(preview.outputAmount, 6 ether);
+        assertEq(uint8(preview.code), uint8(ICartLens.ValidationCode.OK));
+        assertEq(preview.reason.length, 0);
+
+        route.commands = bytes("");
+        route.inputs = new bytes[](1);
+        preview = lens.previewRoute(address(cart), route);
+        assertFalse(preview.valid);
+        assertEq(uint8(preview.code), uint8(ICartLens.ValidationCode.ROUTE_REJECTED));
+        assertEq(
+            preview.reason,
+            abi.encodeWithSelector(ICartRoutePolicy.CommandInputLengthMismatch.selector, uint256(0), uint256(1))
+        );
 
         ICart.PurchaseOrder memory order;
         order.orderId = keccak256("lens-order");
@@ -199,7 +193,7 @@ contract CartLensTest is Test {
             amount: 1 ether,
             paymentRecipient: address(0x2001)
         });
-        route = ICart.PayoutRoute({commands: bytes(""), inputs: new bytes[](0)});
+        route = ICart.PayoutRoute({commands: bytes(""), inputs: new bytes[](0), routerValue: 0});
         ICart.FulfillmentAction[] memory actions = new ICart.FulfillmentAction[](0);
         order.orderLinesHash = hashes.hashOrderLines(lines);
         order.payoutRouteHash = hashes.hashPayoutRoute(route);
