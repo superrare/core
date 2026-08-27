@@ -99,6 +99,7 @@ library NetworkConfig {
     address cartRoutePolicy;
     address cartPaymentExecutor;
     address cartLens;
+    address cartHashes;
   }
 
   function getCurrent() internal view returns (Addresses memory) {
@@ -212,10 +213,11 @@ library NetworkConfig {
     config.permit2 = _addr(0x000000000022D473030F116dDEE9F6B43aC78BA3);
     config.universalRouter = _addr(0x3A9D48AB9751398BbFa63ad67599Bb04e4BdF98b);
     config.cartProxy = _addr(0x1EBF35b3A76caEf60a009d2786A66A91D42A38Bc);
-    config.cartImplementation = _addr(0x4d277706Af368afb26422708f59756dF390FF82E);
+    config.cartImplementation = _addr(0xE612B7BfF72b413C66F6C6D5784A6318164ca1a1);
     config.cartRoutePolicy = _addr(0x43B3aA230d75651103475cE3871Ea48e77807EF7);
     config.cartPaymentExecutor = _addr(0x239D4CFF9F34f1773cCCd525EEf08Ce2Ecf93113);
-    config.cartLens = _addr(0x27dE8e7Ef6d8a24451F512eAa0c2D73A8dB90993);
+    config.cartLens = _addr(0xF8780bA2627F4431D69EaA4B948a433c73183e1B);
+    config.cartHashes = _addr(0x7cF7626AA1881FFeb2004705886DA42605Ec9A0F);
     config.superRareV1 = _addr(0x4eb420094a17f243878896e274D67A04F916C214);
     config.superRareV2 = _addr(0x6C7C4879dd37Bdf2B57f128b344DeF62DA0Ca34e);
     config.creatorRegistry = _addr(0x38302C717F793dD7EA5C0a2F215494409EaD3ce0);
