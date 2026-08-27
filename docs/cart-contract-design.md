@@ -45,7 +45,7 @@ enum FulfillmentKind {
 }
 
 struct Listing {
-    bytes32 listingId;
+    bytes32 listingSalt;
     address seller;
     bytes32 sku;
     FulfillmentKind fulfillmentKind;
@@ -60,7 +60,7 @@ struct Listing {
 
 struct OrderLine {
     bytes32 sku;
-    bytes32 listingHash;
+    bytes32 listingDigest;
     FulfillmentKind fulfillmentKind;
     uint256 quantity;
     address settlementCurrency;
@@ -129,8 +129,8 @@ The cart exposes `DOMAIN_SEPARATOR()` and otherwise leaves digest construction t
 ## Listing Rules
 
 A Listing is never pre-registered. The caller supplies each deduplicated Listing and its ListingRoot
-inclusion proof; the seller's root signature is supplied once per root. `listingHash` is the complete
-EIP-712 Listing digest. Every supplied Listing must be referenced, every nonzero Order Line hash must
+inclusion proof; the seller's root signature is supplied once per root. `listingDigest` is the complete
+EIP-712 Listing digest. Every supplied Listing must be referenced, every nonzero Order Line digest must
 resolve exactly once, and zero is reserved for platform-only lines.
 
 Each supplied Merkle proof is limited to 64 sibling hashes so malformed witnesses cannot force
@@ -138,9 +138,9 @@ unbounded proof processing.
 
 - The Listing digest is the immutable identity of its exact terms. Any edit signs a new leaf and,
   when needed, a new root.
-- `listingId` is a seller-signed identity for one listing instance. Re-listing returned inventory
-  with otherwise identical terms uses a fresh `listingId`, producing a fresh Listing digest and
-  fill bucket.
+- `listingSalt` is a client-generated random value included in the seller-signed Listing. Re-listing
+  returned inventory with otherwise identical terms uses a fresh `listingSalt`, producing a fresh
+  Listing digest and fill bucket. It is not a public Listing identifier.
 - Fill state is keyed by the Listing digest; the same leaf can be included in multiple reusable roots
   without creating separate inventory buckets.
 - `cancelListingRoot(rootDigest)` invalidates the seller's entire Listing Root, including singleton roots.
@@ -274,7 +274,7 @@ event OrderLineSettled(
     bytes32 indexed orderId,
     uint256 indexed lineIndex,
     bytes32 indexed sku,
-    bytes32 listingHash,
+    bytes32 listingDigest,
     uint256 quantity,
     address settlementCurrency,
     uint256 amount,
@@ -312,7 +312,7 @@ Implementation acceptance includes unit, invariant, fuzz, and fork coverage for:
 - EIP-712 EOA and ERC-1271 platform and seller signatures; altered, malformed, expired, cross-chain, and cross-contract payloads.
 - Purchase Order replay and rollback after every failure stage.
 - Whole Listing Root cancellation, exact Listing cancellation, bulk nonce invalidation, deliberate
-  re-listing with a fresh `listingId`, partial fills, duplicate Listing references, races for final
+  re-listing with a fresh `listingSalt`, partial fills, duplicate Listing references, races for final
   inventory, and fill rollback.
 - Every Fulfillment kind, ownership transition, approval loss, mint incompatibility, recipient splitting, and the 20-operation cap.
 - Empty direct routes and opaque V2/V3/V4, wrap/unwrap, sweep, and Permit2 transfer-from command programs.

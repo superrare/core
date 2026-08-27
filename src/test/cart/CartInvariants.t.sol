@@ -208,7 +208,7 @@ contract CartInvariantsTest is Test {
     ) private pure returns (ICart.OrderLine memory line) {
         line = ICart.OrderLine({
             sku: keccak256(bytes(id)),
-            listingHash: bytes32(0),
+            listingDigest: bytes32(0),
             fulfillmentKind: kind,
             quantity: 1,
             settlementCurrency: currency,

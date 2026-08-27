@@ -8,13 +8,13 @@ import {ICart} from "./ICart.sol";
 ///      the off-chain hashing helper so the two can never drift.
 library CartHashing {
     bytes32 internal constant LISTING_TYPEHASH = keccak256(
-        "Listing(bytes32 listingId,address seller,bytes32 sku,uint8 fulfillmentKind,address tokenContract,uint256 tokenId,address settlementCurrency,uint256 minimumUnitPrice,uint256 availableQuantity,address paymentRecipient)"
+        "Listing(bytes32 listingSalt,address seller,bytes32 sku,uint8 fulfillmentKind,address tokenContract,uint256 tokenId,address settlementCurrency,uint256 minimumUnitPrice,uint256 availableQuantity,address paymentRecipient)"
     );
     bytes32 internal constant ORDER_TYPEHASH = keccak256(
         "PurchaseOrder(bytes32 orderId,address paymentCurrency,uint256 deadline,uint256 paymentAmount,bytes32 orderLinesHash,bytes32 payoutRouteHash,bytes32 fulfillmentActionsHash)"
     );
     bytes32 internal constant ORDER_LINE_TYPEHASH = keccak256(
-        "OrderLine(bytes32 sku,bytes32 listingHash,uint8 fulfillmentKind,uint256 quantity,address settlementCurrency,uint256 amount,address paymentRecipient)"
+        "OrderLine(bytes32 sku,bytes32 listingDigest,uint8 fulfillmentKind,uint256 quantity,address settlementCurrency,uint256 amount,address paymentRecipient)"
     );
     bytes32 internal constant ROUTE_TYPEHASH =
         keccak256("PayoutRoute(bytes commands,bytes[] inputs,uint256 routerValue)");
@@ -28,7 +28,7 @@ library CartHashing {
         return keccak256(
             abi.encode(
                 LISTING_TYPEHASH,
-                listing.listingId,
+                listing.listingSalt,
                 listing.seller,
                 listing.sku,
                 listing.fulfillmentKind,
@@ -67,7 +67,7 @@ library CartHashing {
                 abi.encode(
                     ORDER_LINE_TYPEHASH,
                     lines[i].sku,
-                    lines[i].listingHash,
+                    lines[i].listingDigest,
                     lines[i].fulfillmentKind,
                     lines[i].quantity,
                     lines[i].settlementCurrency,

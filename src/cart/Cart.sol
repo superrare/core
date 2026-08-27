@@ -337,7 +337,7 @@ contract Cart is
 
             for (uint256 j = 0; j < i; ++j) {
                 // Do not accept the same listing more than once in the supplied array.
-                if (resolvedDigests[j] == digest) revert DuplicateListingHash(digest);
+                if (resolvedDigests[j] == digest) revert DuplicateListingDigest(digest);
             }
             // Save the verified digest at the listing's array index.
             resolvedDigests[i] = digest;
@@ -347,7 +347,7 @@ contract Cart is
         bool[] memory referenced = new bool[](listings.length);
         lineListing = new uint256[](lines.length);
         for (uint256 i = 0; i < lines.length; ++i) {
-            bytes32 target = lines[i].listingHash;
+            bytes32 target = lines[i].listingDigest;
             if (target == bytes32(0)) {
                 // Arbitrary ERC-20 swap lines do not require seller inventory.
                 lineListing[i] = NO_LISTING;
@@ -396,7 +396,7 @@ contract Cart is
 
     function _validateListing(Listing calldata listing) private pure {
         // Require the identity and seller fields that make a listing usable.
-        if (listing.listingId == bytes32(0) || listing.seller == address(0) || listing.sku == bytes32(0)) {
+        if (listing.listingSalt == bytes32(0) || listing.seller == address(0) || listing.sku == bytes32(0)) {
             revert InvalidListing();
         }
         // Require a payout recipient and a positive minimum unit price.
@@ -654,7 +654,7 @@ contract Cart is
                 orderId,
                 i,
                 lines[i].sku,
-                lines[i].listingHash,
+                lines[i].listingDigest,
                 lines[i].quantity,
                 lines[i].settlementCurrency,
                 lines[i].amount,

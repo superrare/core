@@ -5,7 +5,7 @@ import {CartTest} from "./Cart.t.sol";
 import {ICart} from "../../cart/ICart.sol";
 
 /// @notice Duplicate identity is now defined by the complete Listing digest.
-contract CartAuditDuplicateIdTest is CartTest {
+contract CartAuditDuplicateDigestTest is CartTest {
     function testDuplicateListingDigestIsRejected() public {
         ICart.Listing memory listing = _listingWithQuantity(
             keccak256("duplicate-listing"), ICart.FulfillmentKind.NONE, address(0), 0, sellerPayout, 1
@@ -24,7 +24,7 @@ contract CartAuditDuplicateIdTest is CartTest {
         bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
 
         vm.deal(payer, 2 ether);
-        vm.expectRevert(abi.encodeWithSelector(ICart.DuplicateListingHash.selector, _listingDigest(listing)));
+        vm.expectRevert(abi.encodeWithSelector(ICart.DuplicateListingDigest.selector, _listingDigest(listing)));
         vm.prank(payer);
         cart.executePurchase{value: 2 ether}(
             order, lines, listings, authorization, _combineRoutes(routes), actions, platformSignature

@@ -65,7 +65,7 @@ contract CartLens is ICartLens {
         ICart target = ICart(cart);
         ICartLensTarget config = ICartLensTarget(cart);
         // Check the listing's required identity and payout fields.
-        if (listing.listingId == bytes32(0) || listing.seller == address(0) || listing.sku == bytes32(0)) {
+        if (listing.listingSalt == bytes32(0) || listing.seller == address(0) || listing.sku == bytes32(0)) {
             return _failure(ValidationCode.INVALID_LISTING, 0, bytes32(0), "");
         }
         if (listing.paymentRecipient == address(0) || listing.minimumUnitPrice == 0) {
@@ -167,14 +167,14 @@ contract CartLens is ICartLens {
                 return _failure(ValidationCode.INVALID_ORDER_LINE, i, order.orderId, "");
             }
             if (
-                lines[i].listingHash == bytes32(0) && lines[i].fulfillmentKind != ICart.FulfillmentKind.NONE
+                lines[i].listingDigest == bytes32(0) && lines[i].fulfillmentKind != ICart.FulfillmentKind.NONE
                     && lines[i].fulfillmentKind != ICart.FulfillmentKind.CURRENCY_SWAP
             ) {
                 return _failure(ValidationCode.INVALID_ORDER_LINE, i, order.orderId, "");
             }
             if (
                 lines[i].fulfillmentKind == ICart.FulfillmentKind.CURRENCY_SWAP
-                    && (lines[i].listingHash != bytes32(0) || lines[i].settlementCurrency == order.paymentCurrency)
+                    && (lines[i].listingDigest != bytes32(0) || lines[i].settlementCurrency == order.paymentCurrency)
             ) {
                 return _failure(ValidationCode.INVALID_ORDER_LINE, i, order.orderId, "");
             }

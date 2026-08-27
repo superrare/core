@@ -32,9 +32,9 @@ interface ICart {
     }
 
     struct Listing {
-        /// @dev A seller-chosen identity for this listing instance. Re-listing returned inventory
-        /// with the same terms requires a fresh listingId.
-        bytes32 listingId;
+        /// @dev A client-generated random salt that makes this listing instance unique. Re-listing
+        /// returned inventory with the same terms requires a fresh listingSalt.
+        bytes32 listingSalt;
         /// @dev Seller that owns the listing and signs its root.
         address seller;
         /// @dev Product identity that must match the order line.
@@ -59,7 +59,7 @@ interface ICart {
         /// @dev Product identity used by the signed order.
         bytes32 sku;
         /// @dev EIP-712 digest of the listing, or zero for a fee or Currency Swap line.
-        bytes32 listingHash;
+        bytes32 listingDigest;
         /// @dev Explicit fulfillment classification used for settlement and reconciliation.
         FulfillmentKind fulfillmentKind;
         /// @dev Number of units in this line.
@@ -147,7 +147,7 @@ interface ICart {
         bytes32 indexed orderId,
         uint256 indexed lineIndex,
         bytes32 indexed sku,
-        bytes32 listingHash,
+        bytes32 listingDigest,
         uint256 quantity,
         address settlementCurrency,
         uint256 amount,
@@ -171,7 +171,7 @@ interface ICart {
     error AlreadyExecuted(bytes32 orderId);
     error ContractPaused();
     error DeadlineExpired(uint256 deadline, uint256 timestamp);
-    error DuplicateListingHash(bytes32 listingHash);
+    error DuplicateListingDigest(bytes32 listingDigest);
     /// @param listingIndex Position of a supplied Listing that no Order Line references.
     error ExtraListing(uint256 listingIndex);
     error InvalidArrayLength();
@@ -195,7 +195,7 @@ interface ICart {
     error UnexpectedCartBalance(address token, uint256 baseline, uint256 current);
     /// @param signer Platform signer or ListingRoot seller whose authorization did not verify.
     error InvalidSignature(address signer, bytes32 digest);
-    error ListingNotFound(bytes32 listingHash);
+    error ListingNotFound(bytes32 listingDigest);
     error ListingQuantityExceeded(bytes32 listingDigest, uint256 available, uint256 requested);
     error ListingTermsMismatch(uint256 lineIndex);
     error MaxFulfillmentOperationsExceeded();

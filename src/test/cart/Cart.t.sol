@@ -492,7 +492,7 @@ contract CartTest is Test {
         ICart.OrderLine[] memory lines = new ICart.OrderLine[](1);
         lines[0] = ICart.OrderLine({
             sku: listing.sku,
-            listingHash: _listingDigest(listing),
+            listingDigest: _listingDigest(listing),
             fulfillmentKind: listing.fulfillmentKind,
             quantity: 1,
             settlementCurrency: address(0),
@@ -523,11 +523,11 @@ contract CartTest is Test {
         assertEq(address(this).balance, protocolBefore + 0.25 ether);
     }
 
-    function testZeroListingHashPreservesExplicitFulfillmentKind() public {
+    function testZeroListingDigestPreservesExplicitFulfillmentKind() public {
         ICart.OrderLine[] memory lines = new ICart.OrderLine[](2);
         lines[0] = ICart.OrderLine({
             sku: keccak256("arbitrary-erc20"),
-            listingHash: bytes32(0),
+            listingDigest: bytes32(0),
             fulfillmentKind: ICart.FulfillmentKind.CURRENCY_SWAP,
             quantity: 1,
             settlementCurrency: address(weth),
@@ -536,7 +536,7 @@ contract CartTest is Test {
         });
         lines[1] = ICart.OrderLine({
             sku: keccak256("fee"),
-            listingHash: bytes32(0),
+            listingDigest: bytes32(0),
             fulfillmentKind: ICart.FulfillmentKind.NONE,
             quantity: 1,
             settlementCurrency: address(0),
@@ -601,7 +601,7 @@ contract CartTest is Test {
         ICart.OrderLine[] memory lines = new ICart.OrderLine[](1);
         lines[0] = ICart.OrderLine({
             sku: keccak256("same-currency-swap"),
-            listingHash: bytes32(0),
+            listingDigest: bytes32(0),
             fulfillmentKind: ICart.FulfillmentKind.CURRENCY_SWAP,
             quantity: 1,
             settlementCurrency: address(0),
@@ -1221,7 +1221,7 @@ contract CartTest is Test {
         ICart.OrderLine[] memory lines = new ICart.OrderLine[](1);
         lines[0] = ICart.OrderLine({
             sku: listing.sku,
-            listingHash: _listingDigest(listing),
+            listingDigest: _listingDigest(listing),
             fulfillmentKind: listing.fulfillmentKind,
             quantity: 1,
             settlementCurrency: address(0),
@@ -1254,7 +1254,7 @@ contract CartTest is Test {
         ICart.OrderLine[] memory lines = new ICart.OrderLine[](1);
         lines[0] = ICart.OrderLine({
             sku: listing.sku,
-            listingHash: _listingDigest(listing),
+            listingDigest: _listingDigest(listing),
             fulfillmentKind: listing.fulfillmentKind,
             quantity: 1,
             settlementCurrency: address(0),
@@ -1610,7 +1610,7 @@ contract CartTest is Test {
         uint256 availableQuantity
     ) internal view returns (ICart.Listing memory) {
         return ICart.Listing({
-            listingId: listingSeed,
+            listingSalt: listingSeed,
             seller: seller,
             sku: keccak256(abi.encodePacked("sku-", listingSeed)),
             fulfillmentKind: fulfillmentKind,
@@ -1631,7 +1631,7 @@ contract CartTest is Test {
         lines = new ICart.OrderLine[](1);
         lines[0] = ICart.OrderLine({
             sku: listing.sku,
-            listingHash: _listingDigest(listing),
+            listingDigest: _listingDigest(listing),
             fulfillmentKind: listing.fulfillmentKind,
             quantity: quantity,
             settlementCurrency: address(0),

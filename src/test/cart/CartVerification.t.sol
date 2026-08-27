@@ -77,7 +77,7 @@ contract CartVerificationTest is CartTest {
         ICart.OrderLine[] memory lines = new ICart.OrderLine[](2);
         lines[0] = ICart.OrderLine({
             sku: first.sku,
-            listingHash: _listingDigest(first),
+            listingDigest: _listingDigest(first),
             fulfillmentKind: first.fulfillmentKind,
             quantity: 2,
             settlementCurrency: address(0),
@@ -86,7 +86,7 @@ contract CartVerificationTest is CartTest {
         });
         lines[1] = ICart.OrderLine({
             sku: second.sku,
-            listingHash: _listingDigest(second),
+            listingDigest: _listingDigest(second),
             fulfillmentKind: second.fulfillmentKind,
             quantity: 3,
             settlementCurrency: address(0),
@@ -190,7 +190,7 @@ contract CartVerificationTest is CartTest {
         ICart.OrderLine[] memory lines = new ICart.OrderLine[](2);
         lines[0] = ICart.OrderLine({
             sku: listing.sku,
-            listingHash: _listingDigest(listing),
+            listingDigest: _listingDigest(listing),
             fulfillmentKind: listing.fulfillmentKind,
             quantity: 1,
             settlementCurrency: address(0),
@@ -316,7 +316,7 @@ contract CartVerificationTest is CartTest {
         bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
 
         vm.deal(payer, 2 ether);
-        vm.expectRevert(abi.encodeWithSelector(ICart.DuplicateListingHash.selector, digest));
+        vm.expectRevert(abi.encodeWithSelector(ICart.DuplicateListingDigest.selector, digest));
         vm.prank(payer);
         cart.executePurchase{value: 2 ether}(
             order, lines, listings, authorization, _combineRoutes(routes), actions, platformSignature
@@ -329,7 +329,7 @@ contract CartVerificationTest is CartTest {
         );
         ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 1 ether);
         bytes32 unknownDigest = keccak256("unknown-listing-digest");
-        lines[0].listingHash = unknownDigest;
+        lines[0].listingDigest = unknownDigest;
         ICart.Listing[] memory listings = _singletonListing(listing);
         ICart.ListingPurchaseAuthorization memory authorization = _rootAuthorization(listings, SELLER_PK);
         ICart.PayoutRoute[] memory routes = _emptyRoutes(1);

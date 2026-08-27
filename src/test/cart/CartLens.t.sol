@@ -186,7 +186,7 @@ contract CartLensTest is Test {
         ICart.OrderLine[] memory lines = new ICart.OrderLine[](1);
         lines[0] = ICart.OrderLine({
             sku: keccak256("lens-sku"),
-            listingHash: bytes32(0),
+            listingDigest: bytes32(0),
             fulfillmentKind: ICart.FulfillmentKind.NONE,
             quantity: 1,
             settlementCurrency: address(0),
@@ -205,7 +205,7 @@ contract CartLensTest is Test {
     }
 
     function _listing(uint256 availableQuantity) internal pure returns (ICart.Listing memory listing) {
-        listing.listingId = keccak256("lens-listing");
+        listing.listingSalt = keccak256("lens-listing");
         listing.seller = SELLER;
         listing.sku = keccak256("lens-sku");
         listing.fulfillmentKind = ICart.FulfillmentKind.NONE;

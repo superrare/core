@@ -118,7 +118,7 @@ contract CartMerkleTest is CartTest {
         );
     }
 
-    function testReturnedErc721CanBeRelistedWithFreshListingId() public {
+    function testReturnedErc721CanBeRelistedWithFreshListingSalt() public {
         CartTestERC721 token = new CartTestERC721();
         token.mint(seller, 1);
         vm.prank(seller);
@@ -150,7 +150,7 @@ contract CartMerkleTest is CartTest {
         assertEq(token.ownerOf(1), seller);
 
         ICart.Listing memory relisted = listing;
-        relisted.listingId = keccak256("returned-erc721-relisted");
+        relisted.listingSalt = keccak256("returned-erc721-relisted");
         ICart.OrderLine[] memory relistedLines = _lineForListing(relisted, 1, 1 ether);
         ICart.FulfillmentAction[] memory relistedActions = new ICart.FulfillmentAction[](1);
         relistedActions[0] = ICart.FulfillmentAction({lineIndex: 0, quantity: 1, recipient: collector});

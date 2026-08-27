@@ -601,7 +601,7 @@ contract CartUniversalRouterCartEthereumTest is Test {
     {
         line = ICart.OrderLine({
             sku: keccak256(bytes(id)),
-            listingHash: bytes32(0),
+            listingDigest: bytes32(0),
             fulfillmentKind: ICart.FulfillmentKind.CURRENCY_SWAP,
             quantity: 1,
             settlementCurrency: currency,
@@ -617,7 +617,7 @@ contract CartUniversalRouterCartEthereumTest is Test {
     {
         line = ICart.OrderLine({
             sku: keccak256(bytes(id)),
-            listingHash: bytes32(0),
+            listingDigest: bytes32(0),
             fulfillmentKind: ICart.FulfillmentKind.NONE,
             quantity: 1,
             settlementCurrency: currency,
