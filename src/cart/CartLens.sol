@@ -71,6 +71,9 @@ contract CartLens is ICartLens {
         if (listing.paymentRecipient == address(0) || listing.minimumUnitPrice == 0) {
             return _failure(ValidationCode.INVALID_LISTING, 0, bytes32(0), "");
         }
+        if (listing.paymentRecipient == cart) {
+            return _failure(ValidationCode.INVALID_LISTING, 0, bytes32(0), "");
+        }
         if (root.listingsRoot == bytes32(0)) {
             return _failure(ValidationCode.INVALID_ROOT, 0, bytes32(0), "");
         }
@@ -162,7 +165,7 @@ contract CartLens is ICartLens {
         for (uint256 i = 0; i < lines.length; ++i) {
             if (
                 lines[i].sku == bytes32(0) || lines[i].quantity == 0 || lines[i].amount == 0
-                    || lines[i].paymentRecipient == address(0)
+                    || lines[i].paymentRecipient == address(0) || lines[i].paymentRecipient == cart
             ) {
                 return _failure(ValidationCode.INVALID_ORDER_LINE, i, order.orderId, "");
             }

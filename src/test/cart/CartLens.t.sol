@@ -173,6 +173,40 @@ contract CartLensTest is Test {
         _assertResult(result, ICartLens.ValidationCode.INVALID_LISTING, 0, bytes32(0));
     }
 
+    function testRejectsCartAsListingAndOrderLinePaymentRecipient() public {
+        ICart.Listing memory listing = _listing(1);
+        listing.paymentRecipient = address(cart);
+        ICart.ListingRoot memory root = _root(listing);
+
+        ICartLens.ValidationResult memory result =
+            lens.validateListing(address(cart), listing, root, bytes("signature"), new bytes32[](0), 1);
+        _assertResult(result, ICartLens.ValidationCode.INVALID_LISTING, 0, bytes32(0));
+
+        ICart.PurchaseOrder memory order;
+        order.orderId = keccak256("cart-self-payout");
+        order.deadline = type(uint256).max;
+        order.paymentAmount = 1 ether;
+        ICart.OrderLine[] memory lines = new ICart.OrderLine[](1);
+        lines[0] = ICart.OrderLine({
+            sku: keccak256("cart-self-payout"),
+            listingDigest: bytes32(0),
+            fulfillmentKind: ICart.FulfillmentKind.NONE,
+            quantity: 1,
+            settlementCurrency: address(0),
+            amount: 1 ether,
+            paymentRecipient: address(cart)
+        });
+        ICart.PayoutRoute memory route =
+            ICart.PayoutRoute({commands: bytes(""), inputs: new bytes[](0), routerValue: 0});
+        ICart.FulfillmentAction[] memory actions = new ICart.FulfillmentAction[](0);
+        order.orderLinesHash = hashes.hashOrderLines(lines);
+        order.payoutRouteHash = hashes.hashPayoutRoute(route);
+        order.fulfillmentActionsHash = hashes.hashFulfillmentActions(actions);
+
+        result = lens.validatePurchaseEnvelope(address(cart), order, lines, route, actions, bytes("signature"));
+        _assertResult(result, ICartLens.ValidationCode.INVALID_ORDER_LINE, 0, order.orderId);
+    }
+
     function testPreviewRouteAndEnvelopeRemainStateless() public {
         CartLensTestPolicy policy = new CartLensTestPolicy();
         cart.setConfig(address(policy));

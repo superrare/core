@@ -403,6 +403,7 @@ contract Cart is
         if (listing.paymentRecipient == address(0) || listing.minimumUnitPrice == 0) {
             revert InvalidListing();
         }
+        if (listing.paymentRecipient == address(this)) revert InvalidPaymentRecipient(listing.paymentRecipient);
         // Currency conversions are platform-authorized Purchase Order lines, never seller Listings.
         if (listing.fulfillmentKind == FulfillmentKind.CURRENCY_SWAP) revert InvalidListing();
         if (!_isOnChainKind(listing.fulfillmentKind)) {
@@ -440,6 +441,7 @@ contract Cart is
             {
                 revert InvalidListing();
             }
+            if (line.paymentRecipient == address(this)) revert InvalidPaymentRecipient(line.paymentRecipient);
             uint256 listingIndex = lineListing[i];
             // Non-inventory lines explicitly distinguish fees from arbitrary ERC-20 fulfillment.
             if (listingIndex == NO_LISTING) {

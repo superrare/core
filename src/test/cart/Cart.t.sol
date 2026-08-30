@@ -523,6 +523,35 @@ contract CartTest is Test {
         assertEq(address(this).balance, protocolBefore + 0.25 ether);
     }
 
+    function testNativePayoutRejectsCartAsPaymentRecipient() public {
+        ICart.OrderLine[] memory lines = new ICart.OrderLine[](1);
+        lines[0] = ICart.OrderLine({
+            sku: keccak256("cart-self-payout"),
+            listingDigest: bytes32(0),
+            fulfillmentKind: ICart.FulfillmentKind.NONE,
+            quantity: 1,
+            settlementCurrency: address(0),
+            amount: 1 ether,
+            paymentRecipient: address(cart)
+        });
+        ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
+        ICart.FulfillmentAction[] memory actions = new ICart.FulfillmentAction[](0);
+        ICart.PurchaseOrder memory order = _order("cart-self-payout", lines, routes, actions);
+        bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
+        ICart.Listing[] memory listings = new ICart.Listing[](0);
+        ICart.ListingPurchaseAuthorization memory authorization = _rootAuthorization(listings, SELLER_PK);
+
+        vm.deal(payer, 1 ether);
+        vm.expectRevert(abi.encodeWithSelector(ICart.InvalidPaymentRecipient.selector, address(cart)));
+        vm.prank(payer);
+        cart.executePurchase{value: 1 ether}(
+            order, lines, listings, authorization, _combineRoutes(routes), actions, platformSignature
+        );
+
+        assertFalse(cart.executedOrderIds(order.orderId));
+        assertEq(address(cart).balance, 0);
+    }
+
     function testZeroListingDigestPreservesExplicitFulfillmentKind() public {
         ICart.OrderLine[] memory lines = new ICart.OrderLine[](2);
         lines[0] = ICart.OrderLine({

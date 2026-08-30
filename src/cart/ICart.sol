@@ -188,6 +188,7 @@ interface ICart {
     error InvalidRootIndex(uint256 index);
     error InvalidOrderId();
     error InvalidOrderLinesHash();
+    error InvalidPaymentRecipient(address recipient);
     error InvalidPayoutRouteHash();
     error AllowanceNotCleared(address token, address spender);
     error PreexistingAllowance(address token, address spender, uint256 amount);
