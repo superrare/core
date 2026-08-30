@@ -248,7 +248,7 @@ contract CartLens is ICartLens {
         return true;
     }
 
-    function _validListingShape(ICart.Listing calldata listing) private pure returns (bool) {
+    function _validListingShape(ICart.Listing calldata listing) private view returns (bool) {
         if (listing.fulfillmentKind == ICart.FulfillmentKind.CURRENCY_SWAP) return false;
         // Classify the fulfillment kind so the token fields can be checked consistently.
         bool onChain = listing.fulfillmentKind == ICart.FulfillmentKind.ERC721_TRANSFER
@@ -257,8 +257,9 @@ contract CartLens is ICartLens {
             || listing.fulfillmentKind == ICart.FulfillmentKind.ERC1155_MINT_TO;
         // Off-chain listings must not contain NFT fields.
         if (!onChain && (listing.tokenContract != address(0) || listing.tokenId != 0)) return false;
-        // On-chain listings must contain a token contract.
-        if (onChain && listing.tokenContract == address(0)) return false;
+        // On-chain listings must point to deployed code. This rejects EOAs without
+        // treating the advisory lens as proof that the contract behaves honestly.
+        if (onChain && listing.tokenContract.code.length == 0) return false;
         // An ERC-721 transfer can authorize zero or one available token only.
         if (
             listing.fulfillmentKind == ICart.FulfillmentKind.ERC721_TRANSFER && listing.availableQuantity != 0

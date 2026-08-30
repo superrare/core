@@ -394,7 +394,7 @@ contract Cart is
         _requireSignature(_cartConfig().platformSigner, orderDigest, signature);
     }
 
-    function _validateListing(Listing calldata listing) private pure {
+    function _validateListing(Listing calldata listing) private view {
         // Require the identity and seller fields that make a listing usable.
         if (listing.listingSalt == bytes32(0) || listing.seller == address(0) || listing.sku == bytes32(0)) {
             revert InvalidListing();
@@ -408,8 +408,10 @@ contract Cart is
         if (!_isOnChainKind(listing.fulfillmentKind)) {
             // Off-chain listings must not carry an NFT contract or token id.
             if (listing.tokenContract != address(0) || listing.tokenId != 0) revert InvalidListing();
-        } else if (listing.tokenContract == address(0)) {
-            // On-chain listings must identify the contract that performs fulfillment.
+        } else if (listing.tokenContract.code.length == 0) {
+            // On-chain listings must identify deployed code that performs fulfillment.
+            // This rejects EOAs but does not attempt to prove that a contract implements
+            // the declared token behavior honestly.
             revert InvalidListing();
         }
         // An ERC-721 transfer can move only one existing token.

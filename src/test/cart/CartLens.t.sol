@@ -160,6 +160,19 @@ contract CartLensTest is Test {
         _assertResult(result, ICartLens.ValidationCode.INVALID_LISTING_NONCE, 0, bytes32(0));
     }
 
+    function testValidateListingRejectsOnChainTargetWithoutCode() public {
+        ICart.Listing memory listing = _listing(1);
+        listing.fulfillmentKind = ICart.FulfillmentKind.ERC1155_TRANSFER;
+        listing.tokenContract = address(0xBEEF);
+        listing.tokenId = 1;
+        ICart.ListingRoot memory root = _root(listing);
+
+        ICartLens.ValidationResult memory result =
+            lens.validateListing(address(cart), listing, root, bytes("signature"), new bytes32[](0), 1);
+
+        _assertResult(result, ICartLens.ValidationCode.INVALID_LISTING, 0, bytes32(0));
+    }
+
     function testPreviewRouteAndEnvelopeRemainStateless() public {
         CartLensTestPolicy policy = new CartLensTestPolicy();
         cart.setConfig(address(policy));

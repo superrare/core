@@ -597,6 +597,39 @@ contract CartTest is Test {
         );
     }
 
+    function testOnChainListingsRejectTargetsWithoutCode() public {
+        address codeLessTarget = address(0xBEEF);
+        ICart.FulfillmentAction[] memory actions = new ICart.FulfillmentAction[](1);
+        actions[0] = ICart.FulfillmentAction({lineIndex: 0, quantity: 1, recipient: collector});
+
+        for (
+            uint8 rawKind = uint8(ICart.FulfillmentKind.ERC721_TRANSFER);
+            rawKind <= uint8(ICart.FulfillmentKind.ERC1155_MINT_TO);
+            ++rawKind
+        ) {
+            ICart.FulfillmentKind kind = ICart.FulfillmentKind(rawKind);
+            uint256 tokenId = kind == ICart.FulfillmentKind.ERC721_MINT_TO ? 0 : 1;
+            ICart.Listing memory listing = _listing(
+                keccak256(abi.encode("code-less-target", rawKind)), kind, codeLessTarget, tokenId, sellerPayout
+            );
+
+            ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 1 ether);
+            ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
+            ICart.PurchaseOrder memory order =
+                _order(string(abi.encodePacked("code-less-target-", rawKind)), lines, routes, actions);
+            ICart.Listing[] memory listings = _singletonListing(listing);
+            ICart.ListingPurchaseAuthorization memory authorization = _rootAuthorization(listings, SELLER_PK);
+            bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
+
+            vm.deal(payer, 1 ether);
+            vm.expectRevert(ICart.InvalidListing.selector);
+            vm.prank(payer);
+            cart.executePurchase{value: 1 ether}(
+                order, lines, listings, authorization, _combineRoutes(routes), actions, platformSignature
+            );
+        }
+    }
+
     function testCurrencySwapMustChangeCurrency() public {
         ICart.OrderLine[] memory lines = new ICart.OrderLine[](1);
         lines[0] = ICart.OrderLine({
