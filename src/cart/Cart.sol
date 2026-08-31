@@ -415,6 +415,9 @@ contract Cart is
             // the declared token behavior honestly.
             revert InvalidListing();
         }
+        if (_isMintKind(listing.fulfillmentKind) && !_isContractOwner(listing.tokenContract, listing.seller)) {
+            revert InvalidMintContractOwner(listing.tokenContract, listing.seller);
+        }
         // An ERC-721 transfer can move only one existing token.
         if (
             listing.fulfillmentKind == FulfillmentKind.ERC721_TRANSFER && listing.availableQuantity != 0
@@ -424,6 +427,17 @@ contract Cart is
         }
         // An ERC-721 mint returns the new token id, so the listing cannot fix a token id.
         if (listing.fulfillmentKind == FulfillmentKind.ERC721_MINT_TO && listing.tokenId != 0) revert InvalidListing();
+    }
+
+    function _isContractOwner(address tokenContract, address expectedOwner) private view returns (bool) {
+        (bool success, bytes memory data) = tokenContract.staticcall(abi.encodeWithSignature("owner()"));
+        if (!success || data.length < 32) return false;
+
+        uint256 encodedOwner;
+        assembly ("memory-safe") {
+            encodedOwner := mload(add(data, 0x20))
+        }
+        return encodedOwner <= type(uint160).max && address(uint160(encodedOwner)) == expectedOwner;
     }
 
     function _validateLineTerms(

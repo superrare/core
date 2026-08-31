@@ -25,6 +25,16 @@ contract CartLensTestSigner {
     }
 }
 
+contract CartLensTestOwned {
+    address public owner;
+
+    constructor(address owner_) {
+        owner = owner_;
+    }
+}
+
+contract CartLensTestNoOwner {}
+
 contract CartLensTestState {
     bool public paused;
     address public platformSigner;
@@ -171,6 +181,39 @@ contract CartLensTest is Test {
             lens.validateListing(address(cart), listing, root, bytes("signature"), new bytes32[](0), 1);
 
         _assertResult(result, ICartLens.ValidationCode.INVALID_LISTING, 0, bytes32(0));
+    }
+
+    function testValidateListingRejectsMintOwnerMismatchAndMissingOwner() public {
+        CartLensTestOwned wrongOwner = new CartLensTestOwned(address(0xBEEF));
+        CartLensTestNoOwner noOwner = new CartLensTestNoOwner();
+        address[2] memory targets = [address(wrongOwner), address(noOwner)];
+
+        for (uint256 i = 0; i < targets.length; ++i) {
+            ICart.Listing memory listing = _listing(1);
+            listing.fulfillmentKind = ICart.FulfillmentKind.ERC721_MINT_TO;
+            listing.tokenContract = targets[i];
+            ICart.ListingRoot memory root = _root(listing);
+
+            ICartLens.ValidationResult memory result =
+                lens.validateListing(address(cart), listing, root, bytes("signature"), new bytes32[](0), 1);
+
+            _assertResult(result, ICartLens.ValidationCode.INVALID_LISTING, 0, bytes32(0));
+        }
+    }
+
+    function testValidateListingAcceptsMintContractOwnedBySeller() public {
+        CartLensTestOwned owned = new CartLensTestOwned(address(signer));
+        ICart.Listing memory listing = _listing(1);
+        listing.seller = address(signer);
+        listing.fulfillmentKind = ICart.FulfillmentKind.ERC1155_MINT_TO;
+        listing.tokenContract = address(owned);
+        listing.tokenId = 1;
+        ICart.ListingRoot memory root = _root(listing);
+
+        ICartLens.ValidationResult memory result =
+            lens.validateListing(address(cart), listing, root, bytes("signature"), new bytes32[](0), 1);
+
+        _assertResult(result, ICartLens.ValidationCode.OK, 0, bytes32(0));
     }
 
     function testRejectsCartAsListingAndOrderLinePaymentRecipient() public {

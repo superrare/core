@@ -659,6 +659,45 @@ contract CartTest is Test {
         }
     }
 
+    function testMintListingsRejectContractOwnerMismatch() public {
+        CartTestMintableERC721 erc721 = new CartTestMintableERC721();
+        CartTestERC1155 erc1155 = new CartTestERC1155();
+        address[2] memory targets = [address(erc721), address(erc1155)];
+
+        for (uint256 i = 0; i < targets.length; ++i) {
+            ICart.FulfillmentKind kind =
+                i == 0 ? ICart.FulfillmentKind.ERC721_MINT_TO : ICart.FulfillmentKind.ERC1155_MINT_TO;
+            ICart.Listing memory listing =
+                _listing(keccak256(abi.encode("owner-mismatch", i)), kind, targets[i], i, sellerPayout);
+            ICart.FulfillmentAction[] memory actions = new ICart.FulfillmentAction[](1);
+            actions[0] = ICart.FulfillmentAction({lineIndex: 0, quantity: 1, recipient: collector});
+
+            _executeNativeListingExpectRevert(
+                listing,
+                string(abi.encodePacked("owner-mismatch-", i)),
+                1,
+                actions,
+                abi.encodeWithSelector(ICart.InvalidMintContractOwner.selector, targets[i], seller)
+            );
+        }
+    }
+
+    function testMintListingRejectsContractWithoutOwner() public {
+        CartTestERC721 token = new CartTestERC721();
+        ICart.Listing memory listing =
+            _listing(keccak256("missing-owner"), ICart.FulfillmentKind.ERC721_MINT_TO, address(token), 0, sellerPayout);
+        ICart.FulfillmentAction[] memory actions = new ICart.FulfillmentAction[](1);
+        actions[0] = ICart.FulfillmentAction({lineIndex: 0, quantity: 1, recipient: collector});
+
+        _executeNativeListingExpectRevert(
+            listing,
+            "missing-owner",
+            1,
+            actions,
+            abi.encodeWithSelector(ICart.InvalidMintContractOwner.selector, address(token), listing.seller)
+        );
+    }
+
     function testCurrencySwapMustChangeCurrency() public {
         ICart.OrderLine[] memory lines = new ICart.OrderLine[](1);
         lines[0] = ICart.OrderLine({
@@ -1717,6 +1756,29 @@ contract CartTest is Test {
         bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
 
         vm.deal(payer, amount);
+        vm.prank(payer);
+        cart.executePurchase{value: amount}(
+            order, lines, authorizationListings, authorization, _combineRoutes(routes), actions, platformSignature
+        );
+    }
+
+    function _executeNativeListingExpectRevert(
+        ICart.Listing memory listing,
+        string memory orderId,
+        uint256 quantity,
+        ICart.FulfillmentAction[] memory actions,
+        bytes memory reason
+    ) internal {
+        uint256 amount = listing.minimumUnitPrice * quantity;
+        ICart.OrderLine[] memory lines = _lineForListing(listing, quantity, amount);
+        ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
+        ICart.PurchaseOrder memory order = _order(orderId, lines, routes, actions);
+        ICart.Listing[] memory authorizationListings = _singletonListing(listing);
+        ICart.ListingPurchaseAuthorization memory authorization = _rootAuthorization(authorizationListings, SELLER_PK);
+        bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
+
+        vm.deal(payer, amount);
+        vm.expectRevert(reason);
         vm.prank(payer);
         cart.executePurchase{value: amount}(
             order, lines, authorizationListings, authorization, _combineRoutes(routes), actions, platformSignature

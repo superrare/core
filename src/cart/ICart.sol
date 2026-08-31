@@ -179,6 +179,7 @@ interface ICart {
     error InvalidFulfillmentResult(uint256 lineIndex, uint256 actionIndex, bytes result);
     error InvalidFulfillmentActionsHash();
     error InvalidListing();
+    error InvalidMintContractOwner(address tokenContract, address expectedOwner);
     error InvalidListingNonce(uint256 expected, uint256 actual);
     error InvalidListingRoot();
     error CancelledListingRoot(bytes32 rootDigest);

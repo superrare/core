@@ -243,11 +243,6 @@ contract CartLens is ICartLens {
                 return false;
             }
         }
-        if (_isMintKind(listing.fulfillmentKind)) {
-            // A mint listing is available only when the seller controls the mint contract.
-            (bool success, bytes memory data) = listing.tokenContract.staticcall(abi.encodeWithSignature("owner()"));
-            return success && data.length >= 32 && abi.decode(data, (address)) == listing.seller;
-        }
         return true;
     }
 
@@ -263,6 +258,10 @@ contract CartLens is ICartLens {
         // On-chain listings must point to deployed code. This rejects EOAs without
         // treating the advisory lens as proof that the contract behaves honestly.
         if (onChain && listing.tokenContract.code.length == 0) return false;
+        // Mint listings must attribute the contract to its reported owner.
+        if (_isMintKind(listing.fulfillmentKind) && !_isContractOwner(listing.tokenContract, listing.seller)) {
+            return false;
+        }
         // An ERC-721 transfer can authorize zero or one available token only.
         if (
             listing.fulfillmentKind == ICart.FulfillmentKind.ERC721_TRANSFER && listing.availableQuantity != 0
@@ -275,6 +274,17 @@ contract CartLens is ICartLens {
     function _isMintKind(ICart.FulfillmentKind kind) private pure returns (bool) {
         // Identify fulfillment kinds that call a mint function.
         return kind == ICart.FulfillmentKind.ERC721_MINT_TO || kind == ICart.FulfillmentKind.ERC1155_MINT_TO;
+    }
+
+    function _isContractOwner(address tokenContract, address expectedOwner) private view returns (bool) {
+        (bool success, bytes memory data) = tokenContract.staticcall(abi.encodeWithSignature("owner()"));
+        if (!success || data.length < 32) return false;
+
+        uint256 encodedOwner;
+        assembly ("memory-safe") {
+            encodedOwner := mload(add(data, 0x20))
+        }
+        return encodedOwner <= type(uint160).max && address(uint160(encodedOwner)) == expectedOwner;
     }
 
     function _typedDataHash(bytes32 domainSeparator, bytes32 structHash) private pure returns (bytes32) {
