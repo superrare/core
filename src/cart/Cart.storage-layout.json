@@ -1,0 +1,38 @@
+{
+  "contract": "src/cart/Cart.sol:Cart",
+  "baseline": "Initial deployment candidate",
+  "storageModel": "erc7201",
+  "compatibilityPolicy": "Pre-deployment layout; fields may be removed or reordered before the first deployment. Post-deployment upgrades must preserve namespace identifiers and field slots.",
+  "namespaces": {
+    "config": {
+      "identifier": "superrare.storage.CartConfig",
+      "location": "0xc012b0fbebfe5af5b8d952297ba0e80136c8473aa49759c18a1edebf3f3a9b00",
+      "fields": [
+        { "label": "platformSigner", "slot": 0, "offset": 0, "type": "address" },
+        { "label": "universalRouter", "slot": 1, "offset": 0, "type": "address" },
+        { "label": "permit2", "slot": 2, "offset": 0, "type": "address" },
+        { "label": "weth", "slot": 3, "offset": 0, "type": "address" },
+        { "label": "paused", "slot": 3, "offset": 20, "type": "bool" },
+        { "label": "protocolRecipient", "slot": 4, "offset": 0, "type": "address" }
+      ]
+    },
+    "listings": {
+      "identifier": "superrare.storage.CartListings",
+      "location": "0xc8a60026949baf9fc493cfe5d84f9acad28caf992be661d90708c137c6ab4d00",
+      "fields": [
+        { "label": "filledQuantity", "slot": 0, "offset": 0, "type": "mapping(bytes32 => uint256)" },
+        { "label": "listingNonces", "slot": 1, "offset": 0, "type": "mapping(address => uint256)" },
+        { "label": "cancelledListingRoots", "slot": 2, "offset": 0, "type": "mapping(address => mapping(bytes32 => bool))" },
+        { "label": "cancelledListings", "slot": 3, "offset": 0, "type": "mapping(address => mapping(bytes32 => bool))" }
+      ]
+    },
+    "settlement": {
+      "identifier": "superrare.storage.CartSettlement",
+      "location": "0xfc270c27ab1faa9aefd81c2a82301c8d0dada2f8e495ae4b2d6bc4fd8a9cff00",
+      "fields": [
+        { "label": "executedOrderIds", "slot": 0, "offset": 0, "type": "mapping(bytes32 => bool)" }
+      ]
+    }
+  },
+  "inheritedLinearStorage": "OpenZeppelin upgradeable base contracts remain outside these namespaces and must also remain layout-compatible."
+}
