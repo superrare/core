@@ -14,11 +14,12 @@ import "solady/utils/DateTimeLib.sol";
 /// @notice Fixed-price monthly USDC payments, paid directly to an artist and treasury.
 /// @dev Membership identity and content access remain account-based off chain. No NFT is issued.
 /// The operator can authorize a first payment and cancel, but cannot alter an enrolled member's
-/// price, creator, treasury or cadence. Renewals are permissionless and never charge arrears.
+/// price, creator or cadence. The owner controls the fee split and treasury for future payments.
+/// Renewals are permissionless and never charge arrears.
 contract CreatorMemberships is Ownable2Step, Pausable, ReentrancyGuard, EIP712 {
   using SafeERC20 for IERC20;
 
-  uint256 public constant FEE_BASIS_POINTS = 500;
+  uint256 public feeBasisPoints = 500;
   uint256 public constant RENEWAL_WINDOW = 7 days;
   bytes32 public constant TERMS_TYPEHASH =
     keccak256(
@@ -26,7 +27,7 @@ contract CreatorMemberships is Ownable2Step, Pausable, ReentrancyGuard, EIP712 {
     );
 
   IERC20 public immutable usdc;
-  address public immutable treasury;
+  address public treasury;
   address public operator;
 
   struct MembershipTerms {
@@ -56,11 +57,15 @@ contract CreatorMemberships is Ownable2Step, Pausable, ReentrancyGuard, EIP712 {
     uint256 amount,
     uint256 platformFee,
     uint256 periodStart,
-    uint256 periodEnd
+    uint256 periodEnd,
+    uint256 feeBasisPoints,
+    address treasury
   );
   event SubscriptionCanceled(bytes32 indexed subscriptionId);
   event CreatorEnded(address indexed creator);
   event OperatorChanged(address indexed previousOperator, address indexed newOperator);
+  event FeeBasisPointsChanged(uint256 previousFeeBasisPoints, uint256 newFeeBasisPoints);
+  event TreasuryChanged(address indexed previousTreasury, address indexed newTreasury);
 
   error InvalidConfiguration();
   error InvalidTerms();
@@ -78,6 +83,8 @@ contract CreatorMemberships is Ownable2Step, Pausable, ReentrancyGuard, EIP712 {
       token.code.length == 0 ||
       IERC20Metadata(token).decimals() != 6 ||
       feeRecipient == address(0) ||
+      feeRecipient == address(this) ||
+      feeRecipient == token ||
       initialOperator == address(0) ||
       initialOwner == address(0)
     ) revert InvalidConfiguration();
@@ -170,6 +177,22 @@ contract CreatorMemberships is Ownable2Step, Pausable, ReentrancyGuard, EIP712 {
     operator = newOperator;
   }
 
+  /// @notice Set the platform share of all future payments, including existing renewals.
+  /// @dev One basis point is 0.01%. The member's authorized total does not change.
+  function setFeeBasisPoints(uint256 newFeeBasisPoints) external onlyOwner {
+    if (newFeeBasisPoints > 10_000) revert InvalidConfiguration();
+    emit FeeBasisPointsChanged(feeBasisPoints, newFeeBasisPoints);
+    feeBasisPoints = newFeeBasisPoints;
+  }
+
+  /// @notice Redirect the platform share of future payments to a new treasury.
+  function setTreasury(address newTreasury) external onlyOwner {
+    if (newTreasury == address(0) || newTreasury == address(this) || newTreasury == address(usdc))
+      revert InvalidConfiguration();
+    emit TreasuryChanged(treasury, newTreasury);
+    treasury = newTreasury;
+  }
+
   function pause() external onlyOwner {
     _pause();
   }
@@ -185,9 +208,21 @@ contract CreatorMemberships is Ownable2Step, Pausable, ReentrancyGuard, EIP712 {
     uint256 start,
     uint256 end
   ) internal {
-    uint256 fee = (amount * FEE_BASIS_POINTS) / 10_000;
-    usdc.safeTransferFrom(payer, creator, amount - fee);
-    usdc.safeTransferFrom(payer, treasury, fee);
-    emit MembershipPaid(subscriptionId, payer, creator, amount, fee, start, end);
+    uint256 paymentFeeBasisPoints = feeBasisPoints;
+    address paymentTreasury = treasury;
+    uint256 fee = (amount * paymentFeeBasisPoints) / 10_000;
+    if (amount > fee) usdc.safeTransferFrom(payer, creator, amount - fee);
+    if (fee > 0) usdc.safeTransferFrom(payer, paymentTreasury, fee);
+    emit MembershipPaid(
+      subscriptionId,
+      payer,
+      creator,
+      amount,
+      fee,
+      start,
+      end,
+      paymentFeeBasisPoints,
+      paymentTreasury
+    );
   }
 }

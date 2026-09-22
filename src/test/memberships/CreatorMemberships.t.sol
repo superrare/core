@@ -93,6 +93,111 @@ contract CreatorMembershipsTest is Test {
     assertEq(token.balanceOf(treasury), (amount * 5) / 100);
   }
 
+  function testFuzzConfiguredFeeSplit(uint256 cents, uint256 basisPoints) public {
+    amount = bound(cents, 100, 50_000) * 10_000;
+    uint256 rate = bound(basisPoints, 0, 10_000);
+    memberships.setFeeBasisPoints(rate);
+    vm.prank(payer);
+    token.approve(address(memberships), amount);
+    subscribe();
+    uint256 expectedFee = (amount * rate) / 10_000;
+    assertEq(token.balanceOf(payer), 1000e6 - amount);
+    assertEq(token.balanceOf(creator), amount - expectedFee);
+    assertEq(token.balanceOf(treasury), expectedFee);
+    assertEq(token.balanceOf(address(memberships)), 0);
+  }
+
+  function testFeeAndTreasuryUpdatesApplyToExistingRenewals() public {
+    uint256 end = subscribe();
+    address newTreasury = address(0x400);
+    vm.expectEmit(false, false, false, true, address(memberships));
+    emit CreatorMemberships.FeeBasisPointsChanged(500, 375);
+    memberships.setFeeBasisPoints(375);
+    vm.expectEmit(true, true, false, true, address(memberships));
+    emit CreatorMemberships.TreasuryChanged(treasury, newTreasury);
+    memberships.setTreasury(newTreasury);
+    vm.warp(end);
+    vm.expectEmit(true, true, true, true, address(memberships));
+    emit CreatorMemberships.MembershipPaid(
+      subscriptionId,
+      payer,
+      creator,
+      amount,
+      375_000,
+      end,
+      DateTimeLib.addMonths(end, 1),
+      375,
+      newTreasury
+    );
+    memberships.renew(subscriptionId, end);
+    assertEq(token.balanceOf(treasury), 500_000);
+    assertEq(token.balanceOf(newTreasury), 375_000);
+    assertEq(token.balanceOf(creator), 19_125_000);
+    assertEq(token.balanceOf(payer), 980e6);
+    (address savedPayer, address savedCreator, uint256 savedAmount, , ) = memberships.subscriptions(subscriptionId);
+    assertEq(savedPayer, payer);
+    assertEq(savedCreator, creator);
+    assertEq(savedAmount, amount);
+  }
+
+  function testZeroAndFullFeeApplyToFirstPayments() public {
+    memberships.setFeeBasisPoints(0);
+    uint256 end = subscribe();
+    assertEq(token.balanceOf(creator), amount);
+    assertEq(token.balanceOf(treasury), 0);
+    vm.warp(end + 7 days + 1);
+    subscriptionId = keccak256("full-fee-enrollment");
+    memberships.setFeeBasisPoints(10_000);
+    subscribe();
+    assertEq(token.balanceOf(creator), amount);
+    assertEq(token.balanceOf(treasury), amount);
+    assertEq(token.balanceOf(payer), 980e6);
+  }
+
+  function testOnlyOwnerCanChangePaymentConfiguration() public {
+    address[3] memory unauthorized = [payer, creator, vm.addr(operatorKey)];
+    for (uint256 i; i < unauthorized.length; ++i) {
+      vm.startPrank(unauthorized[i]);
+      vm.expectRevert("Ownable: caller is not the owner");
+      memberships.setFeeBasisPoints(1000);
+      vm.expectRevert("Ownable: caller is not the owner");
+      memberships.setTreasury(address(0x400));
+      vm.stopPrank();
+    }
+  }
+
+  function testPaymentConfigurationAuthorityFollowsTwoStepOwnershipTransfer() public {
+    address newOwner = address(0x500);
+    memberships.transferOwnership(newOwner);
+    vm.prank(newOwner);
+    vm.expectRevert("Ownable: caller is not the owner");
+    memberships.setFeeBasisPoints(1000);
+    vm.prank(newOwner);
+    memberships.acceptOwnership();
+    vm.expectRevert("Ownable: caller is not the owner");
+    memberships.setTreasury(address(0x400));
+    vm.expectRevert("Ownable: caller is not the owner");
+    memberships.setFeeBasisPoints(1000);
+    vm.startPrank(newOwner);
+    memberships.setFeeBasisPoints(1000);
+    memberships.setTreasury(address(0x400));
+    vm.stopPrank();
+    assertEq(memberships.feeBasisPoints(), 1000);
+    assertEq(memberships.treasury(), address(0x400));
+  }
+
+  function testRejectsInvalidPaymentConfiguration() public {
+    vm.expectRevert(CreatorMemberships.InvalidConfiguration.selector);
+    memberships.setFeeBasisPoints(10_001);
+    address[3] memory invalid = [address(0), address(memberships), address(token)];
+    for (uint256 i; i < invalid.length; ++i) {
+      vm.expectRevert(CreatorMemberships.InvalidConfiguration.selector);
+      memberships.setTreasury(invalid[i]);
+    }
+    assertEq(memberships.feeBasisPoints(), 500);
+    assertEq(memberships.treasury(), treasury);
+  }
+
   function testLeapYearAndDecemberBoundaries() public {
     vm.warp(DateTimeLib.dateToTimestamp(2028, 1, 31));
     assertEq(subscribe(), DateTimeLib.dateToTimestamp(2028, 2, 29));
