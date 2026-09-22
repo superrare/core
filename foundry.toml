@@ -4,3 +4,13 @@ viaIR = true
 optimizer = true
 optimizer_runs = 100
 fs_permissions = [{ access = "read", path = "./"}]
+
+[profile.memberships]
+src = "src/memberships"
+test = "src/test/memberships"
+script = "script/memberships"
+solc = "0.8.24"
+evm_version = "paris"
+
+[profile.memberships.fuzz]
+runs = 512
