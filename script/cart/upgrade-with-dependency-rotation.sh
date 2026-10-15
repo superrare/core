@@ -44,9 +44,13 @@ forge_args=(
   script
   "${script_dir}/CartUpgrade.s.sol:CartUpgrade"
   --rpc-url "${RPC_URL}"
+  --gas-estimate-multiplier "${CART_GAS_ESTIMATE_MULTIPLIER:-150}"
   -vv
 )
 if [[ "${should_broadcast}" == true ]]; then
-  forge_args+=(--broadcast)
+  # Keep delegated EOA transactions sequential. Use live RPC gas estimates rather than
+  # Foundry's local gas schedule, which may lag network state-creation repricing.
+  # The script's dependency and owner checks still run before broadcasting.
+  forge_args+=(--broadcast --slow --skip-simulation)
 fi
 FOUNDRY_PROFILE="${FOUNDRY_PROFILE:-cart}" forge "${forge_args[@]}"

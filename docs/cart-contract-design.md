@@ -310,6 +310,13 @@ Every cart implementation is constructed with the route policy address, so each 
 
 The proxy address remains the EIP-712 verifying contract and approval target. Upgrades preserve domain name/version unless invalidating pending signatures is intentional, and must preserve execution, Listing fill, cancellation, nonce, and configuration storage.
 
+Use `CART_ENV_FILE=/path/to/.env bash script/cart/upgrade-with-dependency-rotation.sh`
+to simulate an upgrade. Add `--broadcast` to deploy replacement helpers and upgrade the existing
+proxy. Broadcasting uses sequential transactions and live RPC gas estimates, with a configurable
+`CART_GAS_ESTIMATE_MULTIPLIER` buffer. This avoids delegated-account in-flight limits and local
+Foundry gas schedules that lag network repricing. Update `NetworkConfig.s.sol` and SDK Lens
+configuration from the confirmed deployment addresses. The proxy address stays unchanged.
+
 ## Verification Expectations
 
 Implementation acceptance includes unit, invariant, fuzz, and fork coverage for:
