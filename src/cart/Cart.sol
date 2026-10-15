@@ -189,7 +189,7 @@ contract Cart is
     ) {
       revert InvalidArrayLength();
     }
-    if (authorization.listingProofs.length != listings.length || order.paymentAmount == 0) {
+    if (authorization.listingProofs.length != listings.length) {
       revert InvalidArrayLength();
     }
     // Reject oversized witnesses and route plans before hashing or external policy calls.
@@ -411,8 +411,8 @@ contract Cart is
     if (listing.listingSalt == bytes32(0) || listing.seller == address(0) || listing.sku == bytes32(0)) {
       revert InvalidListing();
     }
-    // Require a payout recipient and a positive minimum unit price.
-    if (listing.paymentRecipient == address(0) || listing.minimumUnitPrice == 0) {
+    // Free Listings still require a valid payout recipient.
+    if (listing.paymentRecipient == address(0)) {
       revert InvalidListing();
     }
     if (listing.paymentRecipient == address(this)) revert InvalidPaymentRecipient(listing.paymentRecipient);
@@ -464,7 +464,7 @@ contract Cart is
     requested = new uint256[](listings.length);
     for (uint256 i = 0; i < lines.length; ++i) {
       OrderLine calldata line = lines[i];
-      if (line.sku == bytes32(0) || line.quantity == 0 || line.amount == 0 || line.paymentRecipient == address(0)) {
+      if (line.sku == bytes32(0) || line.quantity == 0 || line.paymentRecipient == address(0)) {
         revert InvalidListing();
       }
       if (line.paymentRecipient == address(this)) revert InvalidPaymentRecipient(line.paymentRecipient);
@@ -488,7 +488,9 @@ contract Cart is
         line.paymentRecipient != listing.paymentRecipient
       ) revert ListingTermsMismatch(i);
       // Check the multiplication before calculating the minimum accepted amount.
-      if (line.quantity > type(uint256).max / listing.minimumUnitPrice) revert ListingTermsMismatch(i);
+      if (listing.minimumUnitPrice != 0 && line.quantity > type(uint256).max / listing.minimumUnitPrice) {
+        revert ListingTermsMismatch(i);
+      }
       if (line.amount < listing.minimumUnitPrice * line.quantity) revert ListingTermsMismatch(i);
       // Add this line's quantity to the total reserved quantity for the listing.
       if (requested[listingIndex] > type(uint256).max - line.quantity) revert InvalidListing();

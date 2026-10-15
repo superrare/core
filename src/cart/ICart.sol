@@ -47,7 +47,7 @@ interface ICart {
         uint256 tokenId;
         /// @dev Currency that the seller receives for this listing.
         address settlementCurrency;
-        /// @dev Lowest accepted total price per unit.
+        /// @dev Lowest accepted total price per unit. Zero permits free fulfillment.
         uint256 minimumUnitPrice;
         /// @dev Zero means the Listing is uncapped; positive values authorize a finite quantity.
         uint256 availableQuantity;
@@ -97,7 +97,7 @@ interface ICart {
         address paymentCurrency;
         /// @dev Last timestamp at which Cart may execute the order.
         uint256 deadline;
-        /// @dev Exact amount collected from the transaction caller for the fixed platform quote.
+        /// @dev Exact amount collected from the transaction caller. Zero is valid when no funding is needed.
         uint256 paymentAmount;
         /// @dev Hash of the complete OrderLine array.
         bytes32 orderLinesHash;

@@ -61,9 +61,7 @@ contract CartPayments is CartStorage, ICartPayments {
         state.nativeBaseline = address(this).balance - msg.value;
         state.assetSnapshots = _snapshotAssets(settlementTokens);
         if (order.paymentCurrency != address(0)) {
-            _assertNoPreexistingApprovals(
-                order.paymentCurrency, _cartConfig().permit2, _cartConfig().universalRouter
-            );
+            _assertNoPreexistingApprovals(order.paymentCurrency, _cartConfig().permit2, _cartConfig().universalRouter);
         }
         _fundPayment(order, route);
         _executeRoute(order, route);
@@ -132,6 +130,8 @@ contract CartPayments is CartStorage, ICartPayments {
         }
 
         if (msg.value != 0 || route.routerValue != 0) revert ICart.NativeValueMismatch();
+        // A zero-total order still validates and fulfills, but needs no token transfer or approval.
+        if (order.paymentAmount == 0) return;
         uint256 beforeBalance = IERC20(order.paymentCurrency).balanceOf(address(this));
         IERC20(order.paymentCurrency).safeTransferFrom(msg.sender, address(this), order.paymentAmount);
         uint256 received = IERC20(order.paymentCurrency).balanceOf(address(this)) - beforeBalance;
@@ -248,6 +248,8 @@ contract CartPayments is CartStorage, ICartPayments {
         Payout[] memory payouts = new Payout[](lines.length);
         uint256 count;
         for (uint256 i = 0; i < lines.length; ++i) {
+            // Free merchandise still fulfills; only its monetary payout is omitted.
+            if (lines[i].amount == 0) continue;
             bool native = lines[i].settlementCurrency == address(0);
             address token = native ? wrappedNative : lines[i].settlementCurrency;
             uint256 payoutIndex = NO_GROUP;

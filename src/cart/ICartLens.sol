@@ -29,7 +29,7 @@ interface ICartLens {
         ORDER_ALREADY_EXECUTED,
         INVALID_ARRAY_LENGTH,
         INVALID_ORDER_LINE,
-        ZERO_PAYMENT_AMOUNT,
+        ZERO_PAYMENT_AMOUNT, // Reserved legacy code. Zero-total orders are valid.
         INVALID_ORDER_LINES_HASH,
         INVALID_PAYOUT_ROUTE_HASH,
         INVALID_FULFILLMENT_ACTIONS_HASH,

@@ -152,6 +152,8 @@ unbounded proof processing.
   quantity; zero means the Listing is uncapped until its deadline or root cancellation.
 - The line SKU, settlement currency, and payment recipient must equal the Listing values.
 - `line.amount >= listing.minimumUnitPrice * line.quantity` with checked arithmetic.
+- `minimumUnitPrice` and `line.amount` may be zero. Free Listings still require seller and platform
+  authorization, consume inventory, execute fulfillment, and emit settlement events.
 - For finite Listings, cumulative requested quantity across every line referencing the Listing must fit its remaining
   authorized quantity. Uncapped Listings do not use `filledQuantity` as a limit.
 - `filledQuantity` records cumulative fulfilled quantity for both finite and uncapped Listings. It is observational for
@@ -191,7 +193,10 @@ Native ETH is represented by `address(0)` and is supported as input or settlemen
 
 - Native input requires `msg.value == order.paymentAmount`.
 - ERC-20 input requires `msg.value == 0` and calls `transferFrom(msg.sender, Cart,
-  order.paymentAmount)` against the caller's ordinary Cart allowance.
+  order.paymentAmount)` against the caller's ordinary Cart allowance when `paymentAmount` is nonzero.
+- Fully free Orders use `paymentAmount = 0` and an empty route. Cart skips zero-value funding and
+  payouts, but still checks solvency and preserves preexisting balances. Fixed and per-unit fees
+  remain separate funded Order Lines even when the merchandise price is zero.
 - Fee-on-transfer and rebasing currencies are unsupported.
 - Payment and settlement currencies are supplied by the client and authorized by the platform-signed order; native ETH is represented by `address(0)`. The client owns pool selection, path construction, exact-input/output semantics, slippage, refunds, and sweep placement. Cart forwards the opaque, platform-signed Universal Router command program and verifies only the resulting supported-currency settlement outcomes.
 - Each order carries one `PayoutRoute` for the complete order.

@@ -68,7 +68,7 @@ contract CartLens is ICartLens {
         if (listing.listingSalt == bytes32(0) || listing.seller == address(0) || listing.sku == bytes32(0)) {
             return _failure(ValidationCode.INVALID_LISTING, 0, bytes32(0), "");
         }
-        if (listing.paymentRecipient == address(0) || listing.minimumUnitPrice == 0) {
+        if (listing.paymentRecipient == address(0)) {
             return _failure(ValidationCode.INVALID_LISTING, 0, bytes32(0), "");
         }
         if (listing.paymentRecipient == cart) {
@@ -152,7 +152,6 @@ contract CartLens is ICartLens {
         if (route.commands.length > MAX_ROUTE_COMMANDS || route.inputs.length > MAX_ROUTE_COMMANDS) {
             return _failure(ValidationCode.INVALID_ARRAY_LENGTH, 0, order.orderId, "");
         }
-        if (order.paymentAmount == 0) return _failure(ValidationCode.ZERO_PAYMENT_AMOUNT, 0, order.orderId, "");
         if (CartHashing.hashOrderLines(lines) != order.orderLinesHash) {
             return _failure(ValidationCode.INVALID_ORDER_LINES_HASH, 0, order.orderId, "");
         }
@@ -164,8 +163,8 @@ contract CartLens is ICartLens {
         }
         for (uint256 i = 0; i < lines.length; ++i) {
             if (
-                lines[i].sku == bytes32(0) || lines[i].quantity == 0 || lines[i].amount == 0
-                    || lines[i].paymentRecipient == address(0) || lines[i].paymentRecipient == cart
+                lines[i].sku == bytes32(0) || lines[i].quantity == 0 || lines[i].paymentRecipient == address(0)
+                    || lines[i].paymentRecipient == cart
             ) {
                 return _failure(ValidationCode.INVALID_ORDER_LINE, i, order.orderId, "");
             }
