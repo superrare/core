@@ -11,6 +11,7 @@ This repository contains the Solidity contracts that power Rare Protocol's marke
   - [`RareBatchAuctionHouse`](#rarebatchauctionhouse)
   - [`BatchOffer`](#batchoffer)
   - [`RareMinter` — blind & sequential lazy minting](#rareminter--blind--sequential-lazy-minting)
+  - [`CreditPackSale` — arcade credit packs with a platform fee](#creditpacksale--arcade-credit-packs-with-a-platform-fee)
 - [Token Contracts](#token-contracts)
   - [`LazySovereignNFT` — token contract for `RareMinter` drops](#lazysovereignnft--token-contract-for-rareminter-drops)
   - [`SovereignBatchMint` — standard creator collections](#sovereignbatchmint--standard-creator-collections)
@@ -43,6 +44,7 @@ This repository contains the Solidity contracts that power Rare Protocol's marke
 | Batch-auction many tokens (Merkle) | [`RareBatchAuctionHouse`](#rarebatchauctionhouse) |
 | Make one offer covering many tokens, even across collections (Merkle) | [`BatchOffer`](#batchoffer) |
 | Mint into a single creator-owned collection | [`SovereignBatchMint`](#sovereignbatchmint--standard-creator-collections) |
+| Sell off-chain arcade credit packs in USDC with a SuperRare platform fee | [`CreditPackSale`](#creditpacksale--arcade-credit-packs-with-a-platform-fee) |
 | Restrict which ERC-20s the protocol accepts | [`ApprovedTokenRegistry`](#approvedtokenregistry--required-erc-20-allowlist) |
 | Stake RARE / earn rewards | **Deprecated — see below** |
 
@@ -117,6 +119,20 @@ Use `BatchOffer` when you want to make a **blanket offer over a curated list of 
 2. Call `setMinterApproval(rareMinterAddress, true)` on the NFT to authorize `RareMinter` as a minter.
 3. Call `RareMinter.prepareMintDirectSale(...)` to configure currency, price, start time, mint caps, and splits.
 4. Buyers call `RareMinter.mintDirectSale(...)` to purchase + mint in one tx.
+
+---
+
+### `CreditPackSale` — arcade credit packs with a platform fee
+
+`CreditPackSale` sells packs of arcade credits in a single ERC-20 (USDC). Credits are not tokens: the contract only settles payment and emits `PackPurchased`, and the Studio backend grants the credits off-chain from that event. Each payment is split in the same transaction: the platform fee (basis points of the pack price, deducted from the operator's proceeds) goes to `feeRecipient`, the rest to the group's treasury. The contract never holds funds.
+
+**Roles:**
+- **Operator** — whoever calls `createGroup(treasury, packPrice, packCredits)`. Only the operator can change the group's terms, deactivate it or transfer it.
+- **Owner** (SuperRare) — sets the default fee and per-group fee overrides, the fee recipient, suspends groups and pauses all purchases. Ownership is two-step and cannot be renounced.
+
+**Purchase:** `purchase(groupId, recipient, quantity, expectedPackPrice, expectedPackCredits, quoteId)` pulls `packPrice × quantity` from `msg.sender` and credits `recipient`, so a card processor (Coinflow) can pay on the buyer's behalf. The expected terms guard against operator changes after quoting; a `quoteId` can be used once per payer.
+
+**Deploy:** `script/credits/credit-pack-sale-deploy/deploy.sh` (see `env.sample`).
 
 ---
 
