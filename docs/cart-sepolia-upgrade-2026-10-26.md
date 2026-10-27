@@ -1,5 +1,7 @@
 # Sepolia Cart upgrade, October 26, 2026
 
+Cart, CartPayments, and CartLens were replaced by the [October 27 free-listing repair](cart-sepolia-free-listings-2026-10-27.md). The route policy recorded below remains current. This document retains the October 26 deployment history.
+
 The Cart proxy at `0x1EBF35b3A76caEf60a009d2786A66A91D42A38Bc` now uses the implementation with listing lookup and hashing optimizations, mint-result returns, and no numerical resource caps. The route policy, payment executor, and CartLens were replaced together.
 
 | Contract | Address |

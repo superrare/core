@@ -43,4 +43,4 @@ The corrective upgrade replaces CartPayments, Cart, and CartLens. It preserves t
 
 Broadcasts require fresh live RPC gas estimates. The October 26 local simulator substantially underpriced Sepolia creation transactions. A percentage buffer over those local estimates does not repair the mismatch.
 
-No corrective deployment is recorded here until its transaction receipts and runtime checks are confirmed. After deployment, update `NetworkConfig.s.sol` and the SDK CartLens address together, then propagate the SDK dependency through its consumers.
+The corrective Sepolia upgrade is confirmed in the [deployment record](cart-sepolia-free-listings-2026-10-27.md). `NetworkConfig.s.sol` records the new addresses. The new Lens accepts a signed zero-price Listing that the previous Lens rejects. SDK and consumer dependency updates follow the confirmed Lens address.
