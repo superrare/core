@@ -27,6 +27,14 @@ The monorepo and SDK dirty checkouts were saved in named recovery commits before
 
 Other repaired directories keep their current owner-layer branches or named integration aliases. Monorepo and SDK stack registrations have no rebase flags. The CLI migration layer retains a history-only ancestry flag: its current favorites implementation already matches the auth-fix blob, and its SDK dependency includes the SDK auth fix. No remote history was rewritten.
 
+## Verification
+
+`FOUNDRY_PROFILE=cart forge test --offline` passed all 646 tests across 19 suites, with no failures or skips. The storage-upgrade canary passed. Each stateful invariant completed 256 runs and 128,000 calls with no reverts.
+
+The corrective upgrade script passed a Sepolia fork simulation at block 12,006,708. Its configuration and EIP-712 domain checks passed after the simulated upgrade. No live transaction was sent.
+
+The sender passed isolated success and failure scenarios for receipt failure, nonce drift, admin-state drift, runtime mismatch, and stale compiled artifacts. Checkout fixtures cover detached, dirty, untracked, stale, and missing-reference checkouts, plus live remote-reference freshness.
+
 ## Deployment preparation
 
 The corrective upgrade replaces CartPayments, Cart, and CartLens. It preserves the proxy, route policy, configuration, approvals, listing state, replay state, and EIP-712 domain. No initializer runs. CartHashes remains compatible.
