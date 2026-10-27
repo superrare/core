@@ -1,0 +1,208 @@
+{
+  "method": "Identical CartListingGas payloads; same compiler and fixture; max(gross call gas + ordinary intrinsic gas, calldata floor). Off-chain fulfillment and one payout recipient. Not chain receipts or isolated lookup-only gas.",
+  "cart_runtime_bytes": 18198,
+  "baseline_source_sha256": "dd24a63cc344555e7787f4678d9317e0d8a7b6db5b13d511f2662a112dacd726",
+  "optimized_source_sha256": "d1eaa7ac9c86a1bbc2b31979e9e7d897ec7ea22d34593cfcc762f1a60f47d889",
+  "results": [
+    {
+      "lines": 9,
+      "listings": 1,
+      "calldata_bytes": 3748,
+      "baseline": {
+        "lines": 9,
+        "listings": 1,
+        "calldataBytes": 3748,
+        "grossCallGas": 270138,
+        "intrinsicGas": 49096,
+        "calldataFloorGas": 91240,
+        "approximateTransactionGas": 319234
+      },
+      "optimized": {
+        "lines": 9,
+        "listings": 1,
+        "calldataBytes": 3748,
+        "grossCallGas": 269845,
+        "intrinsicGas": 49096,
+        "calldataFloorGas": 91240,
+        "approximateTransactionGas": 318941
+      },
+      "gas_saved": 293,
+      "percent_saved": 0.09178220364998715
+    },
+    {
+      "lines": 9,
+      "listings": 9,
+      "calldata_bytes": 8228,
+      "baseline": {
+        "lines": 9,
+        "listings": 9,
+        "calldataBytes": 8228,
+        "grossCallGas": 554092,
+        "intrinsicGas": 89708,
+        "calldataFloorGas": 192770,
+        "approximateTransactionGas": 643800
+      },
+      "optimized": {
+        "lines": 9,
+        "listings": 9,
+        "calldataBytes": 8228,
+        "grossCallGas": 549619,
+        "intrinsicGas": 89708,
+        "calldataFloorGas": 192770,
+        "approximateTransactionGas": 639327
+      },
+      "gas_saved": 4473,
+      "percent_saved": 0.6947809878844362
+    },
+    {
+      "lines": 18,
+      "listings": 1,
+      "calldata_bytes": 5764,
+      "baseline": {
+        "lines": 18,
+        "listings": 1,
+        "calldataBytes": 5764,
+        "grossCallGas": 397272,
+        "intrinsicGas": 65164,
+        "calldataFloorGas": 131410,
+        "approximateTransactionGas": 462436
+      },
+      "optimized": {
+        "lines": 18,
+        "listings": 1,
+        "calldataBytes": 5764,
+        "grossCallGas": 396628,
+        "intrinsicGas": 65164,
+        "calldataFloorGas": 131410,
+        "approximateTransactionGas": 461792
+      },
+      "gas_saved": 644,
+      "percent_saved": 0.13926251416412216
+    },
+    {
+      "lines": 18,
+      "listings": 18,
+      "calldata_bytes": 15716,
+      "baseline": {
+        "lines": 18,
+        "listings": 18,
+        "calldataBytes": 15716,
+        "grossCallGas": 1036180,
+        "intrinsicGas": 159020,
+        "calldataFloorGas": 366050,
+        "approximateTransactionGas": 1195200
+      },
+      "optimized": {
+        "lines": 18,
+        "listings": 18,
+        "calldataBytes": 15716,
+        "grossCallGas": 991704,
+        "intrinsicGas": 159020,
+        "calldataFloorGas": 366050,
+        "approximateTransactionGas": 1150724
+      },
+      "gas_saved": 44476,
+      "percent_saved": 3.7212182061579653
+    },
+    {
+      "lines": 32,
+      "listings": 1,
+      "calldata_bytes": 8900,
+      "baseline": {
+        "lines": 32,
+        "listings": 1,
+        "calldataBytes": 8900,
+        "grossCallGas": 595517,
+        "intrinsicGas": 90152,
+        "calldataFloorGas": 193880,
+        "approximateTransactionGas": 685669
+      },
+      "optimized": {
+        "lines": 32,
+        "listings": 1,
+        "calldataBytes": 8900,
+        "grossCallGas": 594327,
+        "intrinsicGas": 90152,
+        "calldataFloorGas": 193880,
+        "approximateTransactionGas": 684479
+      },
+      "gas_saved": 1190,
+      "percent_saved": 0.17355312840452172
+    },
+    {
+      "lines": 32,
+      "listings": 32,
+      "calldata_bytes": 26916,
+      "baseline": {
+        "lines": 32,
+        "listings": 32,
+        "calldataBytes": 26916,
+        "grossCallGas": 1848052,
+        "intrinsicGas": 259164,
+        "calldataFloorGas": 616410,
+        "approximateTransactionGas": 2107216
+      },
+      "optimized": {
+        "lines": 32,
+        "listings": 32,
+        "calldataBytes": 26916,
+        "grossCallGas": 1684177,
+        "intrinsicGas": 259164,
+        "calldataFloorGas": 616410,
+        "approximateTransactionGas": 1943341
+      },
+      "gas_saved": 163875,
+      "percent_saved": 7.776848695150379
+    },
+    {
+      "lines": 64,
+      "listings": 1,
+      "calldata_bytes": 16068,
+      "baseline": {
+        "lines": 64,
+        "listings": 1,
+        "calldataBytes": 16068,
+        "grossCallGas": 1050839,
+        "intrinsicGas": 147228,
+        "calldataFloorGas": 336570,
+        "approximateTransactionGas": 1198067
+      },
+      "optimized": {
+        "lines": 64,
+        "listings": 1,
+        "calldataBytes": 16068,
+        "grossCallGas": 1048401,
+        "intrinsicGas": 147228,
+        "calldataFloorGas": 336570,
+        "approximateTransactionGas": 1195629
+      },
+      "gas_saved": 2438,
+      "percent_saved": 0.20349446232973614
+    },
+    {
+      "lines": 64,
+      "listings": 64,
+      "calldata_bytes": 54564,
+      "baseline": {
+        "lines": 64,
+        "listings": 64,
+        "calldataBytes": 54564,
+        "grossCallGas": 4026623,
+        "intrinsicGas": 520176,
+        "calldataFloorGas": 1268940,
+        "approximateTransactionGas": 4546799
+      },
+      "optimized": {
+        "lines": 64,
+        "listings": 64,
+        "calldataBytes": 54564,
+        "grossCallGas": 3285402,
+        "intrinsicGas": 520176,
+        "calldataFloorGas": 1268940,
+        "approximateTransactionGas": 3805578
+      },
+      "gas_saved": 741221,
+      "percent_saved": 16.3020401825548
+    }
+  ]
+}

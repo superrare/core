@@ -1429,11 +1429,12 @@ contract CartTest is Test {
 
         vm.deal(payer, 2 ether);
         vm.prank(payer);
-        cart.executePurchase{value: 2 ether}(
+        ICart.MintResult[] memory mintResults = cart.executePurchase{value: 2 ether}(
             order, lines, authorizationListings, authorization, _combineRoutes(routes), actions, platformSignature
         );
 
         assertEq(token.balanceOf(collector, 7), 2);
+        assertEq(mintResults.length, 0);
     }
 
     function testUncappedOffchainListingCanBeFilledRepeatedly() public {
@@ -1638,7 +1639,13 @@ contract CartTest is Test {
         actions[0] = ICart.FulfillmentAction({lineIndex: 0, quantity: 2, recipient: collector});
 
         vm.recordLogs();
-        _executeNativeListing(listing, "authoritative-mint-events", 2, actions);
+        ICart.MintResult[] memory mintResults = _executeNativeListing(listing, "authoritative-mint-events", 2, actions);
+
+        assertEq(mintResults.length, 1);
+        assertEq(mintResults[0].fulfillmentActionIndex, 0);
+        assertEq(mintResults[0].tokenIds.length, 2);
+        assertEq(mintResults[0].tokenIds[0], 1);
+        assertEq(mintResults[0].tokenIds[1], 2);
 
         bytes32 eventSignature = keccak256(
             "FulfillmentActionExecuted(bytes32,uint256,uint256,uint8,address,address,uint256,uint256,uint256)"
@@ -1664,6 +1671,95 @@ contract CartTest is Test {
             ++eventCount;
         }
         assertEq(eventCount, 2);
+    }
+
+    function testMintResultsIdentifyActionsAcrossCollectionsAndSplitDeliveries() public {
+        CartTestERC721 transferToken = new CartTestERC721();
+        transferToken.mint(seller, 99);
+        vm.prank(seller);
+        transferToken.setApprovalForAll(address(cart), true);
+
+        CartTestMintableERC721 mintA = new CartTestMintableERC721();
+        CartTestMintableERC721 mintB = new CartTestMintableERC721();
+        CartTestERC1155 mint1155 = new CartTestERC1155();
+        mintA.transferOwnership(seller);
+        mintB.transferOwnership(seller);
+        mint1155.transferOwnership(seller);
+        vm.startPrank(seller);
+        mintA.setMinter(address(cart), true);
+        mintB.setMinter(address(cart), true);
+        mint1155.setMinter(address(cart), true);
+        // Returned IDs must reflect collection state, rather than start at one per action.
+        mintA.mintTo(seller);
+        vm.stopPrank();
+
+        ICart.Listing[] memory listings = new ICart.Listing[](4);
+        listings[0] = _listingWithQuantity(
+            keccak256("mint-result-a"), ICart.FulfillmentKind.ERC721_MINT_TO, address(mintA), 0, sellerPayout, 3
+        );
+        listings[1] = _listing(
+            keccak256("mint-result-transfer"),
+            ICart.FulfillmentKind.ERC721_TRANSFER,
+            address(transferToken),
+            99,
+            sellerPayout
+        );
+        listings[2] = _listingWithQuantity(
+            keccak256("mint-result-1155"), ICart.FulfillmentKind.ERC1155_MINT_TO, address(mint1155), 7, sellerPayout, 2
+        );
+        listings[3] =
+            _listing(keccak256("mint-result-b"), ICart.FulfillmentKind.ERC721_MINT_TO, address(mintB), 0, sellerPayout);
+        ICart.OrderLine[] memory lines = new ICart.OrderLine[](4);
+        lines[0] = _lineForListing(listings[0], 3, 3 ether)[0];
+        lines[1] = _lineForListing(listings[1], 1, 1 ether)[0];
+        lines[2] = _lineForListing(listings[2], 2, 2 ether)[0];
+        lines[3] = _lineForListing(listings[3], 1, 1 ether)[0];
+        ICart.FulfillmentAction[] memory actions = new ICart.FulfillmentAction[](5);
+        actions[0] = ICart.FulfillmentAction({lineIndex: 1, quantity: 1, recipient: collector});
+        actions[1] = ICart.FulfillmentAction({lineIndex: 0, quantity: 2, recipient: collector});
+        actions[2] = ICart.FulfillmentAction({lineIndex: 2, quantity: 2, recipient: collector});
+        actions[3] = ICart.FulfillmentAction({lineIndex: 0, quantity: 1, recipient: payer});
+        actions[4] = ICart.FulfillmentAction({lineIndex: 3, quantity: 1, recipient: collector});
+        ICart.PayoutRoute[] memory routes = _emptyRoutes(4);
+        ICart.PurchaseOrder memory order = _order("mixed-mint-results", lines, routes, actions);
+        ICart.ListingPurchaseAuthorization memory authorization = _rootAuthorization(listings, SELLER_PK);
+        bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
+
+        vm.deal(payer, 7 ether);
+        vm.prank(payer);
+        ICart.MintResult[] memory mintResults = ICart(address(cart)).executePurchase{value: 7 ether}(
+            order, lines, listings, authorization, _combineRoutes(routes), actions, platformSignature
+        );
+
+        assertEq(mintResults.length, 3);
+        assertEq(mintResults[0].fulfillmentActionIndex, 1);
+        assertEq(mintResults[0].tokenIds.length, 2);
+        assertEq(mintResults[0].tokenIds[0], 2);
+        assertEq(mintResults[0].tokenIds[1], 3);
+        assertEq(mintResults[1].fulfillmentActionIndex, 3);
+        assertEq(mintResults[1].tokenIds.length, 1);
+        assertEq(mintResults[1].tokenIds[0], 4);
+        assertEq(mintResults[2].fulfillmentActionIndex, 4);
+        assertEq(mintResults[2].tokenIds.length, 1);
+        assertEq(mintResults[2].tokenIds[0], 1);
+        assertEq(mintA.ownerOf(2), collector);
+        assertEq(mintA.ownerOf(3), collector);
+        assertEq(mintA.ownerOf(4), payer);
+        assertEq(mintB.ownerOf(1), collector);
+        assertEq(transferToken.ownerOf(99), collector);
+        assertEq(mint1155.balanceOf(collector, 7), 2);
+        assertEq(sellerPayout.balance, 7 ether);
+    }
+
+    function testPurchaseWithoutFulfillmentReturnsEmptyMintResults() public {
+        ICart.Listing memory listing =
+            _listing(keccak256("empty-mint-results"), ICart.FulfillmentKind.OFF_CHAIN, address(0), 0, sellerPayout);
+
+        ICart.MintResult[] memory mintResults =
+            _executeNativeListing(listing, "empty-mint-results", 1, new ICart.FulfillmentAction[](0));
+
+        assertEq(mintResults.length, 0);
+        assertEq(sellerPayout.balance, 1 ether);
     }
 
     function testTooManyListingsAreRejectedBeforeVerification() public {
@@ -1746,7 +1842,7 @@ contract CartTest is Test {
         string memory orderId,
         uint256 quantity,
         ICart.FulfillmentAction[] memory actions
-    ) internal {
+    ) internal returns (ICart.MintResult[] memory mintResults) {
         uint256 amount = listing.minimumUnitPrice * quantity;
         ICart.OrderLine[] memory lines = _lineForListing(listing, quantity, amount);
         ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
@@ -1757,7 +1853,7 @@ contract CartTest is Test {
 
         vm.deal(payer, amount);
         vm.prank(payer);
-        cart.executePurchase{value: amount}(
+        return cart.executePurchase{value: amount}(
             order, lines, authorizationListings, authorization, _combineRoutes(routes), actions, platformSignature
         );
     }

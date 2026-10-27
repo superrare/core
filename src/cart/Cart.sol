@@ -31,13 +31,6 @@ contract Cart is
   string private constant EIP712_NAME = "SuperRare Cart";
   string private constant EIP712_VERSION = "1";
 
-  uint256 private constant MAX_ORDER_LINES = 32;
-  uint256 private constant MAX_FULFILLMENT_OPERATIONS = 20;
-  // Keep proof processing bounded even when a caller supplies a malformed witness.
-  uint256 private constant MAX_MERKLE_PROOF_DEPTH = 64;
-  // Keep each route's command and input arrays bounded before hashing them.
-  uint256 private constant MAX_ROUTE_COMMANDS = 32;
-
   /// @dev Marks an Order Line that references no Listing, such as shipping or platform compensation.
   uint256 private constant NO_LISTING = type(uint256).max;
 
@@ -141,9 +134,9 @@ contract Cart is
     PayoutRoute calldata route,
     FulfillmentAction[] calldata actions,
     bytes calldata platformSignature
-  ) external payable override nonReentrant {
+  ) external payable override nonReentrant returns (MintResult[] memory mintResults) {
     PayoutRoute memory routeCopy = route;
-    _executePurchaseCore(
+    return _executePurchaseCore(
       order,
       lines,
       listings,
@@ -164,7 +157,7 @@ contract Cart is
     bytes32 routeHash,
     FulfillmentAction[] calldata actions,
     bytes calldata platformSignature
-  ) private {
+  ) private returns (MintResult[] memory mintResults) {
     // Reject a purchase before any external call or state change when the contract is paused.
     if (_cartConfig().paused) revert ContractPaused();
     // Require a unique order identifier and a live order deadline.
@@ -172,16 +165,14 @@ contract Cart is
     if (order.deadline < block.timestamp) revert DeadlineExpired(order.deadline, block.timestamp);
     // Marking an order as executed later prevents the same signed order from being used twice.
     if (_cartSettlement().executedOrderIds[order.orderId]) revert AlreadyExecuted(order.orderId);
-    // Keep the number of lines bounded. The route is order-wide, not line-indexed.
-    if (lines.length == 0 || lines.length > MAX_ORDER_LINES) {
+    // Require an order to contain at least one line.
+    if (lines.length == 0) {
       revert InvalidArrayLength();
     }
     // Every supplied listing must be referenced by at least one order line.
     if (listings.length > lines.length) revert InvalidArrayLength();
     // More roots than listings cannot authorize any additional listing.
     if (authorization.listingRoots.length > listings.length) revert InvalidArrayLength();
-    // Every action costs at least one fulfillment operation; larger arrays cannot pass validation.
-    if (actions.length > MAX_FULFILLMENT_OPERATIONS) revert InvalidArrayLength();
     // Require one signature for each root, one root index for each listing, and one proof for each listing.
     if (
       authorization.listingRoots.length != authorization.listingRootSignatures.length ||
@@ -192,19 +183,6 @@ contract Cart is
     if (authorization.listingProofs.length != listings.length) {
       revert InvalidArrayLength();
     }
-    // Reject oversized witnesses and route plans before hashing or external policy calls.
-    for (uint256 i = 0; i < listings.length; ++i) {
-      if (authorization.listingProofs[i].length > MAX_MERKLE_PROOF_DEPTH) {
-        revert MerkleProofTooDeep(i, authorization.listingProofs[i].length);
-      }
-    }
-    if (route.commands.length > MAX_ROUTE_COMMANDS) {
-      revert RouteTooManyCommands(route.commands.length);
-    }
-    if (route.inputs.length > MAX_ROUTE_COMMANDS) {
-      revert RouteTooManyInputs(route.inputs.length);
-    }
-
     // Hash the order with this proxy as the EIP-712 verifying contract.
     bytes32 orderDigest = _hashTypedDataV4(CartHashing.hashOrderStruct(order));
     // Check that the signed order matches every supplied payload and the platform signature.
@@ -224,7 +202,7 @@ contract Cart is
       resolvedDigests
     );
     // Check that fulfillment actions exactly cover the on-chain items in the order.
-    _validateActions(lines, listings, lineListing, actions);
+    uint256 mintActionCount = _validateActions(lines, listings, lineListing, actions);
     // Consume the order and reserve listing quantity before external settlement calls.
     _cartSettlement().executedOrderIds[order.orderId] = true;
     _reserveListings(listings, resolvedDigests, listingRequested);
@@ -233,7 +211,7 @@ contract Cart is
     // custody, storage, msg.sender, and msg.value while keeping payment bytecode out of Cart.
     ICartPayments.PaymentState memory paymentState = _beginPayment(order, lines, route);
     // Transfer or mint each on-chain item to its requested recipient.
-    _executeFulfillment(order.orderId, listings, lineListing, actions);
+    mintResults = _executeFulfillment(order.orderId, listings, lineListing, actions, mintActionCount);
     // Pay grouped recipients, capture protocol spread, and verify all settlement balances.
     _finishPayment(order.orderId, order.paymentCurrency, lines, paymentState);
 
@@ -299,6 +277,14 @@ contract Cart is
     resolvedDigests = new bytes32[](listings.length);
     bool[] memory rootVerified = new bool[](authorization.listingRoots.length);
     address[] memory rootSellers = new address[](authorization.listingRoots.length);
+    // Digests already distribute uniformly. Store index + 1 so zero marks an empty slot.
+    // Single-listing purchases keep the direct lookup path without allocating a table.
+    uint256[] memory digestIndex;
+    if (listings.length > 1) {
+      uint256 size = 1;
+      while (size < listings.length * 2) size <<= 1;
+      digestIndex = new uint256[](size);
+    }
 
     for (uint256 i = 0; i < listings.length; ++i) {
       // Select the root that authorizes this listing.
@@ -347,9 +333,8 @@ contract Cart is
         revert InvalidMerkleProof(root.listingsRoot, CartHashing.hashListingLeaf(digest));
       }
 
-      for (uint256 j = 0; j < i; ++j) {
-        // Do not accept the same listing more than once in the supplied array.
-        if (resolvedDigests[j] == digest) revert DuplicateListingDigest(digest);
+      if (listings.length > 1) {
+        _indexListingDigest(resolvedDigests, digestIndex, digest, i);
       }
       // Save the verified digest at the listing's array index.
       resolvedDigests[i] = digest;
@@ -365,14 +350,7 @@ contract Cart is
         lineListing[i] = NO_LISTING;
         continue;
       }
-      // Search the verified listing digests for the digest named by this line.
-      uint256 index = NO_LISTING;
-      for (uint256 j = 0; j < resolvedDigests.length; ++j) {
-        if (resolvedDigests[j] == target) {
-          index = j;
-          break;
-        }
-      }
+      uint256 index = _findListingDigest(resolvedDigests, digestIndex, target);
       if (index == NO_LISTING) revert ListingNotFound(target);
       // Mark the listing as used by an order line.
       referenced[index] = true;
@@ -382,6 +360,39 @@ contract Cart is
       // Every supplied listing must be used by one order line.
       if (!referenced[i]) revert ExtraListing(i);
     }
+  }
+
+  /// @dev Full-digest comparison handles bucket collisions and rejects duplicates.
+  function _indexListingDigest(
+    bytes32[] memory digests,
+    uint256[] memory index,
+    bytes32 digest,
+    uint256 listingIndex
+  ) private pure {
+    uint256 mask = index.length - 1;
+    uint256 slot = uint256(digest) & mask;
+    while (index[slot] != 0) {
+      if (digests[index[slot] - 1] == digest) revert DuplicateListingDigest(digest);
+      slot = (slot + 1) & mask;
+    }
+    index[slot] = listingIndex + 1;
+  }
+
+  function _findListingDigest(
+    bytes32[] memory digests,
+    uint256[] memory index,
+    bytes32 target
+  ) private pure returns (uint256) {
+    if (digests.length == 0) return NO_LISTING;
+    if (digests.length == 1) return digests[0] == target ? 0 : NO_LISTING;
+    uint256 mask = index.length - 1;
+    uint256 slot = uint256(target) & mask;
+    while (index[slot] != 0) {
+      uint256 candidate = index[slot] - 1;
+      if (digests[candidate] == target) return candidate;
+      slot = (slot + 1) & mask;
+    }
+    return NO_LISTING;
   }
 
   function _validateOrderHashes(
@@ -516,10 +527,9 @@ contract Cart is
     Listing[] calldata listings,
     uint256[] memory lineListing,
     FulfillmentAction[] calldata actions
-  ) private pure {
+  ) private pure returns (uint256 mintActionCount) {
     // Track how much each line's on-chain listing will fulfill.
     uint256[] memory quantities = new uint256[](lines.length);
-    uint256 operations;
     for (uint256 i = 0; i < actions.length; ++i) {
       FulfillmentAction calldata action = actions[i];
       // Check the action index, quantity, and recipient before reading the line.
@@ -531,6 +541,7 @@ contract Cart is
       if (listingIndex == NO_LISTING) revert InvalidFulfillmentAction(i);
       FulfillmentKind kind = listings[listingIndex].fulfillmentKind;
       if (!_isOnChainKind(kind)) revert InvalidFulfillmentAction(i);
+      if (kind == FulfillmentKind.ERC721_MINT_TO) ++mintActionCount;
       // An ERC-721 transfer is one transfer of one token. It cannot appear twice.
       if (kind == FulfillmentKind.ERC721_TRANSFER && (action.quantity != 1 || quantities[action.lineIndex] != 0)) {
         revert InvalidFulfillmentAction(i);
@@ -540,14 +551,6 @@ contract Cart is
         revert InvalidFulfillmentAction(i);
       }
       quantities[action.lineIndex] += action.quantity;
-
-      // Each ERC-721 mint unit is its own call; every other kind settles in one call.
-      uint256 cost = kind == FulfillmentKind.ERC721_MINT_TO ? action.quantity : 1;
-      // Limit the total number of external fulfillment calls in one purchase.
-      if (cost > MAX_FULFILLMENT_OPERATIONS || operations > MAX_FULFILLMENT_OPERATIONS - cost) {
-        revert MaxFulfillmentOperationsExceeded();
-      }
-      operations += cost;
     }
     for (uint256 i = 0; i < lines.length; ++i) {
       // On-chain lines must be fully covered. Off-chain and ERC-20 swap lines have no action.
@@ -608,14 +611,18 @@ contract Cart is
     bytes32 orderId,
     Listing[] calldata listings,
     uint256[] memory lineListing,
-    FulfillmentAction[] calldata actions
-  ) private {
+    FulfillmentAction[] calldata actions,
+    uint256 mintActionCount
+  ) private returns (MintResult[] memory mintResults) {
+    mintResults = new MintResult[](mintActionCount);
+    uint256 mintResultIndex;
     for (uint256 i = 0; i < actions.length; ++i) {
       FulfillmentAction calldata action = actions[i];
       Listing calldata listing = listings[lineListing[action.lineIndex]];
       FulfillmentKind kind = listing.fulfillmentKind;
 
       bytes memory callData;
+      uint256[] memory mintedTokenIds;
       if (kind == FulfillmentKind.ERC721_TRANSFER) {
         // Build a safe ERC-721 transfer from the seller to the requested recipient.
         callData = abi.encodeWithSelector(
@@ -637,6 +644,8 @@ contract Cart is
       } else if (kind == FulfillmentKind.ERC721_MINT_TO) {
         // Build the mint call for one ERC-721 unit.
         callData = abi.encodeWithSignature("mintTo(address)", action.recipient);
+        mintedTokenIds = new uint256[](action.quantity);
+        mintResults[mintResultIndex++] = MintResult({fulfillmentActionIndex: i, tokenIds: mintedTokenIds});
       } else if (kind == FulfillmentKind.ERC1155_MINT_TO) {
         // Build the mint call for the requested ERC-1155 quantity.
         callData = abi.encodeWithSignature(
@@ -663,6 +672,7 @@ contract Cart is
           // Decode the new token id returned by the ERC-721 mint call.
           if (result.length < 32) revert InvalidFulfillmentResult(action.lineIndex, i, result);
           fulfilledTokenId = abi.decode(result, (uint256));
+          mintedTokenIds[unit] = fulfilledTokenId;
           fulfilledQuantity = 1;
         }
         // Report the exact unit that the token contract fulfilled.

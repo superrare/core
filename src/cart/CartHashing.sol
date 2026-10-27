@@ -59,22 +59,25 @@ library CartHashing {
     }
 
     function hashOrderLines(ICart.OrderLine[] calldata lines) internal pure returns (bytes32) {
-        // Hash each line first so the array can be included in the signed order as one value.
         bytes32[] memory hashes = new bytes32[](lines.length);
-        for (uint256 i = 0; i < lines.length; ++i) {
-            // Hash one line with the canonical OrderLine type hash.
-            hashes[i] = keccak256(
-                abi.encode(
-                    ORDER_LINE_TYPEHASH,
-                    lines[i].sku,
-                    lines[i].listingDigest,
-                    lines[i].fulfillmentKind,
-                    lines[i].quantity,
-                    lines[i].settlementCurrency,
-                    lines[i].amount,
-                    lines[i].paymentRecipient
-                )
-            );
+        // EIP-712 encodes the type hash and seven fields as eight 32-byte words.
+        // Reuse that buffer rather than allocating a fresh abi.encode result per line.
+        bytes32[8] memory words;
+        words[0] = ORDER_LINE_TYPEHASH;
+        for (uint256 i; i < lines.length; ++i) {
+            ICart.OrderLine calldata line = lines[i];
+            words[1] = line.sku;
+            words[2] = line.listingDigest;
+            words[3] = bytes32(uint256(uint8(line.fulfillmentKind)));
+            words[4] = bytes32(line.quantity);
+            words[5] = bytes32(uint256(uint160(line.settlementCurrency)));
+            words[6] = bytes32(line.amount);
+            words[7] = bytes32(uint256(uint160(line.paymentRecipient)));
+            bytes32 digest;
+            assembly ("memory-safe") {
+                digest := keccak256(words, 0x100)
+            }
+            hashes[i] = digest;
         }
         // Concatenate the line hashes and hash the resulting byte sequence.
         return _concatHash(hashes);

@@ -17,11 +17,6 @@ import {ICartRoutePolicy} from "./ICartRoutePolicy.sol";
 /// @dev This contract deliberately owns no state and is never called by Cart settlement. Its
 ///      results are advisory; executePurchase remains the authoritative validation boundary.
 contract CartLens is ICartLens {
-    // Keep preflight bounds aligned with Cart's authoritative execution limits.
-    uint256 private constant MAX_FULFILLMENT_OPERATIONS = 20;
-    uint256 private constant MAX_MERKLE_PROOF_DEPTH = 64;
-    uint256 private constant MAX_ROUTE_COMMANDS = 32;
-
     function listingStatus(address cart, ICart.Listing calldata listing, ICart.ListingRoot calldata root)
         external
         view
@@ -89,9 +84,6 @@ contract CartLens is ICartLens {
         if (!_validListingShape(listing)) {
             return _failure(ValidationCode.INVALID_LISTING, 0, bytes32(0), "");
         }
-        if (proof.length > MAX_MERKLE_PROOF_DEPTH) {
-            return _failure(ValidationCode.INVALID_MERKLE_PROOF, 0, bytes32(0), abi.encode(proof.length));
-        }
         if (listing.fulfillmentKind == ICart.FulfillmentKind.ERC721_TRANSFER && requestedQuantity != 1) {
             return _failure(ValidationCode.INVALID_LISTING, 0, bytes32(0), "");
         }
@@ -146,10 +138,7 @@ contract CartLens is ICartLens {
         if (target.executedOrderIds(order.orderId)) {
             return _failure(ValidationCode.ORDER_ALREADY_EXECUTED, 0, order.orderId, "");
         }
-        if (lines.length == 0 || lines.length > 20 || actions.length > MAX_FULFILLMENT_OPERATIONS) {
-            return _failure(ValidationCode.INVALID_ARRAY_LENGTH, 0, order.orderId, "");
-        }
-        if (route.commands.length > MAX_ROUTE_COMMANDS || route.inputs.length > MAX_ROUTE_COMMANDS) {
+        if (lines.length == 0) {
             return _failure(ValidationCode.INVALID_ARRAY_LENGTH, 0, order.orderId, "");
         }
         if (CartHashing.hashOrderLines(lines) != order.orderLinesHash) {

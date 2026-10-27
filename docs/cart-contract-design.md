@@ -97,9 +97,8 @@ Execution adds only authorization witnesses around this same Purchase Order:
 - `ListingRoot` contains the seller's nonce/deadline and a seller-signed Merkle root of Listing
   digests. The caller supplies each selected Listing and its proof; roots are reusable across
   purchases and can be cancelled as a whole.
-- The root path is batch-native for listings, but on-chain execution remains bounded by the Cart's
-  order-line and fulfillment-operation limits. A large root is assembled off-chain; only the
-  selected leaves and proofs are sent in each transaction.
+- A large Listing Root is assembled off-chain; only selected leaves and proofs are sent in each transaction.
+  The backend admits purchases against gas and transaction-size budgets. Cart imposes no numerical resource caps.
 
 `paymentAmount` is part of the platform signature and is the fixed customer quote, not a caller-chosen
 spending limit. Cart collects it exactly. The complete total has no base amount: every charge is a peer
@@ -119,7 +118,7 @@ The cart exposes `DOMAIN_SEPARATOR()` and otherwise leaves digest construction t
   ERC-20 input uses the caller's ordinary Cart allowance. Cart pulls exactly the signed amount.
 - The configured platform signer validates the Purchase Order through OpenZeppelin `SignatureChecker`.
 - The deadline is inclusive through its final valid timestamp and expired thereafter.
-- There are 1–20 Order Lines.
+- There is at least one Order Line. The backend owns resource admission.
 - Supplied Listings cannot exceed Order Lines, and supplied Listing Roots cannot exceed Listings.
 - The Purchase Order has one order-wide Payout Route covering the complete settlement-currency basket.
 - SKU, amount, quantity, and payment recipient are nonzero.
@@ -133,8 +132,8 @@ inclusion proof; the seller's root signature is supplied once per root. `listing
 EIP-712 Listing digest. Every supplied Listing must be referenced, every nonzero Order Line digest must
 resolve exactly once, and zero is reserved for platform-only lines.
 
-Each supplied Merkle proof is limited to 64 sibling hashes so malformed witnesses cannot force
-unbounded proof processing.
+Cart and CartLens verify each supplied Merkle proof without an explicit depth cap. The transaction
+builder owns proof-size admission alongside complete-transaction gas and byte-size checks.
 
 - The Listing digest is the immutable identity of its exact terms. Any edit signs a new leaf and,
   when needed, a new root.
@@ -181,10 +180,9 @@ The supported mint selectors are exact known interfaces. A collection with an in
   different fulfillment units to different recipients.
 - Every on-chain Listing line has one or more actions; off-chain and platform-only lines have none.
 - Action quantities for each line sum exactly to the line quantity.
-- A Purchase Order contains at most 20 Fulfillment Actions.
 - An ERC-721 transfer has one action of quantity one.
 - ERC-1155 quantities and ERC-721 mint quantities may be divided among recipients.
-- There are at most 20 native fulfillment operations per Purchase Order. Each ERC-721 mint call consumes one operation; each ERC-721 transfer, ERC-1155 transfer, and ERC-1155 mint call consumes one.
+- Each ERC-721 mint unit requires a separate mint call. ERC-721 transfers and ERC-1155 transfers or mints require one call per action. The backend accounts for these costs during admission.
 - NFT owners and collection creators approve the cart proxy directly. The cart performs native transfers and supported mint calls itself.
 
 ## Currency Funding and Routing
@@ -202,7 +200,7 @@ Native ETH is represented by `address(0)` and is supported as input or settlemen
 - Each order carries one `PayoutRoute` for the complete order.
 - `routerValue` is signed with the route and is forwarded exactly to Universal Router. Native payment requires `msg.value == paymentAmount` and `routerValue <= paymentAmount`; ERC-20 payment requires both values to be zero.
 - If every line settles in the payment currency, commands and inputs may be empty. Mixed direct and routed lines use one route for the order-wide settlement basket.
-- The order-wide route contains at most 32 commands and 32 command inputs.
+- The order-wide route requires matching command and input counts. The backend owns route resource admission.
 - Cart's route policy is intentionally shallow: it allows only Permit2 transfer-from, sweep, wrap/unwrap, V2/V3 swaps, and V4 swap command families, with no command flags. It does not decode command inputs, paths, recipients, payer flags, V4 actions, or exact-input/output semantics.
 - Cart snapshots native ETH, WETH, the payment token, and every non-native settlement currency named by the order. ETH and WETH remain distinct payout currencies but share one incremental solvency family.
 - After routing, each non-native settlement delta must cover its signed obligations without consuming the snapshot baseline. ETH and WETH deltas are checked together, then converted only as needed to deliver exact ETH and WETH payouts.
@@ -229,7 +227,7 @@ The Universal Router address is configured once. Supporting another router versi
 
 The non-reentrant execution sequence is:
 
-1. Validate the complete Purchase Order, Listings, the order-wide route, actions, currencies, and local cap shape.
+1. Validate the complete Purchase Order, Listings, the order-wide route, actions, currencies, and structural array relationships.
 2. Mark the order executed and reserve all Listing quantities.
 3. Collect the signed `paymentAmount` from the caller's native value or ordinary Cart allowance.
 4. Execute the one order-wide route, validate each aggregate output basket, and forward surplus to the protocol recipient.
@@ -326,7 +324,7 @@ Implementation acceptance includes unit, invariant, fuzz, and fork coverage for:
 - Whole Listing Root cancellation, exact Listing cancellation, bulk nonce invalidation, deliberate
   re-listing with a fresh `listingSalt`, partial fills, duplicate Listing references, races for final
   inventory, and fill rollback.
-- Every Fulfillment kind, ownership transition, approval loss, mint incompatibility, recipient splitting, and the 20-operation cap.
+- Every Fulfillment kind, ownership transition, approval loss, mint incompatibility, recipient splitting, and execution above the former count caps.
 - Empty direct routes and opaque V2/V3/V4, wrap/unwrap, sweep, and Permit2 transfer-from command programs.
 - Shallow default rejection of unsupported Universal Router command families, command flags, input-count mismatches, and oversized programs; Universal Router owns nested-action, path, recipient, currency, and route-content validation.
 - Native/ERC-20 inputs and outputs, exact signed funding, output and input Protocol Spread, failed native recipients, fee-on-transfer tokens, temporary allowance cleanup, and balance isolation.

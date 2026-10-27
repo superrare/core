@@ -1,0 +1,125 @@
+{
+  "token_standard": "ERC721",
+  "expanded_caps": true,
+  "line_cap": 66,
+  "operation_cap": 64,
+  "method": "Minimal-proxy LazySovereignNFT; one collection; one EOA buyer; two fee lines; transfers preminted, or fresh mints with per-token royalties. Native payment; gross call plus intrinsic subject to calldata floor; excludes fixture preparation and refunds, not receipts or RPC estimates.",
+  "source_sha256": {
+    "src/cart/Cart.sol": "6b848171f8aa7e8a5217e9ca86f2b04f22357195111352582ce63de274551c9b",
+    "src/cart/CartHashing.sol": "a56d2a1ca313e88c50cc4598638c792a92ed4a789246fa8b2bbe5adf03fc65b3",
+    "src/token/ERC721/sovereign/lazy/LazySovereignNFT.sol": "237b9e63dcd8622525474a328c9921a42573f41ff055e74b7babbe54d7b98d79",
+    "src/test/cart/CartERC721Gas.t.sol": "49e09782a739b0d0a98cebb2b7d5e4ae2a9cf9a9725f32412f2cb0f45cd2f549"
+  },
+  "results": [
+    {
+      "sales": 9,
+      "lines": 11,
+      "calldataBytes": 9540,
+      "grossCallGas": 1377117,
+      "intrinsicGas": 98916,
+      "calldataFloorGas": 215790,
+      "mode": "mint",
+      "approximateTransactionGas": 1476033,
+      "bufferedGasLimit": 1845042
+    },
+    {
+      "sales": 9,
+      "lines": 11,
+      "calldataBytes": 9540,
+      "grossCallGas": 756045,
+      "intrinsicGas": 99024,
+      "calldataFloorGas": 216060,
+      "mode": "transfer",
+      "approximateTransactionGas": 855069,
+      "bufferedGasLimit": 1068837
+    },
+    {
+      "sales": 18,
+      "lines": 20,
+      "calldataBytes": 17892,
+      "grossCallGas": 2561761,
+      "intrinsicGas": 174216,
+      "calldataFloorGas": 404040,
+      "mode": "mint",
+      "approximateTransactionGas": 2735977,
+      "bufferedGasLimit": 3419972
+    },
+    {
+      "sales": 18,
+      "lines": 20,
+      "calldataBytes": 17892,
+      "grossCallGas": 1347636,
+      "intrinsicGas": 174588,
+      "calldataFloorGas": 404970,
+      "mode": "transfer",
+      "approximateTransactionGas": 1522224,
+      "bufferedGasLimit": 1902780
+    },
+    {
+      "sales": 32,
+      "lines": 34,
+      "calldataBytes": 30436,
+      "grossCallGas": 4410708,
+      "intrinsicGas": 283768,
+      "calldataFloorGas": 677920,
+      "mode": "mint",
+      "approximateTransactionGas": 4694476,
+      "bufferedGasLimit": 5868095
+    },
+    {
+      "sales": 32,
+      "lines": 34,
+      "calldataBytes": 30436,
+      "grossCallGas": 2272066,
+      "intrinsicGas": 284260,
+      "calldataFloorGas": 679150,
+      "mode": "transfer",
+      "approximateTransactionGas": 2556326,
+      "bufferedGasLimit": 3195408
+    },
+    {
+      "sales": 62,
+      "lines": 64,
+      "calldataBytes": 59300,
+      "grossCallGas": 8397335,
+      "intrinsicGas": 550460,
+      "calldataFloorGas": 1344650,
+      "mode": "mint",
+      "approximateTransactionGas": 8947795,
+      "bufferedGasLimit": 11184744
+    },
+    {
+      "sales": 62,
+      "lines": 64,
+      "calldataBytes": 59300,
+      "grossCallGas": 4273957,
+      "intrinsicGas": 551228,
+      "calldataFloorGas": 1346570,
+      "mode": "transfer",
+      "approximateTransactionGas": 4825185,
+      "bufferedGasLimit": 6031482
+    },
+    {
+      "sales": 64,
+      "lines": 66,
+      "calldataBytes": 61156,
+      "grossCallGas": 8667530,
+      "intrinsicGas": 567172,
+      "calldataFloorGas": 1386430,
+      "mode": "mint",
+      "approximateTransactionGas": 9234702,
+      "bufferedGasLimit": 11543378
+    },
+    {
+      "sales": 64,
+      "lines": 66,
+      "calldataBytes": 61156,
+      "grossCallGas": 4412655,
+      "intrinsicGas": 567940,
+      "calldataFloorGas": 1388350,
+      "mode": "transfer",
+      "approximateTransactionGas": 4980595,
+      "bufferedGasLimit": 6225744
+    }
+  ]
+}

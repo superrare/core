@@ -1,0 +1,142 @@
+[
+  {
+    "test": "testCapacityListings1",
+    "scenario": "listing",
+    "lines": 1,
+    "calldata_bytes": 1956,
+    "gross_call_gas": 157295,
+    "ordinary_intrinsic_gas": 34788,
+    "calldata_floor_gas": 55470,
+    "approximate_total": 192083
+  },
+  {
+    "test": "testCapacityListings10",
+    "scenario": "listing",
+    "lines": 10,
+    "calldata_bytes": 10020,
+    "gross_call_gas": 773318,
+    "ordinary_intrinsic_gas": 96624,
+    "calldata_floor_gas": 210060,
+    "approximate_total": 869942
+  },
+  {
+    "test": "testCapacityListings20",
+    "scenario": "listing",
+    "lines": 20,
+    "calldata_bytes": 18980,
+    "gross_call_gas": 1568268,
+    "ordinary_intrinsic_gas": 165164,
+    "calldata_floor_gas": 381410,
+    "approximate_total": 1733432
+  },
+  {
+    "test": "testCapacityListings32",
+    "scenario": "listing",
+    "lines": 32,
+    "calldata_bytes": 29732,
+    "gross_call_gas": 2675713,
+    "ordinary_intrinsic_gas": 247340,
+    "calldata_floor_gas": 586850,
+    "approximate_total": 2923053
+  },
+  {
+    "test": "testCapacityListings5",
+    "scenario": "listing",
+    "lines": 5,
+    "calldata_bytes": 5540,
+    "gross_call_gas": 419454,
+    "ordinary_intrinsic_gas": 62252,
+    "calldata_floor_gas": 124130,
+    "approximate_total": 481706
+  },
+  {
+    "test": "testCapacityMint20",
+    "scenario": "mint",
+    "lines": 20,
+    "calldata_bytes": 20900,
+    "gross_call_gas": 2753141,
+    "ordinary_intrinsic_gas": 178592,
+    "calldata_floor_gas": 414980,
+    "approximate_total": 2931733
+  },
+  {
+    "test": "testCapacityMint20Proof64",
+    "scenario": "mint",
+    "lines": 20,
+    "calldata_bytes": 61860,
+    "gross_call_gas": 3135271,
+    "ordinary_intrinsic_gas": 832332,
+    "calldata_floor_gas": 2049330,
+    "approximate_total": 3967603
+  },
+  {
+    "test": "testCapacityProof64Lines20",
+    "scenario": "listing",
+    "lines": 20,
+    "calldata_bytes": 59940,
+    "gross_call_gas": 1945364,
+    "ordinary_intrinsic_gas": 818940,
+    "calldata_floor_gas": 2015850,
+    "approximate_total": 2764304
+  },
+  {
+    "test": "testCapacityProof64Lines32",
+    "scenario": "listing",
+    "lines": 32,
+    "calldata_bytes": 95268,
+    "gross_call_gas": 3284442,
+    "ordinary_intrinsic_gas": 1293432,
+    "calldata_floor_gas": 3202080,
+    "approximate_total": 4577874
+  },
+  {
+    "test": "testCapacitySimpleNative1",
+    "scenario": "simple",
+    "lines": 1,
+    "calldata_bytes": 1284,
+    "gross_call_gas": 112164,
+    "ordinary_intrinsic_gas": 29304,
+    "calldata_floor_gas": 41760,
+    "approximate_total": 141468
+  },
+  {
+    "test": "testCapacitySimpleNative10",
+    "scenario": "simple",
+    "lines": 10,
+    "calldata_bytes": 3300,
+    "gross_call_gas": 319261,
+    "ordinary_intrinsic_gas": 41796,
+    "calldata_floor_gas": 72990,
+    "approximate_total": 361057
+  },
+  {
+    "test": "testCapacitySimpleNative20",
+    "scenario": "simple",
+    "lines": 20,
+    "calldata_bytes": 5540,
+    "gross_call_gas": 619889,
+    "ordinary_intrinsic_gas": 55676,
+    "calldata_floor_gas": 107690,
+    "approximate_total": 675565
+  },
+  {
+    "test": "testCapacitySimpleNative32",
+    "scenario": "simple",
+    "lines": 32,
+    "calldata_bytes": 8228,
+    "gross_call_gas": 1078626,
+    "ordinary_intrinsic_gas": 72332,
+    "calldata_floor_gas": 149330,
+    "approximate_total": 1150958
+  },
+  {
+    "test": "testCapacitySimpleNative5",
+    "scenario": "simple",
+    "lines": 5,
+    "calldata_bytes": 2180,
+    "gross_call_gas": 196784,
+    "ordinary_intrinsic_gas": 34844,
+    "calldata_floor_gas": 55610,
+    "approximate_total": 231628
+  }
+]

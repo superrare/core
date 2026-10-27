@@ -1,0 +1,572 @@
+{
+  "compiler": "Solidity 0.8.18; viaIR=true; optimizer=true; optimizer_runs=100",
+  "temporary_max_order_lines": 128,
+  "production_files_changed": false,
+  "baseline_full_purchase": [
+    {
+      "scenario": "listing",
+      "lines": 1,
+      "calldata_bytes": 1956,
+      "gross_call_gas": 157328,
+      "ordinary_intrinsic_gas": 34788,
+      "calldata_floor_gas": 55470,
+      "approximate_total_gas": 192116
+    },
+    {
+      "scenario": "listing",
+      "lines": 10,
+      "calldata_bytes": 10020,
+      "gross_call_gas": 773351,
+      "ordinary_intrinsic_gas": 96624,
+      "calldata_floor_gas": 210060,
+      "approximate_total_gas": 869975
+    },
+    {
+      "scenario": "listing",
+      "lines": 20,
+      "calldata_bytes": 18980,
+      "gross_call_gas": 1568301,
+      "ordinary_intrinsic_gas": 165164,
+      "calldata_floor_gas": 381410,
+      "approximate_total_gas": 1733465
+    },
+    {
+      "scenario": "listing",
+      "lines": 32,
+      "calldata_bytes": 29732,
+      "gross_call_gas": 2675746,
+      "ordinary_intrinsic_gas": 247340,
+      "calldata_floor_gas": 586850,
+      "approximate_total_gas": 2923086
+    },
+    {
+      "scenario": "listing",
+      "lines": 5,
+      "calldata_bytes": 5540,
+      "gross_call_gas": 419487,
+      "ordinary_intrinsic_gas": 62252,
+      "calldata_floor_gas": 124130,
+      "approximate_total_gas": 481739
+    },
+    {
+      "scenario": "listing",
+      "lines": 64,
+      "calldata_bytes": 58404,
+      "gross_call_gas": 6447638,
+      "ordinary_intrinsic_gas": 466572,
+      "calldata_floor_gas": 1134930,
+      "approximate_total_gas": 6914210
+    },
+    {
+      "scenario": "mint",
+      "lines": 20,
+      "calldata_bytes": 20900,
+      "gross_call_gas": 2753153,
+      "ordinary_intrinsic_gas": 178592,
+      "calldata_floor_gas": 414980,
+      "approximate_total_gas": 2931745
+    },
+    {
+      "scenario": "mint",
+      "lines": 20,
+      "calldata_bytes": 61860,
+      "gross_call_gas": 3135274,
+      "ordinary_intrinsic_gas": 832332,
+      "calldata_floor_gas": 2049330,
+      "approximate_total_gas": 3967606
+    },
+    {
+      "scenario": "listing",
+      "lines": 20,
+      "calldata_bytes": 59940,
+      "gross_call_gas": 1945376,
+      "ordinary_intrinsic_gas": 818940,
+      "calldata_floor_gas": 2015850,
+      "approximate_total_gas": 2764316
+    },
+    {
+      "scenario": "listing",
+      "lines": 32,
+      "calldata_bytes": 95268,
+      "gross_call_gas": 3284454,
+      "ordinary_intrinsic_gas": 1293432,
+      "calldata_floor_gas": 3202080,
+      "approximate_total_gas": 4577886
+    },
+    {
+      "scenario": "simple",
+      "lines": 1,
+      "calldata_bytes": 1284,
+      "gross_call_gas": 112197,
+      "ordinary_intrinsic_gas": 29304,
+      "calldata_floor_gas": 41760,
+      "approximate_total_gas": 141501
+    },
+    {
+      "scenario": "simple",
+      "lines": 10,
+      "calldata_bytes": 3300,
+      "gross_call_gas": 319294,
+      "ordinary_intrinsic_gas": 41796,
+      "calldata_floor_gas": 72990,
+      "approximate_total_gas": 361090
+    },
+    {
+      "scenario": "simple",
+      "lines": 20,
+      "calldata_bytes": 5540,
+      "gross_call_gas": 619922,
+      "ordinary_intrinsic_gas": 55676,
+      "calldata_floor_gas": 107690,
+      "approximate_total_gas": 675598
+    },
+    {
+      "scenario": "simple",
+      "lines": 32,
+      "calldata_bytes": 8228,
+      "gross_call_gas": 1078659,
+      "ordinary_intrinsic_gas": 72332,
+      "calldata_floor_gas": 149330,
+      "approximate_total_gas": 1150991
+    },
+    {
+      "scenario": "simple",
+      "lines": 5,
+      "calldata_bytes": 2180,
+      "gross_call_gas": 196817,
+      "ordinary_intrinsic_gas": 34844,
+      "calldata_floor_gas": 55610,
+      "approximate_total_gas": 231661
+    },
+    {
+      "scenario": "simple",
+      "lines": 64,
+      "calldata_bytes": 15396,
+      "gross_call_gas": 2824545,
+      "ordinary_intrinsic_gas": 116676,
+      "calldata_floor_gas": 260190,
+      "approximate_total_gas": 2941221
+    }
+  ],
+  "payout_group_micro": [
+    {
+      "lines": 1,
+      "baseline_gas": 9407,
+      "optimized_gas": 10411
+    },
+    {
+      "lines": 10,
+      "baseline_gas": 62874,
+      "optimized_gas": 40907
+    },
+    {
+      "lines": 20,
+      "baseline_gas": 182871,
+      "optimized_gas": 76933
+    },
+    {
+      "lines": 32,
+      "baseline_gas": 411049,
+      "optimized_gas": 123162
+    }
+  ],
+  "order_line_hash_micro": [
+    {
+      "lines": 1,
+      "baseline_gas": 7475,
+      "optimized_gas": 6951
+    },
+    {
+      "lines": 10,
+      "baseline_gas": 21763,
+      "optimized_gas": 15818
+    },
+    {
+      "lines": 20,
+      "baseline_gas": 37808,
+      "optimized_gas": 25670
+    },
+    {
+      "lines": 32,
+      "baseline_gas": 57289,
+      "optimized_gas": 37478
+    }
+  ],
+  "differential_fuzz": {
+    "payout_group_runs": 256,
+    "hash_runs": 256,
+    "line_count_range": "0 through 128",
+    "payout_currency_values": "address(0), address(1) as WETH, and address(2)",
+    "recipient_values": "16 addresses to exercise repeated groups",
+    "hash_malformed_payload_regression": "Same success and returned bytes for an invalid enum and dirty upper bits in settlementCurrency and paymentRecipient"
+  },
+  "measurement_limitations": [
+    "Full purchase uses gross CALL gas plus ordinary intrinsic gas and calldata floor. Account warmth, outer CALL overhead, and refunds differ from top-level receipts.",
+    "The scenarios use existing EOA payout recipients, local token mocks, no external NFT mint case at 64 lines, and no swap route.",
+    "The hash table preserves group order and checks full grouping equality. Deliberately colliding hash buckets can still make lookups quadratic.",
+    "Microbenchmarks include external ABI encoding and return processing. Use the full purchase comparison for end-to-end savings.",
+    "The 64-line experiment raises only the temporary MAX_ORDER_LINES to 128. Production limits and files remain unchanged.",
+    "The original inherited Cart test methods were removed only in the temporary fixture. The capacity builder uses an external self-call to avoid optimizer duplication. Both variants use the same builder and fixture.",
+    "The hash-buffer variant was checked by differential fuzzing and malformed payload tests. It was not combined with the payout variant in full purchase measurements.",
+    "Unconditional hash-table grouping regresses the one-group and two-group workloads measured separately. Its full purchase gains apply to dispersed payout groups. An adaptive small-group path requires investigation before adopting it for typical carts."
+  ],
+  "date": "2026-10-24",
+  "payout_optimized_full_purchase": [
+    {
+      "scenario": "listing",
+      "lines": 1,
+      "calldata_bytes": 1956,
+      "gross_call_gas": 158650,
+      "ordinary_intrinsic_gas": 34788,
+      "calldata_floor_gas": 55470,
+      "approximate_total_gas": 193438
+    },
+    {
+      "scenario": "listing",
+      "lines": 10,
+      "calldata_bytes": 10020,
+      "gross_call_gas": 748619,
+      "ordinary_intrinsic_gas": 96624,
+      "calldata_floor_gas": 210060,
+      "approximate_total_gas": 845243
+    },
+    {
+      "scenario": "listing",
+      "lines": 20,
+      "calldata_bytes": 18980,
+      "gross_call_gas": 1443975,
+      "ordinary_intrinsic_gas": 165164,
+      "calldata_floor_gas": 381410,
+      "approximate_total_gas": 1609139
+    },
+    {
+      "scenario": "listing",
+      "lines": 32,
+      "calldata_bytes": 29732,
+      "gross_call_gas": 2334585,
+      "ordinary_intrinsic_gas": 247340,
+      "calldata_floor_gas": 586850,
+      "approximate_total_gas": 2581925
+    },
+    {
+      "scenario": "listing",
+      "lines": 5,
+      "calldata_bytes": 5540,
+      "gross_call_gas": 417171,
+      "ordinary_intrinsic_gas": 62252,
+      "calldata_floor_gas": 124130,
+      "approximate_total_gas": 479423
+    },
+    {
+      "scenario": "listing",
+      "lines": 64,
+      "calldata_bytes": 58404,
+      "gross_call_gas": 5021916,
+      "ordinary_intrinsic_gas": 466572,
+      "calldata_floor_gas": 1134930,
+      "approximate_total_gas": 5488488
+    },
+    {
+      "scenario": "mint",
+      "lines": 20,
+      "calldata_bytes": 20900,
+      "gross_call_gas": 2628827,
+      "ordinary_intrinsic_gas": 178592,
+      "calldata_floor_gas": 414980,
+      "approximate_total_gas": 2807419
+    },
+    {
+      "scenario": "mint",
+      "lines": 20,
+      "calldata_bytes": 61860,
+      "gross_call_gas": 3010948,
+      "ordinary_intrinsic_gas": 832332,
+      "calldata_floor_gas": 2049330,
+      "approximate_total_gas": 3843280
+    },
+    {
+      "scenario": "listing",
+      "lines": 20,
+      "calldata_bytes": 59940,
+      "gross_call_gas": 1821050,
+      "ordinary_intrinsic_gas": 818940,
+      "calldata_floor_gas": 2015850,
+      "approximate_total_gas": 2639990
+    },
+    {
+      "scenario": "listing",
+      "lines": 32,
+      "calldata_bytes": 95268,
+      "gross_call_gas": 2943293,
+      "ordinary_intrinsic_gas": 1293432,
+      "calldata_floor_gas": 3202080,
+      "approximate_total_gas": 4236725
+    },
+    {
+      "scenario": "simple",
+      "lines": 1,
+      "calldata_bytes": 1284,
+      "gross_call_gas": 113519,
+      "ordinary_intrinsic_gas": 29304,
+      "calldata_floor_gas": 41760,
+      "approximate_total_gas": 142823
+    },
+    {
+      "scenario": "simple",
+      "lines": 10,
+      "calldata_bytes": 3300,
+      "gross_call_gas": 294562,
+      "ordinary_intrinsic_gas": 41796,
+      "calldata_floor_gas": 72990,
+      "approximate_total_gas": 336358
+    },
+    {
+      "scenario": "simple",
+      "lines": 20,
+      "calldata_bytes": 5540,
+      "gross_call_gas": 495596,
+      "ordinary_intrinsic_gas": 55676,
+      "calldata_floor_gas": 107690,
+      "approximate_total_gas": 551272
+    },
+    {
+      "scenario": "simple",
+      "lines": 32,
+      "calldata_bytes": 8228,
+      "gross_call_gas": 737498,
+      "ordinary_intrinsic_gas": 72332,
+      "calldata_floor_gas": 149330,
+      "approximate_total_gas": 809830
+    },
+    {
+      "scenario": "simple",
+      "lines": 5,
+      "calldata_bytes": 2180,
+      "gross_call_gas": 194501,
+      "ordinary_intrinsic_gas": 34844,
+      "calldata_floor_gas": 55610,
+      "approximate_total_gas": 229345
+    },
+    {
+      "scenario": "simple",
+      "lines": 64,
+      "calldata_bytes": 15396,
+      "gross_call_gas": 1398823,
+      "ordinary_intrinsic_gas": 116676,
+      "calldata_floor_gas": 260190,
+      "approximate_total_gas": 1515499
+    }
+  ],
+  "comparisons": [
+    {
+      "scenario": "listing",
+      "lines": 1,
+      "calldata_bytes": 1956,
+      "baseline_approximate_gas": 192116,
+      "optimized_approximate_gas": 193438,
+      "gross_gas_saved": -1322,
+      "percent_approximate_gas_saved": -0.69
+    },
+    {
+      "scenario": "listing",
+      "lines": 10,
+      "calldata_bytes": 10020,
+      "baseline_approximate_gas": 869975,
+      "optimized_approximate_gas": 845243,
+      "gross_gas_saved": 24732,
+      "percent_approximate_gas_saved": 2.84
+    },
+    {
+      "scenario": "listing",
+      "lines": 20,
+      "calldata_bytes": 18980,
+      "baseline_approximate_gas": 1733465,
+      "optimized_approximate_gas": 1609139,
+      "gross_gas_saved": 124326,
+      "percent_approximate_gas_saved": 7.17
+    },
+    {
+      "scenario": "listing",
+      "lines": 32,
+      "calldata_bytes": 29732,
+      "baseline_approximate_gas": 2923086,
+      "optimized_approximate_gas": 2581925,
+      "gross_gas_saved": 341161,
+      "percent_approximate_gas_saved": 11.67
+    },
+    {
+      "scenario": "listing",
+      "lines": 5,
+      "calldata_bytes": 5540,
+      "baseline_approximate_gas": 481739,
+      "optimized_approximate_gas": 479423,
+      "gross_gas_saved": 2316,
+      "percent_approximate_gas_saved": 0.48
+    },
+    {
+      "scenario": "listing",
+      "lines": 64,
+      "calldata_bytes": 58404,
+      "baseline_approximate_gas": 6914210,
+      "optimized_approximate_gas": 5488488,
+      "gross_gas_saved": 1425722,
+      "percent_approximate_gas_saved": 20.62
+    },
+    {
+      "scenario": "mint",
+      "lines": 20,
+      "calldata_bytes": 20900,
+      "baseline_approximate_gas": 2931745,
+      "optimized_approximate_gas": 2807419,
+      "gross_gas_saved": 124326,
+      "percent_approximate_gas_saved": 4.24
+    },
+    {
+      "scenario": "mint",
+      "lines": 20,
+      "calldata_bytes": 61860,
+      "baseline_approximate_gas": 3967606,
+      "optimized_approximate_gas": 3843280,
+      "gross_gas_saved": 124326,
+      "percent_approximate_gas_saved": 3.13
+    },
+    {
+      "scenario": "listing",
+      "lines": 20,
+      "calldata_bytes": 59940,
+      "baseline_approximate_gas": 2764316,
+      "optimized_approximate_gas": 2639990,
+      "gross_gas_saved": 124326,
+      "percent_approximate_gas_saved": 4.5
+    },
+    {
+      "scenario": "listing",
+      "lines": 32,
+      "calldata_bytes": 95268,
+      "baseline_approximate_gas": 4577886,
+      "optimized_approximate_gas": 4236725,
+      "gross_gas_saved": 341161,
+      "percent_approximate_gas_saved": 7.45
+    },
+    {
+      "scenario": "simple",
+      "lines": 1,
+      "calldata_bytes": 1284,
+      "baseline_approximate_gas": 141501,
+      "optimized_approximate_gas": 142823,
+      "gross_gas_saved": -1322,
+      "percent_approximate_gas_saved": -0.93
+    },
+    {
+      "scenario": "simple",
+      "lines": 10,
+      "calldata_bytes": 3300,
+      "baseline_approximate_gas": 361090,
+      "optimized_approximate_gas": 336358,
+      "gross_gas_saved": 24732,
+      "percent_approximate_gas_saved": 6.85
+    },
+    {
+      "scenario": "simple",
+      "lines": 20,
+      "calldata_bytes": 5540,
+      "baseline_approximate_gas": 675598,
+      "optimized_approximate_gas": 551272,
+      "gross_gas_saved": 124326,
+      "percent_approximate_gas_saved": 18.4
+    },
+    {
+      "scenario": "simple",
+      "lines": 32,
+      "calldata_bytes": 8228,
+      "baseline_approximate_gas": 1150991,
+      "optimized_approximate_gas": 809830,
+      "gross_gas_saved": 341161,
+      "percent_approximate_gas_saved": 29.64
+    },
+    {
+      "scenario": "simple",
+      "lines": 5,
+      "calldata_bytes": 2180,
+      "baseline_approximate_gas": 231661,
+      "optimized_approximate_gas": 229345,
+      "gross_gas_saved": 2316,
+      "percent_approximate_gas_saved": 1.0
+    },
+    {
+      "scenario": "simple",
+      "lines": 64,
+      "calldata_bytes": 15396,
+      "baseline_approximate_gas": 2941221,
+      "optimized_approximate_gas": 1515499,
+      "gross_gas_saved": 1425722,
+      "percent_approximate_gas_saved": 48.47
+    }
+  ],
+  "source_sha256": {
+    "CartPayments.baseline.sol": "9ef216e184a3d016bcaf2fdb5cbadafeb475ee534121ecc9712762355fd23959",
+    "payout-candidate.txt": "4beb5576abe9b1aced75cce4201d01a679db287ae7b6a49c79c21c3ea517b083",
+    "src/cart/Cart.sol": "bf91c86f94a2f869e38d29b58ce9c0aabedc56080798dc26abab0619b6f33ea7",
+    "src/cart/CartHashing.sol": "db85426053e6c4b199a6d2b034e14a88ae05890e3140df05744b68ab802c4ccc",
+    "src/test/cart/Cart.t.sol": "b64b6b5cbec1b67de0f0fc4f14f04e0bce0a45664343f8929956300116ff798b",
+    "src/test/cart/CartGasCapacity.t.sol": "614f586b89056c3363205489017054b97bb023d4b672b121a3b66e055a4105bd"
+  },
+  "payout_group_shared_micro": [
+    {
+      "lines": 19,
+      "groups": 1,
+      "baseline_gas": 43012,
+      "optimized_gas": 52372,
+      "optimized_extra_gas": 9360
+    },
+    {
+      "lines": 32,
+      "groups": 1,
+      "baseline_gas": 67470,
+      "optimized_gas": 82265,
+      "optimized_extra_gas": 14795
+    },
+    {
+      "lines": 64,
+      "groups": 1,
+      "baseline_gas": 128227,
+      "optimized_gas": 156760,
+      "optimized_extra_gas": 28533
+    },
+    {
+      "lines": 9,
+      "groups": 1,
+      "baseline_gas": 24287,
+      "optimized_gas": 29153,
+      "optimized_extra_gas": 4866
+    },
+    {
+      "lines": 19,
+      "groups": 2,
+      "baseline_gas": 49587,
+      "optimized_gas": 53423,
+      "optimized_extra_gas": 3836
+    },
+    {
+      "lines": 32,
+      "groups": 2,
+      "baseline_gas": 78493,
+      "optimized_gas": 83333,
+      "optimized_extra_gas": 4840
+    },
+    {
+      "lines": 64,
+      "groups": 2,
+      "baseline_gas": 149417,
+      "optimized_gas": 157873,
+      "optimized_extra_gas": 8456
+    },
+    {
+      "lines": 9,
+      "groups": 2,
+      "baseline_gas": 27685,
+      "optimized_gas": 30188,
+      "optimized_extra_gas": 2503
+    }
+  ]
+}

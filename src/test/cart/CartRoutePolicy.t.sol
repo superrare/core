@@ -56,21 +56,28 @@ contract CartRoutePolicyTest is Test {
         policy.validate(hex"08", new bytes[](0));
     }
 
-    function testRejectsTooManyCommands() public {
+    function testAcceptsMoreThan32Commands() public {
         bytes memory commands = new bytes(33);
         bytes[] memory inputs = new bytes[](commands.length);
         for (uint256 i = 0; i < inputs.length; ++i) {
             inputs[i] = bytes("");
         }
 
-        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.RouteTooManyCommands.selector, commands.length));
         policy.validate(commands, inputs);
     }
 
-    function testRejectsTooManyInputs() public {
+    function testRejectsLargeMismatchedInputArray() public {
         bytes[] memory inputs = new bytes[](33);
-        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.RouteTooManyInputs.selector, 33));
+        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.CommandInputLengthMismatch.selector, 1, 33));
         policy.validate(hex"08", inputs);
+    }
+
+    function testStillRejectsUnsupportedCommandAfterFormerLimit() public {
+        bytes memory commands = new bytes(34);
+        bytes[] memory inputs = new bytes[](34);
+        commands[33] = bytes1(0x03);
+        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.CommandNotAllowed.selector, 33, bytes1(0x03)));
+        policy.validate(commands, inputs);
     }
 
     function testRejectsUnsupportedCommand() public {

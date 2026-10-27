@@ -1,0 +1,160 @@
+[
+  {
+    "transaction_hash": "0x65254aa73ce2016132e856932c5e3a632f28574b2cf9cff23afe467a4e2e4ef4",
+    "source": "https://eth-sepolia.blockscout.com/api/v2/transactions/0x65254aa73ce2016132e856932c5e3a632f28574b2cf9cff23afe467a4e2e4ef4",
+    "block": 11979843,
+    "total_lines": 3,
+    "none_lines": [
+      {
+        "line_index": 1,
+        "sku": "0xd71857967de4d0e7ab5e94c34fa12d18385adb7835378e3b8cd50854fa8532bb",
+        "kind": 0,
+        "quantity": 1,
+        "amount": 150000000000,
+        "currency": "0x0000000000000000000000000000000000000000",
+        "recipient": "0xba68422a154e459f7b4992a95ad358d412b6bd1d"
+      },
+      {
+        "line_index": 2,
+        "sku": "0x5954a86ab339d8c2cc5b8e43d71adcc39f27279f0b2a97a688912dc88f205bcd",
+        "kind": 0,
+        "quantity": 1,
+        "amount": 30000000000,
+        "currency": "0x0000000000000000000000000000000000000000",
+        "recipient": "0xba68422a154e459f7b4992a95ad358d412b6bd1d"
+      }
+    ],
+    "groups_by_sku_currency_recipient": [
+      {
+        "sku": "0xd71857967de4d0e7ab5e94c34fa12d18385adb7835378e3b8cd50854fa8532bb",
+        "currency": "0x0000000000000000000000000000000000000000",
+        "recipient": "0xba68422a154e459f7b4992a95ad358d412b6bd1d",
+        "line_count": 1,
+        "amount": 150000000000
+      },
+      {
+        "sku": "0x5954a86ab339d8c2cc5b8e43d71adcc39f27279f0b2a97a688912dc88f205bcd",
+        "currency": "0x0000000000000000000000000000000000000000",
+        "recipient": "0xba68422a154e459f7b4992a95ad358d412b6bd1d",
+        "line_count": 1,
+        "amount": 30000000000
+      }
+    ],
+    "commercial_purpose": "Not inferred from SKU hashes. Compatible accounting treatment remains a condition before aggregation."
+  },
+  {
+    "transaction_hash": "0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95",
+    "source": "https://eth-sepolia.blockscout.com/api/v2/transactions/0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95",
+    "block": 11979681,
+    "total_lines": 19,
+    "none_lines": [
+      {
+        "line_index": 9,
+        "sku": "0xd71857967de4d0e7ab5e94c34fa12d18385adb7835378e3b8cd50854fa8532bb",
+        "kind": 0,
+        "quantity": 1,
+        "amount": 150000000000,
+        "currency": "0x0000000000000000000000000000000000000000",
+        "recipient": "0xba68422a154e459f7b4992a95ad358d412b6bd1d"
+      },
+      {
+        "line_index": 10,
+        "sku": "0xd71857967de4d0e7ab5e94c34fa12d18385adb7835378e3b8cd50854fa8532bb",
+        "kind": 0,
+        "quantity": 1,
+        "amount": 150000000000,
+        "currency": "0x0000000000000000000000000000000000000000",
+        "recipient": "0xba68422a154e459f7b4992a95ad358d412b6bd1d"
+      },
+      {
+        "line_index": 11,
+        "sku": "0xd71857967de4d0e7ab5e94c34fa12d18385adb7835378e3b8cd50854fa8532bb",
+        "kind": 0,
+        "quantity": 1,
+        "amount": 150000000000,
+        "currency": "0x0000000000000000000000000000000000000000",
+        "recipient": "0xba68422a154e459f7b4992a95ad358d412b6bd1d"
+      },
+      {
+        "line_index": 12,
+        "sku": "0xd71857967de4d0e7ab5e94c34fa12d18385adb7835378e3b8cd50854fa8532bb",
+        "kind": 0,
+        "quantity": 1,
+        "amount": 150000000000,
+        "currency": "0x0000000000000000000000000000000000000000",
+        "recipient": "0xba68422a154e459f7b4992a95ad358d412b6bd1d"
+      },
+      {
+        "line_index": 13,
+        "sku": "0xd71857967de4d0e7ab5e94c34fa12d18385adb7835378e3b8cd50854fa8532bb",
+        "kind": 0,
+        "quantity": 1,
+        "amount": 150000000000,
+        "currency": "0x0000000000000000000000000000000000000000",
+        "recipient": "0xba68422a154e459f7b4992a95ad358d412b6bd1d"
+      },
+      {
+        "line_index": 14,
+        "sku": "0xd71857967de4d0e7ab5e94c34fa12d18385adb7835378e3b8cd50854fa8532bb",
+        "kind": 0,
+        "quantity": 1,
+        "amount": 150000000000,
+        "currency": "0x0000000000000000000000000000000000000000",
+        "recipient": "0xba68422a154e459f7b4992a95ad358d412b6bd1d"
+      },
+      {
+        "line_index": 15,
+        "sku": "0xd71857967de4d0e7ab5e94c34fa12d18385adb7835378e3b8cd50854fa8532bb",
+        "kind": 0,
+        "quantity": 1,
+        "amount": 150000000000,
+        "currency": "0x0000000000000000000000000000000000000000",
+        "recipient": "0xba68422a154e459f7b4992a95ad358d412b6bd1d"
+      },
+      {
+        "line_index": 16,
+        "sku": "0xd71857967de4d0e7ab5e94c34fa12d18385adb7835378e3b8cd50854fa8532bb",
+        "kind": 0,
+        "quantity": 1,
+        "amount": 150000000000,
+        "currency": "0x0000000000000000000000000000000000000000",
+        "recipient": "0xba68422a154e459f7b4992a95ad358d412b6bd1d"
+      },
+      {
+        "line_index": 17,
+        "sku": "0xd71857967de4d0e7ab5e94c34fa12d18385adb7835378e3b8cd50854fa8532bb",
+        "kind": 0,
+        "quantity": 1,
+        "amount": 150000000000,
+        "currency": "0x0000000000000000000000000000000000000000",
+        "recipient": "0xba68422a154e459f7b4992a95ad358d412b6bd1d"
+      },
+      {
+        "line_index": 18,
+        "sku": "0x5954a86ab339d8c2cc5b8e43d71adcc39f27279f0b2a97a688912dc88f205bcd",
+        "kind": 0,
+        "quantity": 1,
+        "amount": 270000000000,
+        "currency": "0x0000000000000000000000000000000000000000",
+        "recipient": "0xba68422a154e459f7b4992a95ad358d412b6bd1d"
+      }
+    ],
+    "groups_by_sku_currency_recipient": [
+      {
+        "sku": "0xd71857967de4d0e7ab5e94c34fa12d18385adb7835378e3b8cd50854fa8532bb",
+        "currency": "0x0000000000000000000000000000000000000000",
+        "recipient": "0xba68422a154e459f7b4992a95ad358d412b6bd1d",
+        "line_count": 9,
+        "amount": 1350000000000
+      },
+      {
+        "sku": "0x5954a86ab339d8c2cc5b8e43d71adcc39f27279f0b2a97a688912dc88f205bcd",
+        "currency": "0x0000000000000000000000000000000000000000",
+        "recipient": "0xba68422a154e459f7b4992a95ad358d412b6bd1d",
+        "line_count": 1,
+        "amount": 270000000000
+      }
+    ],
+    "commercial_purpose": "Not inferred from SKU hashes. Compatible accounting treatment remains a condition before aggregation."
+  }
+]

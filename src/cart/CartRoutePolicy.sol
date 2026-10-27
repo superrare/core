@@ -5,7 +5,7 @@ import {ICartRoutePolicy} from "./ICartRoutePolicy.sol";
 
 /// @notice Shallow default-deny validation for the Universal Router command families used by Cart.
 /// @dev Cart deliberately does not reimplement Universal Router planning. The router decodes and
-///      validates command inputs; this policy only bounds the opaque program and excludes commands
+///      validates command inputs; this policy checks array shape and excludes commands
 ///      that can move funds outside the supported settlement workflow.
 contract CartRoutePolicy is ICartRoutePolicy {
     uint8 private constant V3_SWAP_EXACT_IN = 0x00;
@@ -19,11 +19,8 @@ contract CartRoutePolicy is ICartRoutePolicy {
     uint8 private constant V4_SWAP = 0x10;
 
     uint8 private constant COMMAND_FLAGS_MASK = 0xc0;
-    uint256 public constant MAX_ROUTE_COMMANDS = 32;
 
     function validate(bytes calldata commands, bytes[] calldata inputs) external pure override {
-        if (commands.length > MAX_ROUTE_COMMANDS) revert RouteTooManyCommands(commands.length);
-        if (inputs.length > MAX_ROUTE_COMMANDS) revert RouteTooManyInputs(inputs.length);
         if (commands.length != inputs.length) {
             revert CommandInputLengthMismatch(commands.length, inputs.length);
         }

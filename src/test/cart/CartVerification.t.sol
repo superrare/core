@@ -5,6 +5,9 @@ import {IERC1271} from "openzeppelin-contracts/interfaces/IERC1271.sol";
 import {ECDSA} from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 
 import {ICart} from "../../cart/ICart.sol";
+import {CartLens} from "../../cart/CartLens.sol";
+import {ICartRoutePolicy} from "../../cart/ICartRoutePolicy.sol";
+import {ICartLens} from "../../cart/ICartLens.sol";
 import {
     CartTest,
     CartTestERC1155,
@@ -394,7 +397,7 @@ contract CartVerificationTest is CartTest {
         );
     }
 
-    function testFulfillmentActionArrayIsBoundedBeforeHashing() public {
+    function testLargeActionArrayStillRequiresOnChainListing() public {
         ICart.Listing memory listing =
             _listing(keccak256("action-count-bound"), ICart.FulfillmentKind.NONE, address(0), 0, sellerPayout);
         ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 1 ether);
@@ -409,14 +412,14 @@ contract CartVerificationTest is CartTest {
         bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
 
         vm.deal(payer, 1 ether);
-        vm.expectRevert(ICart.InvalidArrayLength.selector);
+        vm.expectRevert(abi.encodeWithSelector(ICart.InvalidFulfillmentAction.selector, 0));
         vm.prank(payer);
         cart.executePurchase{value: 1 ether}(
             order, lines, listings, authorization, _combineRoutes(routes), actions, platformSignature
         );
     }
 
-    function testMerkleProofDepthIsBoundedBeforeVerification() public {
+    function testDeepInvalidMerkleProofStillFailsVerification() public {
         ICart.Listing memory listing =
             _listing(keccak256("proof-depth-bound"), ICart.FulfillmentKind.NONE, address(0), 0, sellerPayout);
         ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 1 ether);
@@ -429,14 +432,76 @@ contract CartVerificationTest is CartTest {
         bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
 
         vm.deal(payer, 1 ether);
-        vm.expectRevert(abi.encodeWithSelector(ICart.MerkleProofTooDeep.selector, 0, 65));
+        CartLens lens = new CartLens();
+        ICartLens.ValidationResult memory validation = lens.validateListing(
+            address(cart),
+            listing,
+            authorization.listingRoots[0],
+            authorization.listingRootSignatures[0],
+            authorization.listingProofs[0],
+            1
+        );
+        assertFalse(validation.valid);
+        assertEq(uint256(validation.code), uint256(ICartLens.ValidationCode.INVALID_MERKLE_PROOF));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ICart.InvalidMerkleProof.selector,
+                authorization.listingRoots[0].listingsRoot,
+                hashes.hashListingLeaf(_listingDigest(listing))
+            )
+        );
         vm.prank(payer);
         cart.executePurchase{value: 1 ether}(
             order, lines, listings, authorization, _combineRoutes(routes), actions, platformSignature
         );
     }
 
-    function testRouteCommandCountIsBoundedBeforeHashing() public {
+    function testFuzzDeepMerkleProofCanExecute(uint8 extraDepth) public {
+        uint256 depth = 65 + uint256(extraDepth) % 64;
+        ICart.Listing memory listing =
+            _listing(keccak256("deep-proof-valid"), ICart.FulfillmentKind.OFF_CHAIN, address(0), 0, sellerPayout);
+        ICart.Listing[] memory listings = _singletonListing(listing);
+        ICart.ListingPurchaseAuthorization memory authorization = _rootAuthorization(listings, SELLER_PK);
+        authorization.listingProofs[0] = new bytes32[](depth);
+        bytes32 root = hashes.hashListingLeaf(_listingDigest(listing));
+        for (uint256 i; i < depth; ++i) {
+            bytes32 sibling = keccak256(abi.encode("deep-sibling", depth, i));
+            authorization.listingProofs[0][i] = sibling;
+            root = root < sibling
+                ? keccak256(abi.encodePacked(root, sibling))
+                : keccak256(abi.encodePacked(sibling, root));
+        }
+        authorization.listingRoots[0].listingsRoot = root;
+        authorization.listingRootSignatures[0] =
+            _sign(SELLER_PK, hashes.hashListingRoot(cart.DOMAIN_SEPARATOR(), authorization.listingRoots[0]));
+        CartLens lens = new CartLens();
+        assertTrue(
+            lens.validateListing(
+                address(cart),
+                listing,
+                authorization.listingRoots[0],
+                authorization.listingRootSignatures[0],
+                authorization.listingProofs[0],
+                1
+            )
+            .valid
+        );
+        ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 1 ether);
+        ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
+        ICart.FulfillmentAction[] memory actions = _noActions();
+        ICart.PurchaseOrder memory order = _order("deep-proof-valid", lines, routes, actions);
+        bytes memory signature = _sign(PLATFORM_PK, _orderDigest(order));
+        vm.deal(payer, 1 ether);
+        vm.prank(payer);
+        cart.executePurchase{value: 1 ether}(
+            order, lines, listings, authorization, _combineRoutes(routes), actions, signature
+        );
+        assertEq(cart.filledQuantity(_listingDigest(listing)), 1);
+        assertEq(sellerPayout.balance, 1 ether);
+        assertTrue(cart.executedOrderIds(order.orderId));
+    }
+
+    function testLargeRouteStillRequiresMatchingInputs() public {
         ICart.Listing memory listing =
             _listing(keccak256("route-command-bound"), ICart.FulfillmentKind.NONE, address(0), 0, sellerPayout);
         ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 1 ether);
@@ -449,14 +514,21 @@ contract CartVerificationTest is CartTest {
         bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
 
         vm.deal(payer, 1 ether);
-        vm.expectRevert(abi.encodeWithSelector(ICart.RouteTooManyCommands.selector, 33));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ICart.OrderLineFailed.selector,
+                0,
+                ICart.FailureStage.ROUTING,
+                abi.encodeWithSelector(ICartRoutePolicy.CommandInputLengthMismatch.selector, 33, 0)
+            )
+        );
         vm.prank(payer);
         cart.executePurchase{value: 1 ether}(
             order, lines, listings, authorization, _combineRoutes(routes), actions, platformSignature
         );
     }
 
-    function testRouteInputCountIsBoundedBeforeHashing() public {
+    function testLargeRouteInputsStillRequireMatchingCommands() public {
         ICart.Listing memory listing =
             _listing(keccak256("route-input-bound"), ICart.FulfillmentKind.NONE, address(0), 0, sellerPayout);
         ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 1 ether);
@@ -469,7 +541,14 @@ contract CartVerificationTest is CartTest {
         bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
 
         vm.deal(payer, 1 ether);
-        vm.expectRevert(abi.encodeWithSelector(ICart.RouteTooManyInputs.selector, 33));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ICart.OrderLineFailed.selector,
+                0,
+                ICart.FailureStage.ROUTING,
+                abi.encodeWithSelector(ICartRoutePolicy.CommandInputLengthMismatch.selector, 0, 33)
+            )
+        );
         vm.prank(payer);
         cart.executePurchase{value: 1 ether}(
             order, lines, listings, authorization, _combineRoutes(routes), actions, platformSignature
@@ -835,9 +914,11 @@ contract CartVerificationTest is CartTest {
         );
     }
 
-    function testErc721MintQuantityCannotExceedOperationLimit() public {
+    function testErc721MintQuantityAboveOldOperationLimitExecutes() public {
         CartTestMintableERC721 token = new CartTestMintableERC721();
         token.transferOwnership(seller);
+        vm.prank(seller);
+        token.setMinter(address(cart), true);
 
         ICart.Listing memory listing = _listingWithQuantity(
             keccak256("operation-limit"), ICart.FulfillmentKind.ERC721_MINT_TO, address(token), 0, sellerPayout, 0
@@ -847,7 +928,6 @@ contract CartVerificationTest is CartTest {
         NativePurchase memory purchase = _nativePurchase(listing, "operation-limit-order", 21, actions);
 
         vm.deal(payer, purchase.amount);
-        vm.expectRevert(ICart.MaxFulfillmentOperationsExceeded.selector);
         vm.prank(payer);
         cart.executePurchase{value: purchase.amount}(
             purchase.order,
@@ -859,7 +939,78 @@ contract CartVerificationTest is CartTest {
             purchase.platformSignature
         );
 
-        assertEq(cart.filledQuantity(_listingDigest(listing)), 0);
+        assertEq(cart.filledQuantity(_listingDigest(listing)), 21);
+        assertEq(token.balanceOf(collector), 21);
+        assertTrue(cart.executedOrderIds(purchase.order.orderId));
+    }
+
+    function testMoreThan20ActionsExecuteWithExactCoverage() public {
+        CartTestMintableERC721 token = new CartTestMintableERC721();
+        token.transferOwnership(seller);
+        vm.prank(seller);
+        token.setMinter(address(cart), true);
+        ICart.Listing memory listing = _listingWithQuantity(
+            keccak256("many-actions"), ICart.FulfillmentKind.ERC721_MINT_TO, address(token), 0, sellerPayout, 0
+        );
+        ICart.FulfillmentAction[] memory actions = new ICart.FulfillmentAction[](21);
+        for (uint256 i; i < actions.length; ++i) {
+            actions[i] = ICart.FulfillmentAction({lineIndex: 0, quantity: 1, recipient: collector});
+        }
+        NativePurchase memory purchase = _nativePurchase(listing, "many-actions", 21, actions);
+        assertTrue(
+            new CartLens()
+            .validatePurchaseEnvelope(
+                address(cart),
+                purchase.order,
+                purchase.lines,
+                _combineRoutes(purchase.routes),
+                actions,
+                purchase.platformSignature
+            )
+            .valid
+        );
+        vm.deal(payer, purchase.amount);
+        vm.prank(payer);
+        cart.executePurchase{value: purchase.amount}(
+            purchase.order,
+            purchase.lines,
+            purchase.listings,
+            purchase.authorization,
+            _combineRoutes(purchase.routes),
+            actions,
+            purchase.platformSignature
+        );
+        assertEq(token.balanceOf(collector), 21);
+        assertEq(cart.filledQuantity(_listingDigest(listing)), 21);
+    }
+
+    function testMoreThan32RouteCommandsReachRouterAndSettle() public {
+        router.configureMulti(new address[](0), new uint256[](0));
+        ICart.Listing memory listing =
+            _listing(keccak256("many-commands"), ICart.FulfillmentKind.NONE, address(0), 0, sellerPayout);
+        ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 1 ether);
+        ICart.Listing[] memory listings = _singletonListing(listing);
+        ICart.ListingPurchaseAuthorization memory authorization = _rootAuthorization(listings, SELLER_PK);
+        ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
+        routes[0].commands = new bytes(33);
+        routes[0].inputs = new bytes[](33);
+        ICart.FulfillmentAction[] memory actions = _noActions();
+        ICart.PurchaseOrder memory order = _order("many-commands", lines, routes, actions);
+        bytes memory signature = _sign(PLATFORM_PK, _orderDigest(order));
+        CartLens lens = new CartLens();
+        assertTrue(
+            lens.validatePurchaseEnvelope(address(cart), order, lines, _combineRoutes(routes), actions, signature).valid
+        );
+        assertTrue(lens.previewRoute(address(cart), _combineRoutes(routes)).valid);
+        vm.deal(payer, 1 ether);
+        uint256 beforePayout = sellerPayout.balance;
+        vm.prank(payer);
+        cart.executePurchase{value: 1 ether}(
+            order, lines, listings, authorization, _combineRoutes(routes), actions, signature
+        );
+        assertEq(router.lastInputCount(), 33);
+        assertEq(sellerPayout.balance - beforePayout, 1 ether);
+        assertTrue(cart.executedOrderIds(order.orderId));
     }
 
     function testPlatformSignerRotationInvalidatesOutstandingOrders() public {

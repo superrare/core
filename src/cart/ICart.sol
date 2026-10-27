@@ -90,6 +90,14 @@ interface ICart {
         address recipient;
     }
 
+    /// @notice ERC-721 token IDs discovered while executing one mint fulfillment action.
+    struct MintResult {
+        /// @dev Zero-based index in the supplied FulfillmentAction array.
+        uint256 fulfillmentActionIndex;
+        /// @dev Token IDs in mint-call order within that action.
+        uint256[] tokenIds;
+    }
+
     struct PurchaseOrder {
         /// @dev Unique id that prevents replay.
         bytes32 orderId;
@@ -185,7 +193,6 @@ interface ICart {
     error CancelledListingRoot(bytes32 rootDigest);
     error CancelledListing(bytes32 listingDigest);
     error InvalidMerkleProof(bytes32 root, bytes32 leaf);
-    error MerkleProofTooDeep(uint256 listingIndex, uint256 depth);
     error InvalidRootIndex(uint256 index);
     error InvalidOrderId();
     error InvalidOrderLinesHash();
@@ -200,11 +207,8 @@ interface ICart {
     error ListingNotFound(bytes32 listingDigest);
     error ListingQuantityExceeded(bytes32 listingDigest, uint256 available, uint256 requested);
     error ListingTermsMismatch(uint256 lineIndex);
-    error MaxFulfillmentOperationsExceeded();
     error NativeValueMismatch();
     error RouteValueWithoutCommands();
-    error RouteTooManyCommands(uint256 count);
-    error RouteTooManyInputs(uint256 count);
     error OrderLineFailed(uint256 lineIndex, FailureStage stage, bytes reason);
     error FulfillmentActionFailed(uint256 lineIndex, uint256 actionIndex, bytes reason);
 
@@ -217,6 +221,8 @@ interface ICart {
     ) external;
 
     /// @notice Executes a Purchase Order with one order-wide payment route.
+    /// @return mintResults One entry per ERC721_MINT_TO action, in fulfillment-action order.
+    ///         Other action kinds are omitted; no ERC-721 mint actions returns an empty array.
     function executePurchase(
         PurchaseOrder calldata order,
         OrderLine[] calldata lines,
@@ -225,7 +231,7 @@ interface ICart {
         PayoutRoute calldata route,
         FulfillmentAction[] calldata actions,
         bytes calldata platformSignature
-    ) external payable;
+    ) external payable returns (MintResult[] memory mintResults);
 
     /// @notice Cancels one seller root digest for future purchases.
     function cancelListingRoot(bytes32 rootDigest) external;
