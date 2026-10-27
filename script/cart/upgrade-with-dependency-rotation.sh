@@ -32,6 +32,12 @@ case "${1:-}" in
     ;;
 esac
 
+if [[ "${should_broadcast}" == true ]]; then
+  bash "${script_dir}/check-checkout.sh" --remote
+else
+  bash "${script_dir}/check-checkout.sh"
+fi
+
 : "${RPC_URL:?RPC_URL environment variable is required}"
 : "${PRIVATE_KEY:?PRIVATE_KEY environment variable is required}"
 

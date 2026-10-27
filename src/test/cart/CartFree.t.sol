@@ -69,6 +69,58 @@ contract CartFreeTest is CartTest {
     assertEq(cart.filledQuantity(_listingDigest(listings[1])), 1);
   }
 
+  function testLargeFreeOrderPassesLensAndFillsEveryListing() public {
+    uint256 count = 65;
+    ICart.Listing[] memory listings = new ICart.Listing[](count);
+    ICart.OrderLine[] memory lines = new ICart.OrderLine[](count);
+    for (uint256 i; i < count; ++i) {
+      listings[i] = _listing(
+        keccak256(abi.encode("large-free", i)),
+        ICart.FulfillmentKind.OFF_CHAIN,
+        address(0),
+        0,
+        sellerPayout
+      );
+      listings[i].minimumUnitPrice = 0;
+    }
+    // Reverse line order so each lookup must resolve the signed Listing digest.
+    for (uint256 i; i < count; ++i) {
+      lines[i] = _lineForListing(listings[count - i - 1], 1, 0)[0];
+    }
+    ICart.ListingPurchaseAuthorization memory authorization = _rootAuthorization(listings, SELLER_PK);
+    ICart.FulfillmentAction[] memory actions = new ICart.FulfillmentAction[](0);
+    ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
+    ICart.PayoutRoute memory route = _combineRoutes(routes);
+    ICart.PurchaseOrder memory order = _order("large-free-order", lines, routes, actions);
+    bytes memory signature = _sign(PLATFORM_PK, _orderDigest(order));
+    CartLens lens = new CartLens();
+    for (uint256 i; i < count; ++i) {
+      ICartLens.ValidationResult memory result = lens.validateListing(
+        address(cart),
+        listings[i],
+        authorization.listingRoots[i],
+        authorization.listingRootSignatures[i],
+        authorization.listingProofs[i],
+        1
+      );
+      assertTrue(result.valid);
+    }
+    ICartLens.ValidationResult memory envelope =
+      lens.validatePurchaseEnvelope(address(cart), order, lines, route, actions, signature);
+    assertTrue(envelope.valid);
+    assertEq(order.paymentAmount, 0);
+    vm.deal(payer, 0);
+    vm.prank(payer);
+    ICart.MintResult[] memory mintResults =
+      cart.executePurchase(order, lines, listings, authorization, route, actions, signature);
+    assertEq(mintResults.length, 0);
+    assertTrue(cart.executedOrderIds(order.orderId));
+    assertEq(sellerPayout.balance, 0);
+    for (uint256 i; i < count; ++i) {
+      assertEq(cart.filledQuantity(_listingDigest(listings[i])), 1);
+    }
+  }
+
   function testFreeOrderStillRequiresPlatformSignature() public {
     ICart.Listing memory listing = _listing(
       keccak256("unsigned-free"),
@@ -108,8 +160,12 @@ contract CartFreeTest is CartTest {
     ICart.FulfillmentAction[] memory actions = new ICart.FulfillmentAction[](1);
     actions[0] = ICart.FulfillmentAction({lineIndex: 0, quantity: 1, recipient: collector});
 
-    _executeNativeListing(listing, "free-721-order", 1, actions);
+    ICart.MintResult[] memory mintResults = _executeNativeListing(listing, "free-721-order", 1, actions);
 
+    assertEq(mintResults.length, 1);
+    assertEq(mintResults[0].fulfillmentActionIndex, 0);
+    assertEq(mintResults[0].tokenIds.length, 1);
+    assertEq(mintResults[0].tokenIds[0], 1);
     assertEq(token.ownerOf(1), collector);
     assertEq(cart.filledQuantity(_listingDigest(listing)), 1);
     vm.expectRevert();
