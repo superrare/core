@@ -1,6 +1,6 @@
 # Cart resource policy
 
-Updated October 26, 2026. This describes workspace source, not deployed contract behavior.
+This describes the current contract source. Chain-specific deployment evidence is linked from the [Cart index](cart.md#deployment-records).
 
 Cart, CartLens, and CartRoutePolicy impose no numerical resource caps on Order Lines, Fulfillment Actions, expanded NFT operations, Merkle-proof depth, or route commands and inputs. The backend transaction builder owns admission policy. The transaction gas limit still bounds execution.
 

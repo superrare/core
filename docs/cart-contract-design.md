@@ -6,10 +6,12 @@ The cart is a generic atomic settlement contract for on-chain and off-chain comm
 
 See [Commerce language](../CONTEXT.md), [ADR 0001](./adr/0001-cart-route-policy.md), and [ADR 0002](./adr/0002-uups-cart-for-stable-approvals.md).
 
+The [Cart index](cart.md) maps the contracts, integration guidance, and deployment records. `ICart.sol` and `CartHashing.sol` define the canonical ABI and signed types.
+
 ## Decision: caller-funded execution
 
-The pre-deployment design removes seller-submitted accept-offer transactions and buyer-signed
-purchase details. A Purchase Order is authorized by the platform signature, its referenced Listings
+Purchase execution uses platform authorization and seller Listings without seller-submitted
+accept-offer transactions or buyer-signed purchase details. A Purchase Order is authorized by the platform signature, its referenced Listings
 are authorized by sellers, and `msg.sender` is the payer. `paymentSource` is intentionally absent
 from the signed order and calldata because it cannot differ from the caller. The `PurchaseExecuted`
 event still indexes the derived payer for reconciliation. Fulfillment recipients remain independent
@@ -83,8 +85,8 @@ struct FulfillmentAction {
 struct PurchaseOrder {
     bytes32 orderId;
     address paymentCurrency;
-    uint256 paymentAmount;
     uint256 deadline;
+    uint256 paymentAmount;
     bytes32 orderLinesHash;
     bytes32 payoutRouteHash;
     bytes32 fulfillmentActionsHash;
@@ -121,7 +123,8 @@ The cart exposes `DOMAIN_SEPARATOR()` and otherwise leaves digest construction t
 - There is at least one Order Line. The backend owns resource admission.
 - Supplied Listings cannot exceed Order Lines, and supplied Listing Roots cannot exceed Listings.
 - The Purchase Order has one order-wide Payout Route covering the complete settlement-currency basket.
-- SKU, amount, quantity, and payment recipient are nonzero.
+- SKU, quantity, and payment recipient are nonzero. The payment recipient cannot be the Cart proxy.
+- Line amounts and the fixed payment amount may be zero. Free purchases retain authorization, inventory, fulfillment, replay, and balance checks.
 - Duplicate SKUs and duplicate Listing references are permitted.
 - A successful transaction marks the order executed before external calls; any later revert rolls that write back.
 
@@ -184,6 +187,7 @@ The supported mint selectors are exact known interfaces. A collection with an in
 - ERC-1155 quantities and ERC-721 mint quantities may be divided among recipients.
 - Each ERC-721 mint unit requires a separate mint call. ERC-721 transfers and ERC-1155 transfers or mints require one call per action. The backend accounts for these costs during admission.
 - NFT owners and collection creators approve the cart proxy directly. The cart performs native transfers and supported mint calls itself.
+- `executePurchase` returns `MintResult[]` for ERC-721 mint actions. Each result contains the action index and token IDs in mint-call order. Settlement events remain the receipt source for transaction consumers.
 
 ## Currency Funding and Routing
 
@@ -302,7 +306,7 @@ Each line recipient receives exactly its signed `amount`. `ProtocolSpreadCapture
 
 ## Administration and Upgrade Safety
 
-The cart is a UUPS proxy owned by the protocol multisig. OpenZeppelin's inherited linear storage and Cart's namespaced storage must be preserved across upgrades. Cart-owned state is organized into three ERC-7201 namespaces: `CartConfig` for configuration and pause state, `CartListings` for seller Listing state, and `CartSettlement` for Purchase Order replay state. The reviewed pre-deployment baseline is documented in `src/cart/Cart.storage-layout.json` and exercised by the proxy-upgrade canary in `src/test/cart/CartStorageLayout.t.sol`; obsolete offer-authorization fields are intentionally absent because no deployment compatibility is required. Owner powers are limited to platform-signer rotation, pause/unpause, and implementation upgrades. Pausing blocks only Purchase Order execution; Listing Root cancellation and nonce invalidation remain available.
+The cart uses a UUPS proxy, with protocol multisig ownership as the governance design. Deployment ownership is configured separately. OpenZeppelin's inherited linear storage and Cart's namespaced storage must be preserved across upgrades. Cart-owned state is organized into three ERC-7201 namespaces: `CartConfig` for configuration and pause state, `CartListings` for seller Listing state, and `CartSettlement` for Purchase Order replay state. The storage baseline is documented in `src/cart/Cart.storage-layout.json` and exercised by the proxy-upgrade canary in `src/test/cart/CartStorageLayout.t.sol`. Existing proxy state and signatures must survive compatible upgrades. The owner can rotate the platform signer and protocol spread recipient, pause or unpause purchases, transfer ownership, and authorize implementation upgrades. Pausing blocks only Purchase Order execution; seller Listing and Listing Root cancellation and nonce invalidation remain available.
 
 Every cart implementation is constructed with the route policy address, so each upgrade names the policy it was audited against.
 
@@ -326,7 +330,7 @@ Implementation acceptance includes unit, invariant, fuzz, and fork coverage for:
   inventory, and fill rollback.
 - Every Fulfillment kind, ownership transition, approval loss, mint incompatibility, recipient splitting, and execution above the former count caps.
 - Empty direct routes and opaque V2/V3/V4, wrap/unwrap, sweep, and Permit2 transfer-from command programs.
-- Shallow default rejection of unsupported Universal Router command families, command flags, input-count mismatches, and oversized programs; Universal Router owns nested-action, path, recipient, currency, and route-content validation.
+- Shallow default rejection of unsupported Universal Router command families, command flags, and input-count mismatches; Universal Router owns nested-action, path, recipient, currency, and route-content validation. The backend admits program size against gas and byte budgets.
 - Native/ERC-20 inputs and outputs, exact signed funding, output and input Protocol Spread, failed native recipients, fee-on-transfer tokens, temporary allowance cleanup, and balance isolation.
 - Stateful repeated-purchase invariants for supported Cart baselines, ETH/WETH custody, and both temporary approval layers.
 - Indexed error attribution for every line, action, and failure stage.

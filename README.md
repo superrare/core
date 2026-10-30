@@ -4,6 +4,7 @@ This repository contains the Solidity contracts that power Rare Protocol's marke
 
 ## Table of contents
 
+- [Cart commerce](docs/cart.md)
 - [Quick reference](#quick-reference)
 - [Marketplace](#marketplace)
   - [`SuperRareBazaar` — single-token marketplace](#superrarebazaar--single-token-marketplace)
@@ -36,6 +37,7 @@ This repository contains the Solidity contracts that power Rare Protocol's marke
 
 | What you want to do | Use this |
 |---|---|
+| Settle a platform-signed purchase with seller-authorized Listings, multiple payouts, and optional NFT or off-chain fulfillment | [Cart commerce](docs/cart.md) |
 | List, offer on, or auction a **single** token | [`SuperRareBazaar`](#superrarebazaar--single-token-marketplace) |
 | Run a public mint (blind or sequential) of newly-created tokens | [`RareMinter`](#rareminter--blind--sequential-lazy-minting) + [`LazySovereignNFT`](#lazysovereignnft--token-contract-for-rareminter-drops) |
 | Prep a large drop for sale or auction | [`LazySovereignBatchMint`](#lazysovereignbatchmint--lazy-batch-drops) |
