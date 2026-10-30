@@ -8,7 +8,7 @@ Remove the global recipient getter, setter, and configuration-change event. Keep
 
 ## Reason
 
-The fixed quote already binds the payment amount, line obligations, route, and fulfillment actions. Binding the surplus destination makes the quote's settlement terms complete. An owner transaction cannot redirect the spread of an outstanding quote after signing.
+The fixed quote already binds the payment amount, line obligations, route, and fulfillment actions. Binding the surplus destination makes the quote's settlement terms complete. There is no recipient setter that can redirect an outstanding quote after signing. The owner retains its broader implementation-upgrade authority.
 
 The platform signer can authorize any nonzero spread destination. The signing service must enforce its treasury policy. This expands the signer's explicit authority over spread destinations. The previous global setting kept that authority with the contract owner and let treasury rotation redirect all outstanding orders.
 

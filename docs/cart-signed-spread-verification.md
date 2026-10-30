@@ -1,6 +1,6 @@
 # Signed spread-recipient verification
 
-The comparison baseline is PR #26 revision `1df23430daa9aef0911f31b823950f5412e4154b`, immediately after the behavior-preserving cleanup. This migration intentionally changes the checkout interface and signature type.
+The comparison baseline is PR #26 revision `1df23430daa9aef0911f31b823950f5412e4154b`, immediately after the behavior-preserving cleanup. This migration intentionally changes the checkout interface and signature type. The final verification also includes the adversarial-test additions from PR commit `76e710f`.
 
 ## Contract behavior and compatibility
 
@@ -14,7 +14,7 @@ The upgrade helpers deploy matching executor and hashing helpers or fail before 
 
 ## Tests
 
-The final `FOUNDRY_PROFILE=cart forge test --offline --gas-report` run passes 218 tests across 20 suites with no failures or skips. Both stateful invariants complete 256 runs and 128,000 calls with zero reverts. Coverage includes recipient tampering, independently encoded typed-data hashing, old-format signature rejection, signed zero rejection, successive native and multi-token recipients, preexisting-balance protection, retired-slot isolation, and atomic rollback after recipient failure. Lens checks a genuinely signed zero recipient and a valid replacement.
+The final `FOUNDRY_PROFILE=cart forge test --offline --gas-report` run passes 244 tests across 21 suites with no failures or skips. Both stateful invariants complete 256 runs and 128,000 calls with zero reverts. Coverage includes recipient tampering, independently encoded typed-data hashing, old-format signature rejection, signed zero rejection, successive native and multi-token recipients, preexisting-balance protection, retired-slot isolation, and atomic rollback after recipient failure. Lens checks a genuinely signed zero recipient and a valid replacement.
 
 The final build also type-checks the upgrade scripts, Ethereum router-template test, and formal-verification builders. The RPC-backed fork execution was not run because `ETH_MAINNET_RPC_URL` is not configured. Formal proofs were not rerun; saved proof results predate this change.
 

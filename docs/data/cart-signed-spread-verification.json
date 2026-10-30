@@ -1,4 +1,14 @@
 {
+  "tests": {
+    "passed": 244,
+    "suites": 21,
+    "failed": 0,
+    "skipped": 0,
+    "invariants": 2,
+    "runsPerInvariant": 256,
+    "callsPerInvariant": 128000
+  },
+  "mergedAdversarialCommit": "76e710fac02df9ef48eaa86386876a040c588198",
   "inheritedStorageEntries": 14,
   "compiledSourceHashes": "match current source files",
   "unchangedWitnessTypehashes": true,

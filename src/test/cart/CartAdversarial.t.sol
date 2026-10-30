@@ -475,12 +475,15 @@ contract CartAdversarialTest is CartFixture {
         cart.setPaused(true);
         vm.expectRevert("Ownable: caller is not the owner");
         cart.setPlatformSigner(payer);
-        vm.expectRevert("Ownable: caller is not the owner");
-        cart.setProtocolRecipient(payer);
+        // Retired global-recipient selectors are unavailable to every caller.
+        (bool recipientSetterAvailable,) =
+            address(cart).call(abi.encodeWithSignature("setProtocolRecipient(address)", payer));
+        assertFalse(recipientSetterAvailable);
         vm.stopPrank();
         assertFalse(cart.paused());
         assertEq(cart.platformSigner(), platformSigner);
-        assertEq(cart.protocolRecipient(), address(this));
+        (bool recipientGetterAvailable,) = address(cart).staticcall(abi.encodeWithSignature("protocolRecipient()"));
+        assertFalse(recipientGetterAvailable);
     }
 
     function testImplementationCannotInitialize() public {
