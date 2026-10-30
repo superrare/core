@@ -89,4 +89,17 @@ contract CartRoutePolicyTest is CartRoutePolicyFixture {
         vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.CommandFlagsNotAllowed.selector, 0, bytes1(0x80)));
         policy.validate(hex"80", inputs);
     }
+
+    function testRejectsFundMovingCommandsAndFlags() public {
+        bytes memory commands = hex"05060a0d4084";
+        bytes[] memory inputs = new bytes[](1);
+        for (uint256 i; i < commands.length; ++i) {
+            bytes1 command = commands[i];
+            bytes4 selector = uint8(command) & 0xc0 != 0
+                ? ICartRoutePolicy.CommandFlagsNotAllowed.selector
+                : ICartRoutePolicy.CommandNotAllowed.selector;
+            vm.expectRevert(abi.encodeWithSelector(selector, 0, command));
+            policy.validate(abi.encodePacked(command), inputs);
+        }
+    }
 }

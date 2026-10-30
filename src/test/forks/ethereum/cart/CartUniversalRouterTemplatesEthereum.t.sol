@@ -470,6 +470,70 @@ contract CartUniversalRouterCartEthereumTest is Test {
         assertEq(IERC20Template(DAI).balanceOf(address(0x1401)), 0);
     }
 
+    function testCartRealRouterThirdPartyV3OutputRollsBack() public {
+        address attacker = address(0xBAD);
+        uint256 quote = 0.001 ether;
+        vm.deal(address(cart), 2 ether);
+        deal(WETH, address(cart), 3 ether);
+        deal(USDC, address(cart), 4_000_000);
+        deal(DAI, address(cart), 5 ether);
+        uint256 attackerBefore = IERC20Template(DAI).balanceOf(attacker);
+        ICart.PayoutRoute memory route = _nativeV3DaiToRecipientRoute(quote, attacker);
+        ICart.OrderLine[] memory lines = new ICart.OrderLine[](1);
+        lines[0] = _currencyLine(DAI, 1, address(0x1401), "third-party-output");
+        ICart.PurchaseOrder memory order = _order("third-party-output", address(0), quote, lines, route);
+        bytes memory signature = _sign(_orderDigest(order));
+        vm.deal(address(this), quote);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ICart.OrderLineFailed.selector, 0, ICart.FailureStage.ROUTING, abi.encode(uint256(0), uint256(1))
+            )
+        );
+        cart.executePurchase{value: quote}(
+            order,
+            lines,
+            new ICart.Listing[](0),
+            _emptyAuthorization(),
+            route,
+            new ICart.FulfillmentAction[](0),
+            signature
+        );
+        assertFalse(cart.executedOrderIds(order.orderId));
+        assertEq(address(this).balance, quote);
+        assertEq(IERC20Template(DAI).balanceOf(attacker), attackerBefore);
+        _assertCartBaselines(2 ether, 3 ether, 4_000_000, 5 ether);
+    }
+
+    function testCartRealRouterSweepCannotSpendUnnamedCartToken() public {
+        address attacker = address(0xBAD);
+        uint256 quote = 0.001 ether;
+        vm.deal(address(cart), 2 ether);
+        deal(WETH, address(cart), 3 ether);
+        deal(USDC, address(cart), 4_000_000);
+        // DAI is absent from both the payment currency and the settlement lines.
+        deal(DAI, address(cart), 5 ether);
+        deal(DAI, UNIVERSAL_ROUTER, 7 ether);
+        uint256 attackerBefore = IERC20Template(DAI).balanceOf(attacker);
+        ICart.PayoutRoute memory route;
+        route.commands = hex"0b0004";
+        route.inputs = new bytes[](3);
+        route.inputs[0] = abi.encode(address(2), quote);
+        route.inputs[1] = abi.encode(address(1), quote, 1, abi.encodePacked(WETH, uint24(500), USDC), false);
+        route.inputs[2] = abi.encode(DAI, attacker, 0);
+        route.routerValue = quote;
+        ICart.OrderLine[] memory lines = new ICart.OrderLine[](1);
+        lines[0] = _currencyLine(USDC, 1, address(0x1402), "unnamed-token-sweep");
+        vm.deal(address(this), quote);
+        _executeNative("unnamed-token-sweep", quote, lines, route);
+        assertEq(IERC20Template(DAI).balanceOf(attacker), attackerBefore + 7 ether);
+        assertEq(IERC20Template(DAI).balanceOf(UNIVERSAL_ROUTER), 0);
+        assertEq(IERC20Template(USDC).balanceOf(address(0x1402)), 1);
+        assertEq(IERC20Template(DAI).allowance(address(cart), PERMIT2), 0);
+        (uint160 amount,,) = IPermit2Template(PERMIT2).allowance(address(cart), DAI, UNIVERSAL_ROUTER);
+        assertEq(amount, 0);
+        _assertCartBaselines(2 ether, 3 ether, 4_000_000, 5 ether);
+    }
+
     function testCartMixedV2V3V4Plan() public {
         uint256 directAmount = 0.001 ether;
         uint256 v2Amount = 0.001 ether;

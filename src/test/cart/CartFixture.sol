@@ -54,6 +54,29 @@ abstract contract CartFixture is Test {
         cart = Cart(payable(address(new ERC1967Proxy(address(implementation), initData))));
     }
 
+    function _signedInnerPurchase() internal returns (bytes memory) {
+        ICart.Listing memory listing =
+            _listing(keccak256("inner"), ICart.FulfillmentKind.NONE, address(0), 0, sellerPayout);
+        ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 1 ether);
+        ICart.Listing[] memory listings = _singletonListing(listing);
+        ICart.ListingPurchaseAuthorization memory authorization = _rootAuthorization(listings, SELLER_PK);
+        ICart.PayoutRoute memory route = _emptyRoute();
+        ICart.FulfillmentAction[] memory actions = new ICart.FulfillmentAction[](0);
+        ICart.PurchaseOrder memory order = _order("signed-inner-purchase", lines, route, actions);
+        return abi.encodeCall(
+            Cart.executePurchase,
+            (
+                order,
+                lines,
+                listings,
+                authorization,
+                route,
+                actions,
+                _sign(PLATFORM_PK, _orderDigest(order))
+            )
+        );
+    }
+
     function _listing(
         bytes32 listingSeed,
         ICart.FulfillmentKind fulfillmentKind,

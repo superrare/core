@@ -269,6 +269,7 @@ contract ReentrantERC721 is ERC721 {
     bytes internal reentryData;
     bool public reentryAttempted;
     bool public reentrySucceeded;
+    bytes public reentryResult;
 
     constructor(Cart cart_) ERC721("Reentrant Cart NFT", "RCNFT") {
         cart = cart_;
@@ -297,7 +298,7 @@ contract ReentrantERC721 is ERC721 {
     function _attemptReentry() private {
         if (reentryData.length == 0) return;
         reentryAttempted = true;
-        (reentrySucceeded,) = address(cart).call(reentryData);
+        (reentrySucceeded, reentryResult) = address(cart).call{value: 1 ether}(reentryData);
     }
 }
 
@@ -343,6 +344,7 @@ contract ReentrantERC1155 is ERC1155 {
     bytes internal reentryData;
     bool public reentryAttempted;
     bool public reentrySucceeded;
+    bytes public reentryResult;
 
     constructor(Cart cart_) ERC1155("") {
         cart = cart_;
@@ -368,7 +370,7 @@ contract ReentrantERC1155 is ERC1155 {
     function _attemptReentry() private {
         if (reentryData.length == 0) return;
         reentryAttempted = true;
-        (reentrySucceeded,) = address(cart).call(reentryData);
+        (reentrySucceeded, reentryResult) = address(cart).call{value: 1 ether}(reentryData);
     }
 }
 
@@ -415,6 +417,7 @@ contract ReentrantFulfillmentReceiver {
     bytes internal reentryData;
     bool public reentryAttempted;
     bool public reentrySucceeded;
+    bytes public reentryResult;
 
     constructor(Cart cart_) {
         cart = cart_;
@@ -437,6 +440,6 @@ contract ReentrantFulfillmentReceiver {
     function _attemptReentry() private {
         if (reentryData.length == 0) return;
         reentryAttempted = true;
-        (reentrySucceeded,) = address(cart).call(reentryData);
+        (reentrySucceeded, reentryResult) = address(cart).call{value: 1 ether}(reentryData);
     }
 }
