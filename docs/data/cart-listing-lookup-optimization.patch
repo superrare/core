@@ -1,0 +1,85 @@
+--- a/src/cart/Cart.sol
++++ b/src/cart/Cart.sol
+@@ -299,6 +299,14 @@
+     resolvedDigests = new bytes32[](listings.length);
+     bool[] memory rootVerified = new bool[](authorization.listingRoots.length);
+     address[] memory rootSellers = new address[](authorization.listingRoots.length);
++    // Digests already distribute uniformly. Store index + 1 so zero marks an empty slot.
++    // Single-listing purchases keep the direct lookup path without allocating a table.
++    uint256[] memory digestIndex;
++    if (listings.length > 1) {
++      uint256 size = 1;
++      while (size < listings.length * 2) size <<= 1;
++      digestIndex = new uint256[](size);
++    }
+ 
+     for (uint256 i = 0; i < listings.length; ++i) {
+       // Select the root that authorizes this listing.
+@@ -347,9 +355,8 @@
+         revert InvalidMerkleProof(root.listingsRoot, CartHashing.hashListingLeaf(digest));
+       }
+ 
+-      for (uint256 j = 0; j < i; ++j) {
+-        // Do not accept the same listing more than once in the supplied array.
+-        if (resolvedDigests[j] == digest) revert DuplicateListingDigest(digest);
++      if (listings.length > 1) {
++        _indexListingDigest(resolvedDigests, digestIndex, digest, i);
+       }
+       // Save the verified digest at the listing's array index.
+       resolvedDigests[i] = digest;
+@@ -365,14 +372,7 @@
+         lineListing[i] = NO_LISTING;
+         continue;
+       }
+-      // Search the verified listing digests for the digest named by this line.
+-      uint256 index = NO_LISTING;
+-      for (uint256 j = 0; j < resolvedDigests.length; ++j) {
+-        if (resolvedDigests[j] == target) {
+-          index = j;
+-          break;
+-        }
+-      }
++      uint256 index = _findListingDigest(resolvedDigests, digestIndex, target);
+       if (index == NO_LISTING) revert ListingNotFound(target);
+       // Mark the listing as used by an order line.
+       referenced[index] = true;
+@@ -382,6 +382,39 @@
+       // Every supplied listing must be used by one order line.
+       if (!referenced[i]) revert ExtraListing(i);
+     }
++  }
++
++  /// @dev Full-digest comparison handles bucket collisions and rejects duplicates.
++  function _indexListingDigest(
++    bytes32[] memory digests,
++    uint256[] memory index,
++    bytes32 digest,
++    uint256 listingIndex
++  ) private pure {
++    uint256 mask = index.length - 1;
++    uint256 slot = uint256(digest) & mask;
++    while (index[slot] != 0) {
++      if (digests[index[slot] - 1] == digest) revert DuplicateListingDigest(digest);
++      slot = (slot + 1) & mask;
++    }
++    index[slot] = listingIndex + 1;
++  }
++
++  function _findListingDigest(
++    bytes32[] memory digests,
++    uint256[] memory index,
++    bytes32 target
++  ) private pure returns (uint256) {
++    if (digests.length == 0) return NO_LISTING;
++    if (digests.length == 1) return digests[0] == target ? 0 : NO_LISTING;
++    uint256 mask = index.length - 1;
++    uint256 slot = uint256(target) & mask;
++    while (index[slot] != 0) {
++      uint256 candidate = index[slot] - 1;
++      if (digests[candidate] == target) return candidate;
++      slot = (slot + 1) & mask;
++    }
++    return NO_LISTING;
+   }
+ 
+   function _validateOrderHashes(

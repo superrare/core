@@ -1,0 +1,74 @@
+[
+  {
+    "merchandise_count": 15,
+    "grouped_compatible_fees": true,
+    "shared_seller_root": true,
+    "line_count": 17,
+    "calldata_bytes": 13284,
+    "gross_call_gas": 926564,
+    "ordinary_intrinsic_gas": 132636,
+    "calldata_floor_gas": 300090,
+    "approximate_total_gas": 1059200,
+    "model": "OFF_CHAIN merchandise, same seller and payment recipient, two charge purposes, native payment; local current-working-tree fixture, approximate transaction gas"
+  },
+  {
+    "merchandise_count": 15,
+    "grouped_compatible_fees": false,
+    "shared_seller_root": true,
+    "line_count": 31,
+    "calldata_bytes": 16420,
+    "gross_call_gas": 1110657,
+    "ordinary_intrinsic_gas": 155080,
+    "calldata_floor_gas": 356200,
+    "approximate_total_gas": 1265737,
+    "model": "OFF_CHAIN merchandise, same seller and payment recipient, two charge purposes, native payment; local current-working-tree fixture, approximate transaction gas"
+  },
+  {
+    "merchandise_count": 9,
+    "grouped_compatible_fees": true,
+    "shared_seller_root": true,
+    "line_count": 11,
+    "calldata_bytes": 8676,
+    "gross_call_gas": 612348,
+    "ordinary_intrinsic_gas": 92880,
+    "calldata_floor_gas": 200700,
+    "approximate_total_gas": 705228,
+    "model": "OFF_CHAIN merchandise, same seller and payment recipient, two charge purposes, native payment; local current-working-tree fixture, approximate transaction gas"
+  },
+  {
+    "merchandise_count": 9,
+    "grouped_compatible_fees": false,
+    "shared_seller_root": true,
+    "line_count": 19,
+    "calldata_bytes": 10468,
+    "gross_call_gas": 717176,
+    "ordinary_intrinsic_gas": 105712,
+    "calldata_floor_gas": 232780,
+    "approximate_total_gas": 822888,
+    "model": "OFF_CHAIN merchandise, same seller and payment recipient, two charge purposes, native payment; local current-working-tree fixture, approximate transaction gas"
+  },
+  {
+    "merchandise_count": 9,
+    "grouped_compatible_fees": true,
+    "shared_seller_root": false,
+    "line_count": 11,
+    "calldata_bytes": 9572,
+    "gross_call_gas": 675858,
+    "ordinary_intrinsic_gas": 92948,
+    "calldata_floor_gas": 200870,
+    "approximate_total_gas": 768806,
+    "model": "OFF_CHAIN merchandise, same seller and payment recipient, two charge purposes, native payment; local current-working-tree fixture, approximate transaction gas"
+  },
+  {
+    "merchandise_count": 30,
+    "grouped_compatible_fees": true,
+    "shared_seller_root": true,
+    "line_count": 32,
+    "calldata_bytes": 25764,
+    "gross_call_gas": 1785623,
+    "ordinary_intrinsic_gas": 248244,
+    "calldata_floor_gas": 589110,
+    "approximate_total_gas": 2033867,
+    "model": "OFF_CHAIN merchandise, same seller and payment recipient, two charge purposes, native payment; local current-working-tree fixture, approximate transaction gas"
+  }
+]

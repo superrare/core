@@ -1,0 +1,255 @@
+{
+  "chainId": 11155111,
+  "proxy": "0x1ebf35b3a76caef60a009d2786a66a91d42a38bc",
+  "contracts": {
+    "CartPayments": "0x29009e5b49833ad5ad9fdcb43f4427d10f6b6436",
+    "Cart": "0x12d6d589f03076c68d1602e5e11b02485a72a0b1",
+    "CartLens": "0x9cfe838f95fdb8564d8f72e72e2208a3dd124cd3"
+  },
+  "transactions": [
+    {
+      "label": "CartPayments",
+      "nonce": 1996,
+      "estimateGas": 15761942,
+      "gasLimit": 23642913,
+      "status": "confirmed",
+      "hash": "0x279b5f31fd6e6742bd995f556a108c30507a35d3b5dd8a7a7eed2cab437025f8",
+      "receipt": {
+        "status": "0x1",
+        "cumulativeGasUsed": "0x1dc9f1f",
+        "logs": [],
+        "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "type": "0x2",
+        "transactionHash": "0x279b5f31fd6e6742bd995f556a108c30507a35d3b5dd8a7a7eed2cab437025f8",
+        "transactionIndex": "0x18",
+        "blockHash": "0x000ae622c214a8629d0b452f731613d5f982ea21d49273e893eaaf4c6a4306a6",
+        "blockNumber": "0xb7354b",
+        "gasUsed": "0xee98c2",
+        "effectiveGasPrice": "0x30",
+        "from": "0xba68422a154e459f7b4992a95ad358d412b6bd1d",
+        "to": null,
+        "contractAddress": "0x29009e5b49833ad5ad9fdcb43f4427d10f6b6436"
+      }
+    },
+    {
+      "label": "Cart",
+      "nonce": 1997,
+      "estimateGas": 27953499,
+      "gasLimit": 41930249,
+      "status": "confirmed",
+      "hash": "0xb674b46e8dec6e5cce696d4c7064e59003c57591685e8d36139b9747c1d373d7",
+      "receipt": {
+        "status": "0x1",
+        "cumulativeGasUsed": "0x6fc4a39",
+        "logs": [
+          {
+            "address": "0x12d6d589f03076c68d1602e5e11b02485a72a0b1",
+            "topics": [
+              "0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498"
+            ],
+            "data": "0x00000000000000000000000000000000000000000000000000000000000000ff",
+            "blockHash": "0x78ee4c0d81dffe510d48b2bd937801e526841ce8baac7eb1692869af1b58bd30",
+            "blockNumber": "0xb7354c",
+            "blockTimestamp": "0x6ae0e454",
+            "transactionHash": "0xb674b46e8dec6e5cce696d4c7064e59003c57591685e8d36139b9747c1d373d7",
+            "transactionIndex": "0x5c",
+            "logIndex": "0xc1",
+            "removed": false
+          }
+        ],
+        "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000400000000000000000000000000100000000000000000000000000000000000040000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000",
+        "type": "0x2",
+        "transactionHash": "0xb674b46e8dec6e5cce696d4c7064e59003c57591685e8d36139b9747c1d373d7",
+        "transactionIndex": "0x5c",
+        "blockHash": "0x78ee4c0d81dffe510d48b2bd937801e526841ce8baac7eb1692869af1b58bd30",
+        "blockNumber": "0xb7354c",
+        "gasUsed": "0x1a7290b",
+        "effectiveGasPrice": "0x567b",
+        "from": "0xba68422a154e459f7b4992a95ad358d412b6bd1d",
+        "to": null,
+        "contractAddress": "0x12d6d589f03076c68d1602e5e11b02485a72a0b1"
+      }
+    },
+    {
+      "label": "CartLens",
+      "nonce": 1998,
+      "estimateGas": 15162094,
+      "gasLimit": 22743141,
+      "status": "confirmed",
+      "hash": "0xd2c69a63b0dbaeac9fee018dc248eaa03573c8ee18fe3836015a49320ae23fae",
+      "receipt": {
+        "status": "0x1",
+        "cumulativeGasUsed": "0x6141a25",
+        "logs": [],
+        "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "type": "0x2",
+        "transactionHash": "0xd2c69a63b0dbaeac9fee018dc248eaa03573c8ee18fe3836015a49320ae23fae",
+        "transactionIndex": "0x70",
+        "blockHash": "0xfe2af83669afe47dc57592cbe9e56c8cb0a86ed55fb0cfb1db04ead70d7ec5b6",
+        "blockNumber": "0xb7354d",
+        "gasUsed": "0xe5840d",
+        "effectiveGasPrice": "0x81a0",
+        "from": "0xba68422a154e459f7b4992a95ad358d412b6bd1d",
+        "to": null,
+        "contractAddress": "0x9cfe838f95fdb8564d8f72e72e2208a3dd124cd3"
+      }
+    },
+    {
+      "label": "Upgrade",
+      "nonce": 1999,
+      "estimateGas": 42997,
+      "gasLimit": 64496,
+      "status": "confirmed",
+      "hash": "0x05ae2023640a210d968ba06f0d571361639de5413d997452bac41ea9b6384eb9",
+      "receipt": {
+        "status": "0x1",
+        "cumulativeGasUsed": "0x4892b61",
+        "logs": [
+          {
+            "address": "0x1ebf35b3a76caef60a009d2786a66a91d42a38bc",
+            "topics": [
+              "0xbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b",
+              "0x00000000000000000000000012d6d589f03076c68d1602e5e11b02485a72a0b1"
+            ],
+            "data": "0x",
+            "blockHash": "0xd4817af860e4a10e884b41a856b37f739f762edca42672394e22ab0793423dc5",
+            "blockNumber": "0xb7354e",
+            "blockTimestamp": "0x6ae0e46c",
+            "transactionHash": "0x05ae2023640a210d968ba06f0d571361639de5413d997452bac41ea9b6384eb9",
+            "transactionIndex": "0x74",
+            "logIndex": "0xed",
+            "removed": false
+          }
+        ],
+        "logsBloom": "0x00000000000000000000000000001000400000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000040000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040000000000080000000000000000000000000000000000002000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "type": "0x2",
+        "transactionHash": "0x05ae2023640a210d968ba06f0d571361639de5413d997452bac41ea9b6384eb9",
+        "transactionIndex": "0x74",
+        "blockHash": "0xd4817af860e4a10e884b41a856b37f739f762edca42672394e22ab0793423dc5",
+        "blockNumber": "0xb7354e",
+        "gasUsed": "0xa67e",
+        "effectiveGasPrice": "0x6c0c",
+        "from": "0xba68422a154e459f7b4992a95ad358d412b6bd1d",
+        "to": "0x1ebf35b3a76caef60a009d2786a66a91d42a38bc",
+        "contractAddress": null
+      }
+    }
+  ],
+  "artifactSha256": {
+    "CartPayments": "9dd20165c948b99e45ff8a1f2310c5cde82efaea635121f3eee75636b3342c71",
+    "Cart": "070b1e6ee451589ac0098a99c32d38247ae9658fd94631b1b9e5f030f346f00c",
+    "CartLens": "3b9f9f6668a3497f120859dfa60a0bbb52687e03b9602b27ec09c8ed64bfc5cd"
+  },
+  "sourceSha256": {
+    "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol": "9b3ddf6c1c9da600aa996789d63e71075ac93334bc79bb7684096bf6d460a1ae",
+    "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Permit.sol": "d8571c57ba4bf6fda46e2dc1e7a7ff39ae6800e9ff77b4a4b2f6ac42b7820ac6",
+    "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol": "1e22c5cdea794ca24115ad7d42651a8654adf492a5b7c2757ba4c16608b581c4",
+    "lib/openzeppelin-contracts/contracts/utils/Address.sol": "4c80ce54738d3c89b66823ba504828bffd520ea8ebca7a785aa3cc83cadee004",
+    "src/cart/CartPayments.sol": "1ab27d4f725feeea0b9d23173ec18e7bed0b8a17f67067310cbf9964da6234eb",
+    "src/cart/CartStorage.sol": "8dd232dec14cbddd9c98b30976edfef829e2487d1149539188cf09f32612f327",
+    "src/cart/ICart.sol": "78f9a6b649c28d7d94c80504e7035fd627f3c776706dc79f5b296a230a7f6058",
+    "src/cart/ICartPayments.sol": "953de2a32e83f7d94bd2ab6394d9ea5e645d15dd19c96b8ce20028f7e2baafcc",
+    "src/cart/ICartRoutePolicy.sol": "f475753acb0109f66ac590d21d34a19e7023113bf1710f8f2265d40b34dd9080",
+    "src/cart/IPermit2Cart.sol": "6aab677871af9293218e26854068f9391d83cf02fe5637d42c9c6a66ad8c53fd",
+    "lib/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol": "1fbf2a131b895514f0027866cc0deff151ea16424b4aed2b8c573d2275cfa9e8",
+    "lib/openzeppelin-contracts-upgradeable/contracts/interfaces/IERC1967Upgradeable.sol": "167828e6f725b1d47d82bc912fd0f1c6ed0fb67a4e5e06a4d62e72b4a53e95cf",
+    "lib/openzeppelin-contracts-upgradeable/contracts/interfaces/IERC5267Upgradeable.sol": "6a0d92d0222dd70cdc073029b6fe979e03e65d9c9ea4f2b8ffb774e144d2a51e",
+    "lib/openzeppelin-contracts-upgradeable/contracts/interfaces/draft-IERC1822Upgradeable.sol": "a94576fd98585c07b2a9725f7c89c910a3a1909a03f49ec2df465327c6a0ffc3",
+    "lib/openzeppelin-contracts-upgradeable/contracts/proxy/ERC1967/ERC1967UpgradeUpgradeable.sol": "40dd5b14a370eea51ba94eb1b66a89638c6c54d86cc9f406599075c273e5e4c6",
+    "lib/openzeppelin-contracts-upgradeable/contracts/proxy/beacon/IBeaconUpgradeable.sol": "e0ac7115916f0dce0a8e80769694736f3e674bdc5b2e5853964c82004b1e1cc5",
+    "lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol": "a2c4e5c274a586f145d278293ae33198cd8f412ab7e6d26f2394c8949b32b24b",
+    "lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol": "04338003a3be8f5f38595048b591d80fdc147bf95cc7c6285e1e1a5f1afa2b47",
+    "lib/openzeppelin-contracts-upgradeable/contracts/security/ReentrancyGuardUpgradeable.sol": "26219dd6b9b574cf3e225ee00466bdf1b74fbcc1b24bd93ae3628c812a76333e",
+    "lib/openzeppelin-contracts-upgradeable/contracts/utils/AddressUpgradeable.sol": "db92fc1b515decad3a783b1422190877d2d70b907c6e36fb0998d9465aee42db",
+    "lib/openzeppelin-contracts-upgradeable/contracts/utils/ContextUpgradeable.sol": "5fb301961e45cb482fe4e05646d2f529aa449fe0e90c6671475d6a32356fa2d4",
+    "lib/openzeppelin-contracts-upgradeable/contracts/utils/StorageSlotUpgradeable.sol": "5b478023a1200e1364308ca06cdefec7cb7ab990a1cb904cbbdbaa7ba85076be",
+    "lib/openzeppelin-contracts-upgradeable/contracts/utils/StringsUpgradeable.sol": "357c8d1a0fb673fa10a884d6e27b383171ecc3eaf8dee8211de75f88ff77843d",
+    "lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/ECDSAUpgradeable.sol": "aefb3039d0aae994ad64c397dfa0bcc1ab6e675e2fd97b2fdfc0e7739def0b5b",
+    "lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/EIP712Upgradeable.sol": "ed30d96d25a360d320a807157db07b5bbb73392745ce8188b775787eb2d33fb9",
+    "lib/openzeppelin-contracts-upgradeable/contracts/utils/math/MathUpgradeable.sol": "fbf7ebc0f3c2cf5aef908ecce85e69af53db4e2c6652f61c8ac1e3f416c2fa99",
+    "lib/openzeppelin-contracts-upgradeable/contracts/utils/math/SignedMathUpgradeable.sol": "4f06981f993ea4a96e078c2036b5a42e1edade38996e5180171d5fe4be2f18fe",
+    "lib/openzeppelin-contracts/contracts/interfaces/IERC1271.sol": "c981ecaf1c2ec77e3e47f146306d7e99c669b5e733b0adcfd3436c7f6a7a46b6",
+    "lib/openzeppelin-contracts/contracts/utils/Strings.sol": "81adb93350f7ed381aa230f52f0e187259ac8b57175836f536821361dfc297b0",
+    "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol": "94d7ffe60620d14a2c4f4b77c8b9f6b0f30e347ae1e7e407d0773b91910c9a83",
+    "lib/openzeppelin-contracts/contracts/utils/cryptography/MerkleProof.sol": "8846f76c8a79da6b6bfc9afef468a0ca3667ff88525b24e242f761e2205425a2",
+    "lib/openzeppelin-contracts/contracts/utils/cryptography/SignatureChecker.sol": "5bf232e94679faafdabd16a45da480f737580113230fbae038031a1bccc92f9c",
+    "lib/openzeppelin-contracts/contracts/utils/math/Math.sol": "a18f7e086c9d05213620a4953bc3462881d97280cefb2505cb02f141c467d9a3",
+    "lib/openzeppelin-contracts/contracts/utils/math/SignedMath.sol": "420a5a5d8d94611a04b39d6cf5f02492552ed4257ea82aba3c765b1ad52f77f6",
+    "src/cart/Cart.sol": "6d8c49598a86f217a13a5e3f64715a749681482d987ec0751740d4335e7c299a",
+    "src/cart/CartHashing.sol": "a56d2a1ca313e88c50cc4598638c792a92ed4a789246fa8b2bbe5adf03fc65b3",
+    "lib/openzeppelin-contracts/contracts/token/ERC1155/IERC1155.sol": "da64b0d9864646eaf7d73ae42f39b2dadd74b54871039ea75a318cffa79e3d47",
+    "lib/openzeppelin-contracts/contracts/token/ERC721/IERC721.sol": "32781c05799dd3e94d2e5fc8efcf1adc6199fab2dfd920428f044a81aae9791f",
+    "lib/openzeppelin-contracts/contracts/utils/introspection/IERC165.sol": "701e025d13ec6be09ae892eb029cd83b3064325801d73654847a5fb11c58b1e5",
+    "src/cart/CartLens.sol": "0cfa2e201f7253211690e11d68d8f96945b7dfe14d04847ebc1cfc6ef76502c1",
+    "src/cart/ICartLens.sol": "d1facf967ba55fbc1ac920e686a5eebc868ec23427ff78e75188a141de0cf919"
+  },
+  "status": "complete",
+  "owner": "0xba68422a154e459f7b4992a95ad358d412b6bd1d",
+  "baseline": {
+    "owner": "0xba68422a154e459f7b4992a95ad358d412b6bd1d",
+    "platformSigner": "0xf7885c18e2757fbaea2dcfff3ac0df94520f4eae",
+    "universalRouter": "0x3a9d48ab9751398bbfa63ad67599bb04e4bdf98b",
+    "permit2": "0x000000000022d473030f116ddee9f6b43ac78ba3",
+    "weth": "0xfff9976782d46cc05630d1f6ebab18b2324d6b14",
+    "protocolRecipient": "0xba68422a154e459f7b4992a95ad358d412b6bd1d",
+    "paused": "false",
+    "routePolicy": "0xbf6c6d2e8be99cdc5882d186c40fdf9222892f9c",
+    "DOMAIN_SEPARATOR": "0x9a0c2553c86845660db12d4ca6d6fd0ee357939d85a7373f03d6cb143720a7d6",
+    "implementation": "0x6d10c6a2cbd956cbc5bf74e06fab3651434c52aa"
+  },
+  "startNonce": 1996,
+  "runtimeVerification": {
+    "CartPayments": {
+      "matches": true,
+      "immutableAddresses": [
+        "0x29009e5b49833ad5ad9fdcb43f4427d10f6b6436",
+        "0xbf6c6d2e8be99cdc5882d186c40fdf9222892f9c"
+      ]
+    },
+    "Cart": {
+      "matches": true,
+      "immutableAddresses": [
+        "0x12d6d589f03076c68d1602e5e11b02485a72a0b1",
+        "0x29009e5b49833ad5ad9fdcb43f4427d10f6b6436",
+        "0xbf6c6d2e8be99cdc5882d186c40fdf9222892f9c"
+      ]
+    },
+    "CartLens": {
+      "matches": true,
+      "immutableAddresses": []
+    }
+  },
+  "postflight": {
+    "owner": "0xba68422a154e459f7b4992a95ad358d412b6bd1d",
+    "platformSigner": "0xf7885c18e2757fbaea2dcfff3ac0df94520f4eae",
+    "universalRouter": "0x3a9d48ab9751398bbfa63ad67599bb04e4bdf98b",
+    "permit2": "0x000000000022d473030f116ddee9f6b43ac78ba3",
+    "weth": "0xfff9976782d46cc05630d1f6ebab18b2324d6b14",
+    "protocolRecipient": "0xba68422a154e459f7b4992a95ad358d412b6bd1d",
+    "paused": "false",
+    "routePolicy": "0xbf6c6d2e8be99cdc5882d186c40fdf9222892f9c",
+    "DOMAIN_SEPARATOR": "0x9a0c2553c86845660db12d4ca6d6fd0ee357939d85a7373f03d6cb143720a7d6",
+    "implementation": "0x12d6d589f03076c68d1602e5e11b02485a72a0b1"
+  },
+  "date": "2026-10-27",
+  "sourceCommit": "264bebb87b2071eba160e1cb9fa1d83abb22efb0",
+  "tests": {
+    "command": "FOUNDRY_PROFILE=cart forge test --offline",
+    "passed": 646,
+    "suites": 19,
+    "failed": 0,
+    "skipped": 0,
+    "invariantRuns": 256,
+    "invariantCalls": 128000
+  },
+  "freeListingPreflight": {
+    "newLens": "0x9cfe838f95fdb8564d8f72e72e2208a3dd124cd3",
+    "newResult": "(true, 0, 0, 0x0000000000000000000000000000000000000000000000000000000000000000, 0x)",
+    "oldLens": "0x7DD8e5c3560Af43700722270fBbc1D0d6079E9B5",
+    "oldResult": "(false, 11, 0, 0x0000000000000000000000000000000000000000000000000000000000000000, 0x)",
+    "zeroMinimumUnitPrice": true,
+    "signedRoot": true,
+    "readOnly": true,
+    "executedPurchase": false
+  }
+}

@@ -4,3 +4,19 @@ viaIR = true
 optimizer = true
 optimizer_runs = 100
 fs_permissions = [{ access = "read", path = "./"}]
+
+[profile.cart]
+src = "src/cart"
+test = "src/test/cart"
+script = "script/cart"
+libs = ["lib"]
+auto_detect_remappings = false
+remappings = [
+    "openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+    "openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/",
+    "forge-std/=lib/forge-std/src/"
+]
+viaIR = true
+optimizer = true
+optimizer_runs = 100
+fs_permissions = [{ access = "read", path = "./" }]

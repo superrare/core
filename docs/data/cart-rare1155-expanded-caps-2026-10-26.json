@@ -1,0 +1,124 @@
+{
+  "expanded_caps": true,
+  "line_cap": 66,
+  "operation_cap": 64,
+  "method": "Factory-cloned RareERC1155; one collection; distinct IDs; one EOA buyer; shared seller root; two fee lines; native payment; gross call plus intrinsic subject to calldata floor, not receipts or RPC estimates. Transfer leaves one seller unit; mint begins with zero supply. Fixture preparation excluded.",
+  "source_sha256": {
+    "src/cart/Cart.sol": "6b848171f8aa7e8a5217e9ca86f2b04f22357195111352582ce63de274551c9b",
+    "src/cart/CartHashing.sol": "a56d2a1ca313e88c50cc4598638c792a92ed4a789246fa8b2bbe5adf03fc65b3",
+    "src/token/ERC1155/RareERC1155.sol": "9a33271b738ee49c92da1f94ef92f9bfa47121d45bc78a59c5bfd036dfaa14ec",
+    "src/test/cart/CartRareERC1155Gas.t.sol": "3a9a9e78820b0165b0d8458328478c010f7fbec0ef485ff9920988daab6e66e0"
+  },
+  "results": [
+    {
+      "sales": 9,
+      "lines": 11,
+      "calldataBytes": 9540,
+      "grossCallGas": 1372026,
+      "intrinsicGas": 99072,
+      "calldataFloorGas": 216180,
+      "mode": "mint",
+      "approximateTransactionGas": 1471098,
+      "bufferedGasLimit": 1838873
+    },
+    {
+      "sales": 9,
+      "lines": 11,
+      "calldataBytes": 9540,
+      "grossCallGas": 918679,
+      "intrinsicGas": 99072,
+      "calldataFloorGas": 216180,
+      "mode": "transfer",
+      "approximateTransactionGas": 1017751,
+      "bufferedGasLimit": 1272189
+    },
+    {
+      "sales": 18,
+      "lines": 20,
+      "calldataBytes": 17892,
+      "grossCallGas": 2599487,
+      "intrinsicGas": 174636,
+      "calldataFloorGas": 405090,
+      "mode": "mint",
+      "approximateTransactionGas": 2774123,
+      "bufferedGasLimit": 3467654
+    },
+    {
+      "sales": 18,
+      "lines": 20,
+      "calldataBytes": 17892,
+      "grossCallGas": 1698040,
+      "intrinsicGas": 174624,
+      "calldataFloorGas": 405060,
+      "mode": "transfer",
+      "approximateTransactionGas": 1872664,
+      "bufferedGasLimit": 2340830
+    },
+    {
+      "sales": 32,
+      "lines": 34,
+      "calldataBytes": 30436,
+      "grossCallGas": 4516052,
+      "intrinsicGas": 284212,
+      "calldataFloorGas": 679030,
+      "mode": "mint",
+      "approximateTransactionGas": 4800264,
+      "bufferedGasLimit": 6000330
+    },
+    {
+      "sales": 32,
+      "lines": 34,
+      "calldataBytes": 30436,
+      "grossCallGas": 2908187,
+      "intrinsicGas": 284296,
+      "calldataFloorGas": 679240,
+      "mode": "transfer",
+      "approximateTransactionGas": 3192483,
+      "bufferedGasLimit": 3990604
+    },
+    {
+      "sales": 62,
+      "lines": 64,
+      "calldataBytes": 59300,
+      "grossCallGas": 8652183,
+      "intrinsicGas": 551156,
+      "calldataFloorGas": 1346390,
+      "mode": "mint",
+      "approximateTransactionGas": 9203339,
+      "bufferedGasLimit": 11504174
+    },
+    {
+      "sales": 62,
+      "lines": 64,
+      "calldataBytes": 59300,
+      "grossCallGas": 5524432,
+      "intrinsicGas": 551108,
+      "calldataFloorGas": 1346270,
+      "mode": "transfer",
+      "approximateTransactionGas": 6075540,
+      "bufferedGasLimit": 7594425
+    },
+    {
+      "sales": 64,
+      "lines": 66,
+      "calldataBytes": 61156,
+      "grossCallGas": 8931083,
+      "intrinsicGas": 567868,
+      "calldataFloorGas": 1388170,
+      "mode": "mint",
+      "approximateTransactionGas": 9498951,
+      "bufferedGasLimit": 11873689
+    },
+    {
+      "sales": 64,
+      "lines": 66,
+      "calldataBytes": 61156,
+      "grossCallGas": 5703770,
+      "intrinsicGas": 567784,
+      "calldataFloorGas": 1387960,
+      "mode": "transfer",
+      "approximateTransactionGas": 6271554,
+      "bufferedGasLimit": 7839443
+    }
+  ]
+}
