@@ -366,19 +366,10 @@ contract CartTest is CartFixture {
         ICart.PurchaseOrder memory order = _order("reentrant-721-purchase", lines, route, actions);
         bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
 
-        receiver.setReentryData(
-            abi.encodeWithSelector(
-                Cart.executePurchase.selector,
-                order,
-                lines,
-                listings,
-                authorization,
-                route,
-                actions,
-                platformSignature,
-                1 ether
-            )
-        );
+        receiver.setReentryData(_signedInnerPurchase());
+        vm.deal(address(receiver), 1 ether);
+        vm.deal(address(cart), 3 ether);
+        weth.mint(address(cart), 4 ether);
 
         vm.deal(payer, 1 ether);
         vm.prank(payer);
@@ -388,6 +379,12 @@ contract CartTest is CartFixture {
 
         assertTrue(receiver.reentryAttempted());
         assertFalse(receiver.reentrySucceeded());
+        assertEq(receiver.reentryResult(), abi.encodeWithSignature("Error(string)", "ReentrancyGuard: reentrant call"));
+        assertFalse(cart.executedOrderIds(keccak256("signed-inner-purchase")));
+        assertEq(address(receiver).balance, 1 ether);
+        assertEq(sellerPayout.balance, order.paymentAmount);
+        assertEq(address(cart).balance, 3 ether);
+        assertEq(weth.balanceOf(address(cart)), 4 ether);
         assertTrue(cart.executedOrderIds(order.orderId));
         assertEq(cart.filledQuantity(_listingDigest(listing)), 1);
         assertEq(token.ownerOf(1), address(receiver));
@@ -417,19 +414,10 @@ contract CartTest is CartFixture {
         ICart.PurchaseOrder memory order = _order("reentrant-1155-purchase", lines, route, actions);
         bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
 
-        receiver.setReentryData(
-            abi.encodeWithSelector(
-                Cart.executePurchase.selector,
-                order,
-                lines,
-                listings,
-                authorization,
-                route,
-                actions,
-                platformSignature,
-                2 ether
-            )
-        );
+        receiver.setReentryData(_signedInnerPurchase());
+        vm.deal(address(receiver), 1 ether);
+        vm.deal(address(cart), 3 ether);
+        weth.mint(address(cart), 4 ether);
 
         vm.deal(payer, 2 ether);
         vm.prank(payer);
@@ -439,6 +427,12 @@ contract CartTest is CartFixture {
 
         assertTrue(receiver.reentryAttempted());
         assertFalse(receiver.reentrySucceeded());
+        assertEq(receiver.reentryResult(), abi.encodeWithSignature("Error(string)", "ReentrancyGuard: reentrant call"));
+        assertFalse(cart.executedOrderIds(keccak256("signed-inner-purchase")));
+        assertEq(address(receiver).balance, 1 ether);
+        assertEq(sellerPayout.balance, order.paymentAmount);
+        assertEq(address(cart).balance, 3 ether);
+        assertEq(weth.balanceOf(address(cart)), 4 ether);
         assertTrue(cart.executedOrderIds(order.orderId));
         assertEq(cart.filledQuantity(_listingDigest(listing)), 2);
         assertEq(token.balanceOf(address(receiver), 42), 2);
@@ -462,19 +456,10 @@ contract CartTest is CartFixture {
         ICart.PurchaseOrder memory order = _order("reentrant-721-token", lines, route, actions);
         bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
 
-        token.setReentryData(
-            abi.encodeWithSelector(
-                Cart.executePurchase.selector,
-                order,
-                lines,
-                listings,
-                authorization,
-                route,
-                actions,
-                platformSignature,
-                1 ether
-            )
-        );
+        token.setReentryData(_signedInnerPurchase());
+        vm.deal(address(token), 1 ether);
+        vm.deal(address(cart), 3 ether);
+        weth.mint(address(cart), 4 ether);
 
         vm.deal(payer, 1 ether);
         vm.prank(payer);
@@ -484,6 +469,12 @@ contract CartTest is CartFixture {
 
         assertTrue(token.reentryAttempted());
         assertFalse(token.reentrySucceeded());
+        assertEq(token.reentryResult(), abi.encodeWithSignature("Error(string)", "ReentrancyGuard: reentrant call"));
+        assertFalse(cart.executedOrderIds(keccak256("signed-inner-purchase")));
+        assertEq(address(token).balance, 1 ether);
+        assertEq(sellerPayout.balance, order.paymentAmount);
+        assertEq(address(cart).balance, 3 ether);
+        assertEq(weth.balanceOf(address(cart)), 4 ether);
         assertTrue(cart.executedOrderIds(order.orderId));
         assertEq(cart.filledQuantity(_listingDigest(listing)), 1);
         assertEq(token.ownerOf(1), collector);
@@ -512,19 +503,10 @@ contract CartTest is CartFixture {
         ICart.PurchaseOrder memory order = _order("reentrant-1155-token", lines, route, actions);
         bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
 
-        token.setReentryData(
-            abi.encodeWithSelector(
-                Cart.executePurchase.selector,
-                order,
-                lines,
-                listings,
-                authorization,
-                route,
-                actions,
-                platformSignature,
-                2 ether
-            )
-        );
+        token.setReentryData(_signedInnerPurchase());
+        vm.deal(address(token), 1 ether);
+        vm.deal(address(cart), 3 ether);
+        weth.mint(address(cart), 4 ether);
 
         vm.deal(payer, 2 ether);
         vm.prank(payer);
@@ -534,6 +516,12 @@ contract CartTest is CartFixture {
 
         assertTrue(token.reentryAttempted());
         assertFalse(token.reentrySucceeded());
+        assertEq(token.reentryResult(), abi.encodeWithSignature("Error(string)", "ReentrancyGuard: reentrant call"));
+        assertFalse(cart.executedOrderIds(keccak256("signed-inner-purchase")));
+        assertEq(address(token).balance, 1 ether);
+        assertEq(sellerPayout.balance, order.paymentAmount);
+        assertEq(address(cart).balance, 3 ether);
+        assertEq(weth.balanceOf(address(cart)), 4 ether);
         assertTrue(cart.executedOrderIds(order.orderId));
         assertEq(cart.filledQuantity(_listingDigest(listing)), 2);
         assertEq(token.balanceOf(collector, 42), 2);
