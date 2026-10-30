@@ -4,6 +4,7 @@ pragma solidity 0.8.18;
 import {Script, console} from "forge-std/Script.sol";
 
 import {Cart} from "../../src/cart/Cart.sol";
+import {CartHashes} from "../../src/cart/CartHashes.sol";
 import {CartLens} from "../../src/cart/CartLens.sol";
 import {CartPayments} from "../../src/cart/CartPayments.sol";
 import {NetworkConfig} from "../NetworkConfig.s.sol";
@@ -14,7 +15,6 @@ interface ICartFreeListingUpgradeTarget {
     function universalRouter() external view returns (address);
     function permit2() external view returns (address);
     function weth() external view returns (address);
-    function protocolRecipient() external view returns (address);
     function paused() external view returns (bool);
     function routePolicy() external view returns (address);
     function DOMAIN_SEPARATOR() external view returns (bytes32);
@@ -22,7 +22,7 @@ interface ICartFreeListingUpgradeTarget {
 }
 
 /// @title CartFreeListingUpgrade
-/// @notice Restores free fulfillment in Cart, CartPayments, and CartLens while preserving the route policy.
+/// @notice Replaces Cart, CartPayments, CartLens, and CartHashes while preserving the route policy.
 /// @dev Cart embeds its payment executor, so the replacement executor and implementation rotate together.
 ///      No initializer is called. The proxy, approvals, inventory, and order replay state stay in place.
 contract CartFreeListingUpgrade is Script {
@@ -37,7 +37,7 @@ contract CartFreeListingUpgrade is Script {
         address universalRouter;
         address permit2;
         address weth;
-        address protocolRecipient;
+        bytes32 reservedProtocolRecipient;
         bool paused;
         address routePolicy;
         bytes32 domainSeparator;
@@ -70,6 +70,7 @@ contract CartFreeListingUpgrade is Script {
         CartPayments paymentExecutor = new CartPayments(beforeState.routePolicy);
         Cart implementation = new Cart(beforeState.routePolicy, address(paymentExecutor));
         CartLens lens = new CartLens();
+        CartHashes hashes = new CartHashes();
         proxy.upgradeToAndCall(address(implementation), bytes(""));
 
         vm.stopBroadcast();
@@ -83,6 +84,7 @@ contract CartFreeListingUpgrade is Script {
         console.log("Cart route policy (preserved):", beforeState.routePolicy);
         console.log("Cart payment executor:", address(paymentExecutor));
         console.log("Cart lens:", address(lens));
+        console.log("Cart hashes:", address(hashes));
         console.log("Cart owner:", beforeState.owner);
     }
 
@@ -92,7 +94,10 @@ contract CartFreeListingUpgrade is Script {
         state.universalRouter = proxy.universalRouter();
         state.permit2 = proxy.permit2();
         state.weth = proxy.weth();
-        state.protocolRecipient = proxy.protocolRecipient();
+        // Preserve the retired treasury slot without depending on its removed public getter.
+        state.reservedProtocolRecipient = vm.load(
+            address(proxy), bytes32(uint256(0xc012b0fbebfe5af5b8d952297ba0e80136c8473aa49759c18a1edebf3f3a9b04))
+        );
         state.paused = proxy.paused();
         state.routePolicy = proxy.routePolicy();
         state.domainSeparator = proxy.DOMAIN_SEPARATOR();
@@ -108,7 +113,9 @@ contract CartFreeListingUpgrade is Script {
         if (actual.universalRouter != expected.universalRouter) revert ProxyStateChanged("universalRouter");
         if (actual.permit2 != expected.permit2) revert ProxyStateChanged("permit2");
         if (actual.weth != expected.weth) revert ProxyStateChanged("weth");
-        if (actual.protocolRecipient != expected.protocolRecipient) revert ProxyStateChanged("protocolRecipient");
+        if (actual.reservedProtocolRecipient != expected.reservedProtocolRecipient) {
+            revert ProxyStateChanged("reservedProtocolRecipient");
+        }
         if (actual.paused != expected.paused) revert ProxyStateChanged("paused");
         if (actual.routePolicy != expected.routePolicy) revert ProxyStateChanged("routePolicy");
         if (actual.domainSeparator != expected.domainSeparator) revert ProxyStateChanged("DOMAIN_SEPARATOR");

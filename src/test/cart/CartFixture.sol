@@ -162,6 +162,7 @@ abstract contract CartFixture is Test {
             paymentCurrency: address(0),
             deadline: block.timestamp + 1 days,
             paymentAmount: paymentAmount,
+            spreadRecipient: address(this),
             orderLinesHash: hashes.hashOrderLines(lines),
             payoutRouteHash: hashes.hashPayoutRoute(route),
             fulfillmentActionsHash: hashes.hashFulfillmentActions(actions)
@@ -180,6 +181,7 @@ abstract contract CartFixture is Test {
             paymentCurrency: address(inputToken),
             deadline: block.timestamp + 1 days,
             paymentAmount: paymentAmount,
+            spreadRecipient: address(this),
             orderLinesHash: hashes.hashOrderLines(lines),
             payoutRouteHash: hashes.hashPayoutRoute(route),
             fulfillmentActionsHash: hashes.hashFulfillmentActions(new ICart.FulfillmentAction[](0))

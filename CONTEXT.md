@@ -16,9 +16,9 @@ _Avoid_: Add-on, base amount
 The transaction caller whose native or ERC-20 assets fund a Purchase Order. The Cart always pulls
 funds from `msg.sender`; no payer field or buyer-signed purchase authorization is part of the order.
 The `PurchaseExecuted` event indexes the derived payer for reconciliation. The payer is independent
-from every Fulfillment Action recipient and is not the beneficiary of favorable route execution.
-A payment processor such as Coinflow may therefore be the payer without receiving transaction
-residuals.
+from every Fulfillment Action recipient. Cart sends favorable route execution to the signed
+`spreadRecipient`, which need not be the payer. A payment processor such as Coinflow can fund
+the purchase while another account receives transaction residuals.
 _Avoid_: Payment Source
 
 **Fixed Quote**:
@@ -47,9 +47,9 @@ telemetry and reconciliation. The route may use exact-input or exact-output swap
 _Avoid_: ERC-20 swap
 
 **Protocol Spread**:
-Favorable routing variance captured by the configured protocol recipient under a Fixed Quote.
-This includes excess settlement output from an exact-input route and unused payment input from an
-exact-output route. It is never refunded to the Payer, seller, or fulfillment recipient.
+Favorable routing variance captured by the nonzero `spreadRecipient` in the platform-signed Purchase Order under a Fixed Quote. This includes unused input and output above signed line obligations. The recipient is fixed for that order; Cart has no global treasury setting.
+Cart does not automatically refund spread to the Payer. It transfers spread only to the signed
+`spreadRecipient`, which may be any nonzero address.
 _Avoid_: Refund, buyer surplus
 
 **Fulfillment Action**:

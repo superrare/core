@@ -70,7 +70,6 @@ contract Cart is
     config.universalRouter = universalRouter_;
     config.permit2 = permit2_;
     config.weth = weth_;
-    config.protocolRecipient = owner_;
   }
 
   function _authorizeUpgrade(address) internal view override onlyOwner {}
@@ -89,18 +88,6 @@ contract Cart is
 
   function weth() public view override returns (address) {
     return _cartConfig().weth;
-  }
-
-  function protocolRecipient() public view override returns (address) {
-    return _cartConfig().protocolRecipient;
-  }
-
-  function setProtocolRecipient(address recipient) external override onlyOwner {
-    require(recipient != address(0), "zero protocol recipient");
-    CartStorage.Config storage config = _cartConfig();
-    address oldRecipient = config.protocolRecipient;
-    config.protocolRecipient = recipient;
-    emit ProtocolRecipientUpdated(oldRecipient, recipient);
   }
 
   function paused() public view override returns (bool) {
@@ -143,6 +130,8 @@ contract Cart is
     if (_cartConfig().paused) revert ContractPaused();
     // Require a unique order identifier and a live order deadline.
     if (order.orderId == bytes32(0)) revert InvalidOrderId();
+    // Bind every checkout to an explicit surplus destination, including zero-spread orders.
+    if (order.spreadRecipient == address(0)) revert InvalidSpreadRecipient();
     if (order.deadline < block.timestamp) revert DeadlineExpired(order.deadline, block.timestamp);
     // Marking an order as executed later prevents the same signed order from being used twice.
     if (_cartSettlement().executedOrderIds[order.orderId]) revert AlreadyExecuted(order.orderId);
@@ -194,7 +183,7 @@ contract Cart is
     // Transfer or mint each on-chain item to its requested recipient.
     mintResults = _executeFulfillment(order.orderId, listings, lineListing, actions, mintActionCount);
     // Pay grouped recipients, capture protocol spread, and verify all settlement balances.
-    _finishPayment(order.orderId, order.paymentCurrency, lines, paymentState);
+    _finishPayment(order.orderId, order.paymentCurrency, order.spreadRecipient, lines, paymentState);
 
     // Report the payer and exact signed quote after the entire purchase succeeds.
     emit PurchaseExecuted(order.orderId, msg.sender, order.paymentCurrency, order.paymentAmount);
@@ -561,11 +550,12 @@ contract Cart is
   function _finishPayment(
     bytes32 orderId,
     address paymentCurrency,
+    address spreadRecipient,
     OrderLine[] calldata lines,
     ICartPayments.PaymentState memory state
   ) private {
     (bool success, bytes memory result) = address(PAYMENT_EXECUTOR).delegatecall(
-      abi.encodeCall(ICartPayments.finish, (orderId, paymentCurrency, lines, state))
+      abi.encodeCall(ICartPayments.finish, (orderId, paymentCurrency, spreadRecipient, lines, state))
     );
     if (!success) _bubble(result);
   }

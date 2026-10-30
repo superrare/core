@@ -4,6 +4,7 @@ pragma solidity 0.8.18;
 import {Script, console} from "forge-std/Script.sol";
 
 import {Cart} from "../../src/cart/Cart.sol";
+import {CartPayments} from "../../src/cart/CartPayments.sol";
 import {CartHashes} from "../../src/cart/CartHashes.sol";
 import {CartLens} from "../../src/cart/CartLens.sol";
 import {NetworkConfig} from "../NetworkConfig.s.sol";
@@ -14,17 +15,15 @@ interface ICartImplementationLensAndHashesUpgradeTarget {
     function universalRouter() external view returns (address);
     function permit2() external view returns (address);
     function weth() external view returns (address);
-    function protocolRecipient() external view returns (address);
     function paused() external view returns (bool);
     function routePolicy() external view returns (address);
     function upgradeToAndCall(address newImplementation, bytes calldata data) external payable;
 }
 
 /// @title CartImplementationLensAndHashesUpgrade
-/// @notice Rotates the Cart implementation and integration helpers without rotating settlement dependencies.
-/// @dev The payment executor must be the CartPayments address embedded in the currently deployed
-///      implementation. NetworkConfig is the default source of truth; CART_PAYMENT_EXECUTOR may
-///      override it. The existing route policy is read directly from the proxy.
+/// @notice Replaces Cart, its payment executor, and integration helpers while preserving the route policy.
+/// @dev The signed order and executor ABIs must match. Deploy the executor from the same sources.
+///      The existing route policy is read directly from the proxy. No initializer is called.
 contract CartImplementationLensAndHashesUpgrade is Script {
     error MissingCartProxy();
     error BroadcasterNotCartOwner(address broadcaster, address owner);
@@ -37,7 +36,7 @@ contract CartImplementationLensAndHashesUpgrade is Script {
         address universalRouter;
         address permit2;
         address weth;
-        address protocolRecipient;
+        bytes32 reservedProtocolRecipient;
         bool paused;
         address routePolicy;
     }
@@ -64,13 +63,11 @@ contract CartImplementationLensAndHashesUpgrade is Script {
         _assertDependency("permit2", NetworkConfig.requireContract(config.permit2, "permit2"), beforeState.permit2);
         _assertDependency("weth", NetworkConfig.requireContract(config.weth, "weth"), beforeState.weth);
         NetworkConfig.requireContract(beforeState.routePolicy, "cartRoutePolicy");
-        address paymentExecutor = NetworkConfig.requireContract(
-            vm.envOr("CART_PAYMENT_EXECUTOR", config.cartPaymentExecutor), "cartPaymentExecutor"
-        );
 
         vm.startBroadcast(privateKey);
 
-        Cart implementation = new Cart(beforeState.routePolicy, paymentExecutor);
+        CartPayments paymentExecutor = new CartPayments(beforeState.routePolicy);
+        Cart implementation = new Cart(beforeState.routePolicy, address(paymentExecutor));
         CartLens lens = new CartLens();
         CartHashes hashes = new CartHashes();
         proxy.upgradeToAndCall(address(implementation), bytes(""));
@@ -84,7 +81,7 @@ contract CartImplementationLensAndHashesUpgrade is Script {
         console.log("Cart proxy:", proxyAddress);
         console.log("Cart implementation:", address(implementation));
         console.log("Cart route policy (preserved):", beforeState.routePolicy);
-        console.log("Cart payment executor (preserved):", paymentExecutor);
+        console.log("Cart payment executor:", address(paymentExecutor));
         console.log("Cart lens:", address(lens));
         console.log("Cart hashes:", address(hashes));
         console.log("Cart owner:", beforeState.owner);
@@ -100,7 +97,10 @@ contract CartImplementationLensAndHashesUpgrade is Script {
         state.universalRouter = proxy.universalRouter();
         state.permit2 = proxy.permit2();
         state.weth = proxy.weth();
-        state.protocolRecipient = proxy.protocolRecipient();
+        // Preserve the retired treasury slot without depending on its removed public getter.
+        state.reservedProtocolRecipient = vm.load(
+            address(proxy), bytes32(uint256(0xc012b0fbebfe5af5b8d952297ba0e80136c8473aa49759c18a1edebf3f3a9b04))
+        );
         state.paused = proxy.paused();
         state.routePolicy = proxy.routePolicy();
     }
@@ -115,7 +115,9 @@ contract CartImplementationLensAndHashesUpgrade is Script {
         if (actual.universalRouter != expected.universalRouter) revert ProxyStateChanged("universalRouter");
         if (actual.permit2 != expected.permit2) revert ProxyStateChanged("permit2");
         if (actual.weth != expected.weth) revert ProxyStateChanged("weth");
-        if (actual.protocolRecipient != expected.protocolRecipient) revert ProxyStateChanged("protocolRecipient");
+        if (actual.reservedProtocolRecipient != expected.reservedProtocolRecipient) {
+            revert ProxyStateChanged("reservedProtocolRecipient");
+        }
         if (actual.paused != expected.paused) revert ProxyStateChanged("paused");
         if (actual.routePolicy != expected.routePolicy) revert ProxyStateChanged("routePolicy");
     }

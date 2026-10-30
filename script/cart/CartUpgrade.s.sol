@@ -4,6 +4,7 @@ pragma solidity 0.8.18;
 import {Script, console} from "forge-std/Script.sol";
 
 import {Cart} from "../../src/cart/Cart.sol";
+import {CartHashes} from "../../src/cart/CartHashes.sol";
 import {CartLens} from "../../src/cart/CartLens.sol";
 import {CartPayments} from "../../src/cart/CartPayments.sol";
 import {CartRoutePolicy} from "../../src/cart/CartRoutePolicy.sol";
@@ -53,6 +54,7 @@ contract CartUpgrade is Script {
         CartPayments paymentExecutor = new CartPayments(address(routePolicy));
         Cart implementation = new Cart(address(routePolicy), address(paymentExecutor));
         CartLens lens = new CartLens();
+        CartHashes hashes = new CartHashes();
 
         proxy.upgradeToAndCall(address(implementation), bytes(""));
 
@@ -70,6 +72,7 @@ contract CartUpgrade is Script {
         console.log("Cart route policy:", address(routePolicy));
         console.log("Cart payment executor:", address(paymentExecutor));
         console.log("Cart lens:", address(lens));
+        console.log("Cart hashes:", address(hashes));
         console.log("Cart owner:", owner);
         console.log("Universal Router:", universalRouter);
         console.log("Permit2:", permit2);

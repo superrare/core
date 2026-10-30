@@ -92,6 +92,7 @@ abstract contract CartAuthorizationBase is CartProofBase {
             orderId: bytes32(uint256(1)),
             paymentCurrency: address(0),
             paymentAmount: quantity,
+            spreadRecipient: address(this),
             deadline: block.timestamp + 1 days,
             orderLinesHash: bytes32(0),
             payoutRouteHash: bytes32(0),

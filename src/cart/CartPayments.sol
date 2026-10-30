@@ -76,6 +76,7 @@ contract CartPayments is CartStorage, ICartPayments {
     function finish(
         bytes32 orderId,
         address paymentCurrency,
+        address spreadRecipient,
         ICart.OrderLine[] calldata lines,
         PaymentState calldata state
     ) external payable onlyDelegateCall {
@@ -83,8 +84,8 @@ contract CartPayments is CartStorage, ICartPayments {
         _prepareNativeFamily(lines, state.assetSnapshots, state.nativeBaseline);
         // Pay each recipient once per exact currency, retaining first-line failure attribution.
         _payLines(lines);
-        // Deliver favorable execution variance to the protocol and restore every custody baseline.
-        _captureSupportedSpread(orderId, state);
+        // Deliver favorable execution variance to the signed recipient and restore every custody baseline.
+        _captureSupportedSpread(orderId, spreadRecipient, state);
         _verifyFinalBaselines(state);
         if (paymentCurrency != address(0)) {
             _assertAllowancesCleared(paymentCurrency, _cartConfig().permit2, _cartConfig().universalRouter);
@@ -289,8 +290,8 @@ contract CartPayments is CartStorage, ICartPayments {
         }
     }
 
-    function _captureSupportedSpread(bytes32 orderId, PaymentState calldata state) private {
-        address recipient = _cartConfig().protocolRecipient;
+    function _captureSupportedSpread(bytes32 orderId, address recipient, PaymentState calldata state) private {
+        // Deliver every tracked surplus currency to the destination authorized by this order.
         for (uint256 i = 0; i < state.assetSnapshots.length; ++i) {
             ICartPayments.AssetSnapshot calldata snapshot = state.assetSnapshots[i];
             uint256 current = IERC20(snapshot.token).balanceOf(address(this));

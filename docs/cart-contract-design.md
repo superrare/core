@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The cart is a generic atomic settlement contract for on-chain and off-chain commerce. It authenticates platform Purchase Orders and seller Listings, collects one input currency, routes and pays peer Order Lines, performs supported NFT fulfillment, and emits authoritative reconciliation events. It does not interpret catalogue metadata, calculate taxes or discounts, or calculate royalties. Route output above signed line obligations is sent to the configured protocol recipient.
+The cart is a generic atomic settlement contract for on-chain and off-chain commerce. It authenticates platform Purchase Orders and seller Listings, collects one input currency, routes and pays peer Order Lines, performs supported NFT fulfillment, and emits authoritative reconciliation events. It does not interpret catalogue metadata, calculate taxes or discounts, or calculate royalties. Route output above signed line obligations is sent to the signed `PurchaseOrder.spreadRecipient`.
 
 See [Commerce language](../CONTEXT.md), [ADR 0001](./adr/0001-cart-route-policy.md), and [ADR 0002](./adr/0002-uups-cart-for-stable-approvals.md).
 
@@ -87,6 +87,7 @@ struct PurchaseOrder {
     address paymentCurrency;
     uint256 deadline;
     uint256 paymentAmount;
+    address spreadRecipient;
     bytes32 orderLinesHash;
     bytes32 payoutRouteHash;
     bytes32 fulfillmentActionsHash;
@@ -209,17 +210,16 @@ Native ETH is represented by `address(0)` and is supported as input or settlemen
 - Cart snapshots native ETH, WETH, the payment token, and every non-native settlement currency named by the order. ETH and WETH remain distinct payout currencies but share one incremental solvency family.
 - After routing, each non-native settlement delta must cover its signed obligations without consuming the snapshot baseline. ETH and WETH deltas are checked together, then converted only as needed to deliver exact ETH and WETH payouts.
 - Exact-input excess output, exact-output refunds, and any other positive supported-currency delta above exact payouts are Protocol Spread.
-- The protocol surplus recipient is initialized to the Cart owner and can be rotated by the owner;
-  it receives output-token surplus, while line recipients receive exactly their signed amounts.
+- The required nonzero `spreadRecipient` is part of the platform-signed Purchase Order. It receives all positive supported-currency deltas after exact line payouts, including unused input, output-token surplus, ETH, and WETH. There is no global recipient setting or fallback.
 - The signed `paymentAmount` is the final customer charge. Exact-input excess output and exact-output
-  unused input are Protocol Spread; neither is refunded to the payer or processor.
+  unused input are Protocol Spread. Cart transfers both to the signed `spreadRecipient`; it does not derive a refund recipient from the payer or processor.
 - Failed transactions rely on EVM rollback rather than compensating transfers.
 
 The Universal Router and Permit2 are configured once with no runtime dependency setters. Only the platform signer is rotatable. Cart does not spend runtime bytecode defending trusted deployment and administrative calls from bad configuration: dependency addresses are validated by deployment tooling, and the owner may set any platform signer (including an address that cannot validate orders). A bad configuration can make purchases unavailable but cannot bypass signature or settlement invariants. Cart's settlement balance invariant covers the signed payment currency and every signed line settlement currency; intermediate route-token selection is a client and backend responsibility.
 
 ### CartRoutePolicy
 
-`CartRoutePolicy` is a shallow default-deny boundary around Universal Router. It accepts only Permit2 transfer-from, sweep, wrap ETH, unwrap WETH, V2/V3 exact-input and exact-output swaps, and V4 swap commands. It rejects command flags, unsupported command families, empty programs, input-count mismatches, and oversized programs. It deliberately treats every command input as opaque; Universal Router remains responsible for decoding and validating paths, recipients, payer flags, V4 actions, settlement/refund behavior, and exact-input/output semantics.
+`CartRoutePolicy` is a shallow default-deny boundary around Universal Router. It accepts only Permit2 transfer-from, sweep, wrap ETH, unwrap WETH, V2/V3 exact-input and exact-output swaps, and V4 swap commands. It rejects command flags, unsupported command families, empty programs, and input-count mismatches. It imposes no numerical command-count or input-byte cap. It deliberately treats every command input as opaque; Universal Router remains responsible for decoding and validating paths, recipients, payer flags, V4 actions, settlement/refund behavior, and exact-input/output semantics.
 
 The policy is deployed as its own stateless contract and referenced by a cart implementation immutable rather than compiled into the cart. The call boundary keeps the policy out of the cart's EIP-170 budget and gives the cart a `try`/`catch` seam that attributes a rejected route to the Order Line that produced it. Because the reference is an immutable rather than storage, replacing the policy still requires an audited implementation upgrade.
 
@@ -234,10 +234,10 @@ The non-reentrant execution sequence is:
 1. Validate the complete Purchase Order, Listings, the order-wide route, actions, currencies, and structural array relationships.
 2. Mark the order executed and reserve all Listing quantities.
 3. Collect the signed `paymentAmount` from the caller's native value or ordinary Cart allowance.
-4. Execute the one order-wide route, validate each aggregate output basket, and forward surplus to the protocol recipient.
+4. Execute the one order-wide route and validate aggregate incremental solvency.
 5. Execute every Fulfillment Action.
-6. Pay every Order Line recipient.
-7. Send unused input to the protocol recipient as Protocol Spread.
+6. Convert incremental ETH and WETH to their required payout representations and pay every Order Line recipient.
+7. Send all supported-currency surplus to the signed spread recipient, verify final balance baselines, and confirm that temporary payment-token allowances are cleared.
 8. Emit reconciliation events.
 
 Any validation, route, fulfillment, payout, or spread-capture failure reverts the complete transaction, including execution state, Listing fills, token movement, and earlier payments.
@@ -306,7 +306,7 @@ Each line recipient receives exactly its signed `amount`. `ProtocolSpreadCapture
 
 ## Administration and Upgrade Safety
 
-The cart uses a UUPS proxy, with protocol multisig ownership as the governance design. Deployment ownership is configured separately. OpenZeppelin's inherited linear storage and Cart's namespaced storage must be preserved across upgrades. Cart-owned state is organized into three ERC-7201 namespaces: `CartConfig` for configuration and pause state, `CartListings` for seller Listing state, and `CartSettlement` for Purchase Order replay state. The storage baseline is documented in `src/cart/Cart.storage-layout.json` and exercised by the proxy-upgrade canary in `src/test/cart/CartStorageLayout.t.sol`. Existing proxy state and signatures must survive compatible upgrades. The owner can rotate the platform signer and protocol spread recipient, pause or unpause purchases, transfer ownership, and authorize implementation upgrades. Pausing blocks only Purchase Order execution; seller Listing and Listing Root cancellation and nonce invalidation remain available.
+The cart uses a UUPS proxy, with protocol multisig ownership as the governance design. Deployment ownership is configured separately. OpenZeppelin's inherited linear storage and Cart's namespaced storage must be preserved across upgrades. Cart-owned state is organized into three ERC-7201 namespaces: `CartConfig` for configuration and pause state, `CartListings` for seller Listing state, and `CartSettlement` for Purchase Order replay state. The storage baseline is documented in `src/cart/Cart.storage-layout.json` and exercised by the proxy-upgrade canary in `src/test/cart/CartStorageLayout.t.sol`. Existing proxy state and signatures must survive compatible upgrades. The signed spread-recipient change intentionally changes the Purchase Order ABI and EIP-712 typehash. Old checkout payloads must be rebuilt and signed again; seller Listing and Listing Root typehashes and the EIP-712 domain remain unchanged. The owner can rotate the platform signer, pause or unpause purchases, transfer ownership, and authorize implementation upgrades. The platform signer chooses the spread recipient in each Purchase Order. Treasury changes affect newly signed orders; outstanding orders retain their signed recipient. The old global recipient slot remains reserved and unused for proxy storage compatibility. See [ADR 0003](adr/0003-signed-cart-spread-recipient.md) and the [Cart runbook](cart-runbook.md). Pausing blocks only Purchase Order execution; seller Listing and Listing Root cancellation and nonce invalidation remain available.
 
 Every cart implementation is constructed with the route policy address, so each upgrade names the policy it was audited against.
 

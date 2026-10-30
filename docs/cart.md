@@ -23,10 +23,10 @@ The branch combines free Listings and zero-total Orders with the listing digest 
 - Each Order Line names its payout currency, amount, and recipient. Seller-backed lines must meet the Listing's per-unit proceeds floor. Fees and other platform-authorized charges use peer lines.
 - Fulfillment supports ERC-721 and ERC-1155 transfers and the supported `mintTo` interfaces, plus off-chain fulfillment. `NONE` requires no fulfillment job. `CURRENCY_SWAP` is a listing-less conversion through the order-wide route.
 - Free Listings and zero-total Orders retain signature, inventory, replay, fulfillment, and balance protections. ERC-721 mint actions return token IDs through `MintResult[]` and emit fulfillment events.
-- Favorable routing variance goes to the configured protocol recipient. The signed quote is collected exactly, and tracked preexisting balances must survive settlement.
+- Favorable routing variance goes to the nonzero `spreadRecipient` in the signed Purchase Order. There is no global recipient setting. The signed quote is collected exactly, and tracked preexisting balances must survive settlement.
 - Cart, Lens, and route policy impose no numerical resource caps. The signing service owns gas, byte, and workload admission. Structural, authorization, custody, and route-family checks remain on-chain.
 
-The [contract design](cart-contract-design.md) describes the full behavior. [Commerce language](../CONTEXT.md) defines the terms. [ADR 0001](adr/0001-cart-route-policy.md) records the route boundary, and [ADR 0002](adr/0002-uups-cart-for-stable-approvals.md) records the stable proxy decision.
+The [contract design](cart-contract-design.md) describes the full behavior. [Commerce language](../CONTEXT.md) defines the terms. [ADR 0001](adr/0001-cart-route-policy.md) records the route boundary, and [ADR 0002](adr/0002-uups-cart-for-stable-approvals.md) records the stable proxy decision. [ADR 0003](adr/0003-signed-cart-spread-recipient.md) records the signed spread destination. Use the [Cart runbook](cart-runbook.md) for signer rotation, pausing, ownership, upgrades, and seller invalidation.
 
 ## Integration guidance
 
@@ -38,7 +38,9 @@ The transaction builder, SDK, CLI, and settlement consumers are maintained outsi
 
 [NetworkConfig](../script/NetworkConfig.s.sol) records the Sepolia addresses. The [October 27 deployment record](cart-sepolia-free-listings-2026-10-27.md) and [receipt ledger](data/cart-sepolia-free-listings-2026-10-27.json) describe the confirmed free-listing repair, preserving the proxy, route policy, and CartHashes while replacing CartPayments, Cart, and CartLens. The [October 26 record](cart-sepolia-upgrade-2026-10-26.md) is deployment history; its implementation, payment executor, and Lens were superseded.
 
-These records establish the recorded Sepolia deployment. Other chains require separate deployment evidence. Use the scripts in [script/cart](../script/cart) for the intended upgrade scope: implementation-only upgrades preserve embedded dependencies; policy changes require replacing the policy, payment executor, and implementation together. The checkout guard protects deployment sources against detached, dirty, or stale checkouts.
+The signed spread-recipient change has not been deployed. These records describe the older order ABI and its global protocol recipient. A future rollout must replace CartPayments, Cart, CartLens, and CartHashes together and regenerate client bindings. Old checkout payloads require new signatures.
+
+These records establish the recorded Sepolia deployment. Other chains require separate deployment evidence. Use the scripts in [script/cart](../script/cart) for the intended upgrade scope: the implementation-only helper is disabled for the signed-checkout migration. The combined helpers replace the executor and current integration helpers together. Policy changes also require a matching new policy. The checkout guard protects deployment sources against detached, dirty, or stale checkouts.
 
 ## Verification
 
@@ -53,3 +55,5 @@ The profile selects [src/test/cart](../src/test/cart). Shared setup and builders
 The [formal-verification project](../verification/cart/README.md) documents its modeled properties and limitations. Its saved results are separate evidence from the native test suite and must be checked against the source used for any new proof claim.
 
 The [cleanup verification](cart-cleanup-verification.md) records preserved test scenarios, ABI and storage checks, runtime sizes, and checkout-gas comparisons for the internal refactor.
+
+The [signed spread-recipient verification](cart-signed-spread-verification.md) records tests, gas, runtime sizes, ABI changes, and reserved-slot checks for the checkout interface change.

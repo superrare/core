@@ -163,6 +163,7 @@ contract CartToolAssessment is Test {
             orderId: bytes32(uint256(1)),
             paymentCurrency: currency,
             paymentAmount: quote,
+            spreadRecipient: address(this),
             deadline: block.timestamp + 1 days,
             orderLinesHash: hashes.hashOrderLines(lines),
             payoutRouteHash: hashes.hashPayoutRoute(route),

@@ -53,7 +53,6 @@ contract CartInvariantsTest is Test {
         cart = Cart(payable(address(new ERC1967Proxy(address(implementation), initData))));
         hashes = new CartHashes();
         protocolSink = new CartInvariantProtocolSink();
-        cart.setProtocolRecipient(address(protocolSink));
 
         vm.deal(address(cart), 0.25 ether);
         weth.mint(address(cart), 0.5 ether);
@@ -161,6 +160,7 @@ contract CartInvariantsTest is Test {
             paymentCurrency: paymentCurrency,
             deadline: block.timestamp + 1 days,
             paymentAmount: quote,
+            spreadRecipient: address(protocolSink),
             orderLinesHash: hashes.hashOrderLines(lines),
             payoutRouteHash: hashes.hashPayoutRoute(route),
             fulfillmentActionsHash: hashes.hashFulfillmentActions(actions)

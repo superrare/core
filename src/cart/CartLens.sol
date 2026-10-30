@@ -136,6 +136,10 @@ contract CartLens is ICartLens {
             return _failure(ValidationCode.ORDER_DEADLINE_EXPIRED, 0, order.orderId, "");
         }
         if (order.orderId == bytes32(0)) return _failure(ValidationCode.INVALID_ORDER_ID, 0, order.orderId, "");
+        // Require an explicit signed surplus destination even when this checkout has no spread.
+        if (order.spreadRecipient == address(0)) {
+            return _failure(ValidationCode.INVALID_SPREAD_RECIPIENT, 0, order.orderId, "");
+        }
         if (target.executedOrderIds(order.orderId)) {
             return _failure(ValidationCode.ORDER_ALREADY_EXECUTED, 0, order.orderId, "");
         }

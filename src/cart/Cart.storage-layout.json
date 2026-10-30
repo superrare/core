@@ -2,7 +2,7 @@
   "contract": "src/cart/Cart.sol:Cart",
   "baseline": "Initial deployment candidate",
   "storageModel": "erc7201",
-  "compatibilityPolicy": "Pre-deployment layout; fields may be removed or reordered before the first deployment. Post-deployment upgrades must preserve namespace identifiers and field slots.",
+  "compatibilityPolicy": "Preserve deployed namespace identifiers, field slots and offsets. The former protocol recipient slot is reserved and must never be reused.",
   "namespaces": {
     "config": {
       "identifier": "superrare.storage.CartConfig",
@@ -13,7 +13,7 @@
         { "label": "permit2", "slot": 2, "offset": 0, "type": "address" },
         { "label": "weth", "slot": 3, "offset": 0, "type": "address" },
         { "label": "paused", "slot": 3, "offset": 20, "type": "bool" },
-        { "label": "protocolRecipient", "slot": 4, "offset": 0, "type": "address" }
+        { "label": "__deprecatedProtocolRecipient", "slot": 4, "offset": 0, "type": "address" }
       ]
     },
     "listings": {

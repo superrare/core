@@ -1,5 +1,7 @@
 # Cart Kontrol proofs
 
+The signed spread-recipient migration updates these fixture builders to the current order ABI. Saved proof results predate that migration and do not prove the updated contracts; rerun the proof selection before making a current formal-verification claim.
+
 This project verifies fixed-shape purchases through a freshly initialized ERC1967 proxy using the production Cart implementation and CartPayments delegatecalls. Production contracts are imported directly. The runner pins Kontrol 1.0.255 and its container digest.
 
 ## Run

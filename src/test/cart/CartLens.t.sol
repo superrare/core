@@ -229,6 +229,7 @@ contract CartLensTest is Test {
         order.orderId = keccak256("cart-self-payout");
         order.deadline = type(uint256).max;
         order.paymentAmount = 1 ether;
+        order.spreadRecipient = address(0x2002);
         ICart.OrderLine[] memory lines = new ICart.OrderLine[](1);
         lines[0] = ICart.OrderLine({
             sku: keccak256("cart-self-payout"),
@@ -273,6 +274,7 @@ contract CartLensTest is Test {
         order.orderId = keccak256("lens-order");
         order.deadline = type(uint256).max;
         order.paymentAmount = 1 ether;
+        order.spreadRecipient = address(0x2002);
         ICart.OrderLine[] memory lines = new ICart.OrderLine[](1);
         lines[0] = ICart.OrderLine({
             sku: keccak256("lens-sku"),
@@ -291,6 +293,42 @@ contract CartLensTest is Test {
 
         ICartLens.ValidationResult memory result =
             lens.validatePurchaseEnvelope(address(cart), order, lines, route, actions, bytes("signature"));
+        _assertResult(result, ICartLens.ValidationCode.OK, 0, bytes32(0));
+    }
+
+    function testPurchaseEnvelopeRejectsSignedZeroSpreadRecipient() public {
+        uint256 platformKey = 0xA11CE;
+        cart.setSigner(vm.addr(platformKey), DOMAIN_SEPARATOR);
+        ICart.OrderLine[] memory lines = new ICart.OrderLine[](1);
+        lines[0] = ICart.OrderLine({
+            sku: keccak256("free-envelope"),
+            listingDigest: bytes32(0),
+            fulfillmentKind: ICart.FulfillmentKind.NONE,
+            quantity: 1,
+            settlementCurrency: address(0),
+            amount: 0,
+            paymentRecipient: address(0x2001)
+        });
+        ICart.PayoutRoute memory route =
+            ICart.PayoutRoute({commands: bytes(""), inputs: new bytes[](0), routerValue: 0});
+        ICart.FulfillmentAction[] memory actions = new ICart.FulfillmentAction[](0);
+        ICart.PurchaseOrder memory order;
+        order.orderId = keccak256("zero-spread-envelope");
+        order.deadline = type(uint256).max;
+        order.orderLinesHash = hashes.hashOrderLines(lines);
+        order.payoutRouteHash = hashes.hashPayoutRoute(route);
+        order.fulfillmentActionsHash = hashes.hashFulfillmentActions(actions);
+
+        // Sign the zero-recipient checkout to isolate the envelope constraint from signature validity.
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(platformKey, hashes.hashOrder(DOMAIN_SEPARATOR, order));
+        ICartLens.ValidationResult memory result =
+            lens.validatePurchaseEnvelope(address(cart), order, lines, route, actions, abi.encodePacked(r, s, v));
+        _assertResult(result, ICartLens.ValidationCode.INVALID_SPREAD_RECIPIENT, 0, order.orderId);
+
+        // The same free checkout passes when its nonzero destination is included in a fresh signature.
+        order.spreadRecipient = address(0x2002);
+        (v, r, s) = vm.sign(platformKey, hashes.hashOrder(DOMAIN_SEPARATOR, order));
+        result = lens.validatePurchaseEnvelope(address(cart), order, lines, route, actions, abi.encodePacked(r, s, v));
         _assertResult(result, ICartLens.ValidationCode.OK, 0, bytes32(0));
     }
 

@@ -68,6 +68,11 @@ contract CartStorageLayoutTest is Test {
         _assertAddressField(layout, configLocation, "config", 2, address(permit2));
         _assertAddressField(layout, configLocation, "config", 3, address(weth));
 
+        // Emulate the retired global recipient stored by an earlier implementation.
+        bytes32 retiredRecipientSlot = _fieldSlot(layout, configLocation, "config", 5);
+        assertEq(vm.load(address(cart), retiredRecipientSlot), bytes32(0));
+        vm.store(address(cart), retiredRecipientSlot, bytes32(uint256(uint160(address(this)))));
+
         bytes32 orderId = keccak256("layout-order");
         bytes32 listingDigest = keccak256("layout-listing-digest");
         bytes32 rootDigest = keccak256("layout-root-digest");
@@ -111,7 +116,7 @@ contract CartStorageLayoutTest is Test {
         assertEq(cart.permit2(), address(permit2));
         assertEq(cart.weth(), address(weth));
         assertEq(cart.owner(), address(this));
-        assertEq(cart.protocolRecipient(), address(this));
+        _assertAddressField(layout, configLocation, "config", 5, address(this));
         assertEq(cart.DOMAIN_SEPARATOR(), domainSeparator);
         assertTrue(cart.paused());
         assertTrue(cart.executedOrderIds(orderId));

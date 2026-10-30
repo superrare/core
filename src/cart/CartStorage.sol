@@ -18,8 +18,8 @@ abstract contract CartStorage {
         address weth;
         // Stops new purchases while preserving read access and administrative control.
         bool paused;
-        // Receives favorable route output and unused input above signed obligations.
-        address protocolRecipient;
+        // Reserved former protocol recipient slot. Never reuse or read for settlement.
+        address __deprecatedProtocolRecipient;
     }
 
     /// @custom:storage-location erc7201:superrare.storage.CartListings

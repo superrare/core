@@ -15,6 +15,7 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 CHAIN_ID = 11155111
+RESERVED_PROTOCOL_RECIPIENT_SLOT = "0xc012b0fbebfe5af5b8d952297ba0e80136c8473aa49759c18a1edebf3f3a9b04"
 IMPLEMENTATION_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc"
 FIELDS = {
     "owner": "address",
@@ -22,7 +23,6 @@ FIELDS = {
     "universalRouter": "address",
     "permit2": "address",
     "weth": "address",
-    "protocolRecipient": "address",
     "paused": "bool",
     "routePolicy": "address",
     "DOMAIN_SEPARATOR": "bytes32",
@@ -80,7 +80,7 @@ class Upgrade:
         }
         self.artifacts = {}
         source_hashes = {}
-        for name in ("CartPayments", "Cart", "CartLens"):
+        for name in ("CartPayments", "Cart", "CartLens", "CartHashes"):
             contents = (ROOT / "out" / (name + ".sol") / (name + ".json")).read_bytes()
             artifact = json.loads(contents)
             self.artifacts[name] = artifact
@@ -112,6 +112,10 @@ class Upgrade:
             field: run("call", self.proxy, field + "()(" + result_type + ")", "--rpc-url", self.rpc).lower()
             for field, result_type in FIELDS.items()
         }
+        # Preserve the retired treasury slot without calling the removed getter.
+        values["reservedProtocolRecipient"] = self.rpc_call(
+            "eth_getStorageAt", self.proxy, RESERVED_PROTOCOL_RECIPIENT_SLOT, "latest"
+        ).lower()
         slot = self.rpc_call("eth_getStorageAt", self.proxy, IMPLEMENTATION_SLOT, "latest")
         values["implementation"] = "0x" + slot[-40:].lower()
         return values
@@ -217,6 +221,7 @@ class Upgrade:
         payments = self.deploy("CartPayments", "address", (self.baseline["routePolicy"],))
         implementation = self.deploy("Cart", "address,address", (self.baseline["routePolicy"], payments))
         self.deploy("CartLens")
+        self.deploy("CartHashes")
         self.require_unchanged_state()
         self.send("Upgrade", call=(self.proxy, "upgradeToAndCall(address,bytes)", implementation, "0x"))
         expected_state = {**self.baseline, "implementation": implementation}
@@ -231,7 +236,7 @@ class Upgrade:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--broadcast", action="store_true", required=True, help="Submit the four upgrade transactions.")
+    parser.add_argument("--broadcast", action="store_true", required=True, help="Submit the five upgrade transactions.")
     parser.parse_args()
     subprocess.run(["bash", str(ROOT / "script/cart/check-checkout.sh"), "--remote"], cwd=ROOT, check=True)
     upgrade = Upgrade()

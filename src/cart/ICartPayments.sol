@@ -26,6 +26,7 @@ interface ICartPayments {
     function finish(
         bytes32 orderId,
         address paymentCurrency,
+        address spreadRecipient,
         ICart.OrderLine[] calldata lines,
         PaymentState calldata state
     ) external payable;

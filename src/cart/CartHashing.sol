@@ -11,7 +11,7 @@ library CartHashing {
         "Listing(bytes32 listingSalt,address seller,bytes32 sku,uint8 fulfillmentKind,address tokenContract,uint256 tokenId,address settlementCurrency,uint256 minimumUnitPrice,uint256 availableQuantity,address paymentRecipient)"
     );
     bytes32 internal constant ORDER_TYPEHASH = keccak256(
-        "PurchaseOrder(bytes32 orderId,address paymentCurrency,uint256 deadline,uint256 paymentAmount,bytes32 orderLinesHash,bytes32 payoutRouteHash,bytes32 fulfillmentActionsHash)"
+        "PurchaseOrder(bytes32 orderId,address paymentCurrency,uint256 deadline,uint256 paymentAmount,address spreadRecipient,bytes32 orderLinesHash,bytes32 payoutRouteHash,bytes32 fulfillmentActionsHash)"
     );
     bytes32 internal constant ORDER_LINE_TYPEHASH = keccak256(
         "OrderLine(bytes32 sku,bytes32 listingDigest,uint8 fulfillmentKind,uint256 quantity,address settlementCurrency,uint256 amount,address paymentRecipient)"
@@ -51,6 +51,7 @@ library CartHashing {
                 order.paymentCurrency,
                 order.deadline,
                 order.paymentAmount,
+                order.spreadRecipient,
                 order.orderLinesHash,
                 order.payoutRouteHash,
                 order.fulfillmentActionsHash

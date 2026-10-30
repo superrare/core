@@ -224,6 +224,7 @@ contract CartInventoryProof is CartProofBase {
             paymentCurrency: address(0),
             deadline: block.timestamp + 1 days,
             paymentAmount: quote,
+            spreadRecipient: address(this),
             orderLinesHash: hashes.hashOrderLines(lines),
             payoutRouteHash: hashes.hashPayoutRoute(route),
             fulfillmentActionsHash: hashes.hashFulfillmentActions(actions)

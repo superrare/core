@@ -107,6 +107,9 @@ interface ICart {
         uint256 deadline;
         /// @dev Exact amount collected from the transaction caller. Zero is valid when no funding is needed.
         uint256 paymentAmount;
+        /// @notice Receives all supported-currency surplus after line payouts.
+        /// @dev Must be nonzero and is bound by the platform signature.
+        address spreadRecipient;
         /// @dev Hash of the complete OrderLine array.
         bytes32 orderLinesHash;
         /// @dev Hash of the complete order-wide PayoutRoute.
@@ -139,7 +142,6 @@ interface ICart {
 
     event PlatformSignerUpdated(address indexed oldSigner, address indexed newSigner);
     event ContractPausedUpdated(bool paused);
-    event ProtocolRecipientUpdated(address indexed oldRecipient, address indexed newRecipient);
     event ProtocolSpreadCaptured(
         bytes32 indexed orderId, address indexed currency, address indexed recipient, uint256 amount
     );
@@ -195,6 +197,7 @@ interface ICart {
     error InvalidMerkleProof(bytes32 root, bytes32 leaf);
     error InvalidRootIndex(uint256 index);
     error InvalidOrderId();
+    error InvalidSpreadRecipient();
     error InvalidOrderLinesHash();
     error InvalidPaymentRecipient(address recipient);
     error InvalidPayoutRouteHash();
@@ -224,6 +227,7 @@ interface ICart {
     /// @dev The caller is the payer. Native input requires msg.value == paymentAmount; ERC-20
     ///      input requires zero msg.value and an allowance to the Cart proxy for the signed amount.
     ///      Zero-total purchases still validate authorization, reserve inventory, and fulfill.
+    ///      The signed nonzero spreadRecipient receives supported surplus only after line payouts.
     ///      The platform signature binds the ordered lines, route, and ordered actions through
     ///      the three hashes in order. Reordering or changing signed payloads requires re-signing.
     ///      Each distinct supplied Listing must be referenced, and duplicate line references share
@@ -231,7 +235,7 @@ interface ICart {
     ///      Validation precedes inventory reservation and settlement. A later failure reverts all
     ///      transfers, fills, replay writes, and logs. Indexed errors identify the failing line or
     ///      action where available; nested external-call failures retain their revert data.
-    /// @param order Fixed quote, deadline, replay identifier, and hashes authorized by the platform.
+    /// @param order Fixed quote, spread recipient, deadline, replay identifier, and payload hashes.
     /// @param lines Ordered charges. Their nonzero listingDigest resolves to one supplied Listing.
     /// @param listings Deduplicated seller Listings. Every supplied Listing must be used by a line.
     /// @param authorization One signature per root and one root index and proof per Listing, in
@@ -262,8 +266,6 @@ interface ICart {
     function setPlatformSigner(address newSigner) external;
     /// @notice Pauses or resumes new purchase execution.
     function setPaused(bool paused) external;
-    /// @notice Changes the recipient of favorable route output surplus.
-    function setProtocolRecipient(address recipient) external;
 
     /// @notice EIP-712 domain separator clients hash Listings and Purchase Orders against.
     function DOMAIN_SEPARATOR() external view returns (bytes32);
@@ -275,8 +277,6 @@ interface ICart {
     function permit2() external view returns (address);
     /// @notice Returns the WETH contract used for native currency.
     function weth() external view returns (address);
-    /// @notice Returns the recipient of favorable route output surplus.
-    function protocolRecipient() external view returns (address);
     /// @notice Returns true when new purchase execution is paused.
     function paused() external view returns (bool);
     /// @notice Returns true when an order id has already been executed.

@@ -560,7 +560,8 @@ contract CartOutcomeTest is CartFixture {
     function testProtocolSpreadTransferFailureRevertsPurchase() public {
         CartTestToken paymentToken = new CartTestToken("Payment", "PAY");
         CartTestRevertingTransferToken outputToken = new CartTestRevertingTransferToken();
-        outputToken.setRejectingRecipient(address(this));
+        address rejectingSpreadRecipient = address(0xBAD5);
+        outputToken.setRejectingRecipient(rejectingSpreadRecipient);
         ICart.Listing memory listing =
             _listing(keccak256("spread-transfer-failure"), ICart.FulfillmentKind.NONE, address(0), 0, sellerPayout);
         listing.settlementCurrency = address(outputToken);
@@ -571,6 +572,7 @@ contract CartOutcomeTest is CartFixture {
         ICart.FulfillmentAction[] memory actions = new ICart.FulfillmentAction[](0);
         ICart.PurchaseOrder memory order =
             _erc20Order("spread-transfer-failure", paymentToken, lines, route, 1 ether, actions);
+        order.spreadRecipient = rejectingSpreadRecipient;
         ICart.Listing[] memory listings = _singletonListing(listing);
         ICart.ListingPurchaseAuthorization memory authorization = _rootAuthorization(listings, SELLER_PK);
         bytes memory signature = _sign(PLATFORM_PK, _orderDigest(order));
@@ -710,6 +712,7 @@ contract CartOutcomeTest is CartFixture {
             paymentCurrency: address(0),
             deadline: block.timestamp + 1 days,
             paymentAmount: paymentAmount,
+            spreadRecipient: address(this),
             orderLinesHash: hashes.hashOrderLines(lines),
             payoutRouteHash: hashes.hashPayoutRoute(route),
             fulfillmentActionsHash: hashes.hashFulfillmentActions(actions)
@@ -729,6 +732,7 @@ contract CartOutcomeTest is CartFixture {
             paymentCurrency: address(paymentToken),
             deadline: block.timestamp + 1 days,
             paymentAmount: paymentAmount,
+            spreadRecipient: address(this),
             orderLinesHash: hashes.hashOrderLines(lines),
             payoutRouteHash: hashes.hashPayoutRoute(route),
             fulfillmentActionsHash: hashes.hashFulfillmentActions(actions)

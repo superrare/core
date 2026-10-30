@@ -43,7 +43,8 @@ interface ICartLens {
         INVALID_ROOT_SIGNATURE,
         INVALID_MERKLE_PROOF,
         INVALID_ORDER_ID,
-        LISTING_CANCELLED
+        LISTING_CANCELLED,
+        INVALID_SPREAD_RECIPIENT
     }
 
     struct ValidationResult {

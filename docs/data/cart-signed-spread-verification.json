@@ -1,0 +1,345 @@
+{
+  "inheritedStorageEntries": 14,
+  "compiledSourceHashes": "match current source files",
+  "unchangedWitnessTypehashes": true,
+  "baseline": "1df23430daa9aef0911f31b823950f5412e4154b",
+  "runtime": [
+    {
+      "contract": "Cart",
+      "before": 18041,
+      "after": 17565,
+      "delta": -476
+    },
+    {
+      "contract": "CartPayments",
+      "before": 9821,
+      "after": 9801,
+      "delta": -20
+    },
+    {
+      "contract": "CartLens",
+      "before": 9593,
+      "after": 9627,
+      "delta": 34
+    },
+    {
+      "contract": "CartRoutePolicy",
+      "before": 697,
+      "after": 697,
+      "delta": 0
+    },
+    {
+      "contract": "CartHashes",
+      "before": 2247,
+      "after": 2286,
+      "delta": 39
+    }
+  ],
+  "selectors": {
+    "Cart": {
+      "removed": {
+        "executePurchase((bytes32,address,uint256,uint256,bytes32,bytes32,bytes32),(bytes32,bytes32,uint8,uint256,address,uint256,address)[],(bytes32,address,bytes32,uint8,address,uint256,address,uint256,uint256,address)[],((bytes32,uint256,uint256)[],bytes[],uint256[],bytes32[][]),(bytes,bytes[],uint256),(uint256,uint256,address)[],bytes)": "a58ea93f",
+        "protocolRecipient()": "941f5d25",
+        "setProtocolRecipient(address)": "07ba8a54"
+      },
+      "added": {
+        "executePurchase((bytes32,address,uint256,uint256,address,bytes32,bytes32,bytes32),(bytes32,bytes32,uint8,uint256,address,uint256,address)[],(bytes32,address,bytes32,uint8,address,uint256,address,uint256,uint256,address)[],((bytes32,uint256,uint256)[],bytes[],uint256[],bytes32[][]),(bytes,bytes[],uint256),(uint256,uint256,address)[],bytes)": "b19359ab"
+      }
+    },
+    "CartPayments": {
+      "removed": {
+        "begin((bytes32,address,uint256,uint256,bytes32,bytes32,bytes32),(bytes32,bytes32,uint8,uint256,address,uint256,address)[],(bytes,bytes[],uint256))": "21fee789",
+        "finish(bytes32,address,(bytes32,bytes32,uint8,uint256,address,uint256,address)[],((address,uint256)[],uint256))": "94c5baf0"
+      },
+      "added": {
+        "begin((bytes32,address,uint256,uint256,address,bytes32,bytes32,bytes32),(bytes32,bytes32,uint8,uint256,address,uint256,address)[],(bytes,bytes[],uint256))": "08f39d06",
+        "finish(bytes32,address,address,(bytes32,bytes32,uint8,uint256,address,uint256,address)[],((address,uint256)[],uint256))": "28f9e67a"
+      }
+    },
+    "CartLens": {
+      "removed": {
+        "validatePurchaseEnvelope(address,(bytes32,address,uint256,uint256,bytes32,bytes32,bytes32),(bytes32,bytes32,uint8,uint256,address,uint256,address)[],(bytes,bytes[],uint256),(uint256,uint256,address)[],bytes)": "e43ab314"
+      },
+      "added": {
+        "validatePurchaseEnvelope(address,(bytes32,address,uint256,uint256,address,bytes32,bytes32,bytes32),(bytes32,bytes32,uint8,uint256,address,uint256,address)[],(bytes,bytes[],uint256),(uint256,uint256,address)[],bytes)": "22d5aaa4"
+      }
+    },
+    "CartRoutePolicy": {
+      "removed": {},
+      "added": {}
+    },
+    "CartHashes": {
+      "removed": {
+        "hashOrder(bytes32,(bytes32,address,uint256,uint256,bytes32,bytes32,bytes32))": "a3666db7"
+      },
+      "added": {
+        "hashOrder(bytes32,(bytes32,address,uint256,uint256,address,bytes32,bytes32,bytes32))": "e8575012"
+      }
+    }
+  },
+  "gas": [
+    {
+      "case": "ListingGas:lines=18,listings=18",
+      "before": 957943,
+      "after": 956840,
+      "delta": -1103,
+      "percent": -0.11514255023524363,
+      "calldataBytesBefore": 15716,
+      "calldataBytesAfter": 15748
+    },
+    {
+      "case": "ListingGas:lines=32,listings=32",
+      "before": 1623333,
+      "after": 1622574,
+      "delta": -759,
+      "percent": -0.04675565641799927,
+      "calldataBytesBefore": 26916,
+      "calldataBytesAfter": 26948
+    },
+    {
+      "case": "ListingGas:lines=64,listings=64",
+      "before": 3159969,
+      "after": 3159999,
+      "delta": 30,
+      "percent": 0.0009493764021102738,
+      "calldataBytesBefore": 54564,
+      "calldataBytesAfter": 54596
+    },
+    {
+      "case": "ListingGas:lines=9,listings=9",
+      "before": 532920,
+      "after": 531595,
+      "delta": -1325,
+      "percent": -0.2486301883960069,
+      "calldataBytesBefore": 8228,
+      "calldataBytesAfter": 8260
+    },
+    {
+      "case": "ListingGas:lines=18,listings=1",
+      "before": 374607,
+      "after": 373088,
+      "delta": -1519,
+      "percent": -0.4054916218864036,
+      "calldataBytesBefore": 5764,
+      "calldataBytesAfter": 5796
+    },
+    {
+      "case": "ListingGas:lines=32,listings=1",
+      "before": 555302,
+      "after": 553786,
+      "delta": -1516,
+      "percent": -0.27300459929912013,
+      "calldataBytesBefore": 8900,
+      "calldataBytesAfter": 8932
+    },
+    {
+      "case": "ListingGas:lines=64,listings=1",
+      "before": 969364,
+      "after": 967856,
+      "delta": -1508,
+      "percent": -0.15556591744690332,
+      "calldataBytesBefore": 16068,
+      "calldataBytesAfter": 16100
+    },
+    {
+      "case": "ListingGas:lines=9,listings=1",
+      "before": 258594,
+      "after": 257072,
+      "delta": -1522,
+      "percent": -0.5885674068230508,
+      "calldataBytesBefore": 3748,
+      "calldataBytesAfter": 3780
+    },
+    {
+      "case": "ListingGas:lines=65,listings=65",
+      "before": 3221440,
+      "after": 3221496,
+      "delta": 56,
+      "percent": 0.0017383530346677261,
+      "calldataBytesBefore": 57476,
+      "calldataBytesAfter": 57508
+    },
+    {
+      "case": "ERC721Gas:minting=true,sales=18,lines=20",
+      "before": 2541854,
+      "after": 2537128,
+      "delta": -4726,
+      "percent": -0.18592727985163585,
+      "calldataBytesBefore": 17892,
+      "calldataBytesAfter": 17924
+    },
+    {
+      "case": "ERC721Gas:minting=true,sales=32,lines=34",
+      "before": 4371898,
+      "after": 4368847,
+      "delta": -3051,
+      "percent": -0.0697866235671555,
+      "calldataBytesBefore": 30436,
+      "calldataBytesAfter": 30468
+    },
+    {
+      "case": "ERC721Gas:minting=true,sales=62,lines=64",
+      "before": 8328450,
+      "after": 8318531,
+      "delta": -9919,
+      "percent": -0.11909779130570514,
+      "calldataBytesBefore": 59300,
+      "calldataBytesAfter": 59332
+    },
+    {
+      "case": "ERC721Gas:minting=true,sales=64,lines=66",
+      "before": 8600031,
+      "after": 8586261,
+      "delta": -13770,
+      "percent": -0.16011570190851637,
+      "calldataBytesBefore": 61156,
+      "calldataBytesAfter": 61188
+    },
+    {
+      "case": "ERC721Gas:minting=true,sales=9,lines=11",
+      "before": 1365643,
+      "after": 1363553,
+      "delta": -2090,
+      "percent": -0.1530414610553417,
+      "calldataBytesBefore": 9540,
+      "calldataBytesAfter": 9572
+    },
+    {
+      "case": "ERC721Gas:minting=false,sales=18,lines=20",
+      "before": 1325351,
+      "after": 1322715,
+      "delta": -2636,
+      "percent": -0.19889070895181732,
+      "calldataBytesBefore": 17892,
+      "calldataBytesAfter": 17924
+    },
+    {
+      "case": "ERC721Gas:minting=false,sales=32,lines=34",
+      "before": 2234287,
+      "after": 2229692,
+      "delta": -4595,
+      "percent": -0.205658449429281,
+      "calldataBytesBefore": 30436,
+      "calldataBytesAfter": 30468
+    },
+    {
+      "case": "ERC721Gas:minting=false,sales=62,lines=64",
+      "before": 4184217,
+      "after": 4194161,
+      "delta": 9944,
+      "percent": 0.2376549782193419,
+      "calldataBytesBefore": 59300,
+      "calldataBytesAfter": 59332
+    },
+    {
+      "case": "ERC721Gas:minting=false,sales=64,lines=66",
+      "before": 4315731,
+      "after": 4330362,
+      "delta": 14631,
+      "percent": 0.33901556885728046,
+      "calldataBytesBefore": 61156,
+      "calldataBytesAfter": 61188
+    },
+    {
+      "case": "ERC721Gas:minting=false,sales=9,lines=11",
+      "before": 744534,
+      "after": 742337,
+      "delta": -2197,
+      "percent": -0.29508390483174707,
+      "calldataBytesBefore": 9540,
+      "calldataBytesAfter": 9572
+    },
+    {
+      "case": "RareERC1155Gas:minting=true,sales=18,lines=20",
+      "before": 2577382,
+      "after": 2574567,
+      "delta": -2815,
+      "percent": -0.10921935514409582,
+      "calldataBytesBefore": 17892,
+      "calldataBytesAfter": 17924
+    },
+    {
+      "case": "RareERC1155Gas:minting=true,sales=32,lines=34",
+      "before": 4479041,
+      "after": 4473680,
+      "delta": -5361,
+      "percent": -0.11969079988327859,
+      "calldataBytesBefore": 30436,
+      "calldataBytesAfter": 30468
+    },
+    {
+      "case": "RareERC1155Gas:minting=true,sales=62,lines=64",
+      "before": 8559281,
+      "after": 8572390,
+      "delta": 13109,
+      "percent": 0.15315538770137352,
+      "calldataBytesBefore": 59300,
+      "calldataBytesAfter": 59332
+    },
+    {
+      "case": "RareERC1155Gas:minting=true,sales=64,lines=66",
+      "before": 8831088,
+      "after": 8848794,
+      "delta": 17706,
+      "percent": 0.20049624689505982,
+      "calldataBytesBefore": 61156,
+      "calldataBytesAfter": 61188
+    },
+    {
+      "case": "RareERC1155Gas:minting=true,sales=9,lines=11",
+      "before": 1361178,
+      "after": 1358318,
+      "delta": -2860,
+      "percent": -0.2101121234695242,
+      "calldataBytesBefore": 9540,
+      "calldataBytesAfter": 9572
+    },
+    {
+      "case": "RareERC1155Gas:minting=false,sales=18,lines=20",
+      "before": 1669821,
+      "after": 1673119,
+      "delta": 3298,
+      "percent": 0.19750619976632225,
+      "calldataBytesBefore": 17892,
+      "calldataBytesAfter": 17924
+    },
+    {
+      "case": "RareERC1155Gas:minting=false,sales=32,lines=34",
+      "before": 2858887,
+      "after": 2865814,
+      "delta": 6927,
+      "percent": 0.24229708974156725,
+      "calldataBytesBefore": 30436,
+      "calldataBytesAfter": 30468
+    },
+    {
+      "case": "RareERC1155Gas:minting=false,sales=62,lines=64",
+      "before": 5445414,
+      "after": 5444638,
+      "delta": -776,
+      "percent": -0.014250523468004454,
+      "calldataBytesBefore": 59300,
+      "calldataBytesAfter": 59332
+    },
+    {
+      "case": "RareERC1155Gas:minting=false,sales=64,lines=66",
+      "before": 5616830,
+      "after": 5621480,
+      "delta": 4650,
+      "percent": 0.08278691005424768,
+      "calldataBytesBefore": 61156,
+      "calldataBytesAfter": 61188
+    },
+    {
+      "case": "RareERC1155Gas:minting=false,sales=9,lines=11",
+      "before": 905407,
+      "after": 904971,
+      "delta": -436,
+      "percent": -0.048155139070053574,
+      "calldataBytesBefore": 9540,
+      "calldataBytesAfter": 9572
+    }
+  ],
+  "storage": "All namespace locations, slots, offsets and types preserved; former recipient reserved.",
+  "compiler": "Solidity 0.8.18, optimizer 100, viaIR, paris"
+}
