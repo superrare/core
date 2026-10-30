@@ -1,20 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.18;
 
-import {Test} from "forge-std/Test.sol";
+import {CartRoutePolicyFixture} from "./CartRoutePolicyFixture.sol";
 
 import {CartRoutePolicy} from "../../cart/CartRoutePolicy.sol";
 import {ICartRoutePolicy} from "../../cart/ICartRoutePolicy.sol";
 
 /// @notice Tests for Cart's shallow Universal Router command-family boundary.
 /// @dev Inputs are intentionally opaque here. Universal Router owns their decoding and semantics.
-contract CartRoutePolicyTest is Test {
-    CartRoutePolicy internal policy;
-
-    function setUp() public {
-        policy = new CartRoutePolicy();
-    }
-
+contract CartRoutePolicyTest is CartRoutePolicyFixture {
     function testAcceptsEverySupportedCommandWithOpaqueInputs() public {
         bytes memory commands = hex"0001020408090b0c10";
         bytes[] memory inputs = new bytes[](commands.length);

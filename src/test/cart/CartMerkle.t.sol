@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.18;
 
-import {CartTest, CartTestERC721, CartTestToken} from "./Cart.t.sol";
+import {CartFixture} from "./CartFixture.sol";
+import {CartTestERC721, CartTestToken} from "./CartMocks.sol";
 import {ICart} from "../../cart/ICart.sol";
 
 /// @notice Focused coverage for seller root-authorized Listings.
-contract CartMerkleTest is CartTest {
+contract CartMerkleTest is CartFixture {
     function testSingletonListingRootUsesEmptyProof() public {
         ICart.Listing memory listing =
             _listing(keccak256("root-singleton"), ICart.FulfillmentKind.NONE, address(0), 0, sellerPayout);
@@ -15,15 +16,15 @@ contract CartMerkleTest is CartTest {
 
         ICart.ListingPurchaseAuthorization memory authorization = _listingAuthorization(root);
         ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 1 ether);
-        ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
+        ICart.PayoutRoute memory route = _emptyRoute();
         ICart.FulfillmentAction[] memory actions = _emptyActions();
-        ICart.PurchaseOrder memory order = _order("root-singleton-order", lines, routes, actions);
+        ICart.PurchaseOrder memory order = _order("root-singleton-order", lines, route, actions);
         bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
 
         vm.deal(payer, 1 ether);
         vm.prank(payer);
         cart.executePurchase{value: 1 ether}(
-            order, lines, _singletonListing(listing), authorization, _combineRoutes(routes), actions, platformSignature
+            order, lines, _singletonListing(listing), authorization, route, actions, platformSignature
         );
 
         assertEq(cart.filledQuantity(_listingDigest(listing)), 1);
@@ -44,9 +45,9 @@ contract CartMerkleTest is CartTest {
         firstAuthorization.listingProofs[0] = new bytes32[](1);
         firstAuthorization.listingProofs[0][0] = secondLeaf;
         ICart.OrderLine[] memory firstLines = _lineForListing(first, 1, 1 ether);
-        ICart.PayoutRoute[] memory firstRoutes = _emptyRoutes(1);
+        ICart.PayoutRoute memory firstRoute = _emptyRoute();
         ICart.FulfillmentAction[] memory actions = _emptyActions();
-        ICart.PurchaseOrder memory firstOrder = _order("root-batch-first-order", firstLines, firstRoutes, actions);
+        ICart.PurchaseOrder memory firstOrder = _order("root-batch-first-order", firstLines, firstRoute, actions);
         bytes memory firstPlatformSignature = _sign(PLATFORM_PK, _orderDigest(firstOrder));
 
         vm.deal(payer, 2 ether);
@@ -56,7 +57,7 @@ contract CartMerkleTest is CartTest {
             firstLines,
             _singletonListing(first),
             firstAuthorization,
-            _combineRoutes(firstRoutes),
+            firstRoute,
             actions,
             firstPlatformSignature
         );
@@ -69,8 +70,8 @@ contract CartMerkleTest is CartTest {
         secondAuthorization.listingProofs[0] = new bytes32[](1);
         secondAuthorization.listingProofs[0][0] = firstLeaf;
         ICart.OrderLine[] memory secondLines = _lineForListing(second, 1, 1 ether);
-        ICart.PayoutRoute[] memory secondRoutes = _emptyRoutes(1);
-        ICart.PurchaseOrder memory secondOrder = _order("root-batch-second-order", secondLines, secondRoutes, actions);
+        ICart.PayoutRoute memory secondRoute = _emptyRoute();
+        ICart.PurchaseOrder memory secondOrder = _order("root-batch-second-order", secondLines, secondRoute, actions);
         bytes memory secondPlatformSignature = _sign(PLATFORM_PK, _orderDigest(secondOrder));
 
         vm.prank(payer);
@@ -79,7 +80,7 @@ contract CartMerkleTest is CartTest {
             secondLines,
             _singletonListing(second),
             secondAuthorization,
-            _combineRoutes(secondRoutes),
+            secondRoute,
             actions,
             secondPlatformSignature
         );
@@ -120,9 +121,9 @@ contract CartMerkleTest is CartTest {
         ICart.OrderLine[] memory lines = new ICart.OrderLine[](2);
         lines[0] = _lineForListing(first, 1, 1 ether)[0];
         lines[1] = _lineForListing(second, 1, 1 ether)[0];
-        ICart.PayoutRoute[] memory routes = _emptyRoutes(2);
+        ICart.PayoutRoute memory route = _emptyRoute();
         ICart.FulfillmentAction[] memory actions = _emptyActions();
-        ICart.PurchaseOrder memory order = _order("separate-sellers-order", lines, routes, actions);
+        ICart.PurchaseOrder memory order = _order("separate-sellers-order", lines, route, actions);
         bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
 
         uint256 firstPayoutBefore = sellerPayout.balance;
@@ -130,7 +131,7 @@ contract CartMerkleTest is CartTest {
         vm.deal(payer, 2 ether);
         vm.prank(payer);
         cart.executePurchase{value: 2 ether}(
-            order, lines, listings, authorization, _combineRoutes(routes), actions, platformSignature
+            order, lines, listings, authorization, route, actions, platformSignature
         );
 
         assertEq(cart.filledQuantity(_listingDigest(first)), 1);
@@ -165,16 +166,16 @@ contract CartMerkleTest is CartTest {
         ICart.OrderLine[] memory lines = new ICart.OrderLine[](2);
         lines[0] = _lineForListing(first, 1, 1 ether)[0];
         lines[1] = _lineForListing(second, 1, 1 ether)[0];
-        ICart.PayoutRoute[] memory routes = _emptyRoutes(2);
+        ICart.PayoutRoute memory route = _emptyRoute();
         ICart.FulfillmentAction[] memory actions = _emptyActions();
-        ICart.PurchaseOrder memory order = _order("mixed-seller-root-order", lines, routes, actions);
+        ICart.PurchaseOrder memory order = _order("mixed-seller-root-order", lines, route, actions);
         bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
 
         vm.deal(payer, 2 ether);
         vm.expectRevert(ICart.InvalidListingRoot.selector);
         vm.prank(payer);
         cart.executePurchase{value: 2 ether}(
-            order, lines, listings, authorization, _combineRoutes(routes), actions, platformSignature
+            order, lines, listings, authorization, route, actions, platformSignature
         );
     }
 
@@ -184,16 +185,16 @@ contract CartMerkleTest is CartTest {
         ICart.ListingPurchaseAuthorization memory authorization = _listingAuthorization(_singletonRoot(listing));
         authorization.listingRootIndexes[0] = 1;
         ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 1 ether);
-        ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
+        ICart.PayoutRoute memory route = _emptyRoute();
         ICart.FulfillmentAction[] memory actions = _emptyActions();
-        ICart.PurchaseOrder memory order = _order("missing-root-order", lines, routes, actions);
+        ICart.PurchaseOrder memory order = _order("missing-root-order", lines, route, actions);
         bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
 
         vm.deal(payer, 1 ether);
         vm.expectRevert(abi.encodeWithSelector(ICart.InvalidRootIndex.selector, 1));
         vm.prank(payer);
         cart.executePurchase{value: 1 ether}(
-            order, lines, _singletonListing(listing), authorization, _combineRoutes(routes), actions, platformSignature
+            order, lines, _singletonListing(listing), authorization, route, actions, platformSignature
         );
     }
 
@@ -203,9 +204,9 @@ contract CartMerkleTest is CartTest {
         ICart.ListingRoot memory root = _singletonRoot(listing);
         ICart.ListingPurchaseAuthorization memory authorization = _listingAuthorization(root);
         ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 1 ether);
-        ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
+        ICart.PayoutRoute memory route = _emptyRoute();
         ICart.FulfillmentAction[] memory actions = _emptyActions();
-        ICart.PurchaseOrder memory order = _order("root-cancel-order", lines, routes, actions);
+        ICart.PurchaseOrder memory order = _order("root-cancel-order", lines, route, actions);
         bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
 
         bytes32 rootDigest = hashes.hashListingRoot(cart.DOMAIN_SEPARATOR(), root);
@@ -215,7 +216,7 @@ contract CartMerkleTest is CartTest {
         vm.expectRevert(abi.encodeWithSelector(ICart.CancelledListingRoot.selector, rootDigest));
         vm.prank(payer);
         cart.executePurchase{value: 1 ether}(
-            order, lines, _singletonListing(listing), authorization, _combineRoutes(routes), actions, platformSignature
+            order, lines, _singletonListing(listing), authorization, route, actions, platformSignature
         );
     }
 
@@ -232,9 +233,9 @@ contract CartMerkleTest is CartTest {
         bytes32 replacementRootDigest = hashes.hashListingRoot(cart.DOMAIN_SEPARATOR(), replacementRoot);
         ICart.ListingPurchaseAuthorization memory authorization = _listingAuthorization(replacementRoot);
         ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 1 ether);
-        ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
+        ICart.PayoutRoute memory route = _emptyRoute();
         ICart.FulfillmentAction[] memory actions = _emptyActions();
-        ICart.PurchaseOrder memory order = _order("replacement-root-order", lines, routes, actions);
+        ICart.PurchaseOrder memory order = _order("replacement-root-order", lines, route, actions);
         bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
 
         assertTrue(cart.cancelledListingRoots(seller, cancelledRootDigest));
@@ -242,7 +243,7 @@ contract CartMerkleTest is CartTest {
         vm.deal(payer, 1 ether);
         vm.prank(payer);
         cart.executePurchase{value: 1 ether}(
-            order, lines, _singletonListing(listing), authorization, _combineRoutes(routes), actions, platformSignature
+            order, lines, _singletonListing(listing), authorization, route, actions, platformSignature
         );
 
         assertEq(cart.filledQuantity(_listingDigest(listing)), 1);
@@ -263,15 +264,15 @@ contract CartMerkleTest is CartTest {
         assertFalse(cart.cancelledListingRoots(seller, rootDigest));
 
         ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 1 ether);
-        ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
+        ICart.PayoutRoute memory route = _emptyRoute();
         ICart.FulfillmentAction[] memory actions = _emptyActions();
-        ICart.PurchaseOrder memory order = _order("foreign-root-cancel-order", lines, routes, actions);
+        ICart.PurchaseOrder memory order = _order("foreign-root-cancel-order", lines, route, actions);
         bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
 
         vm.deal(payer, 1 ether);
         vm.prank(payer);
         cart.executePurchase{value: 1 ether}(
-            order, lines, _singletonListing(listing), authorization, _combineRoutes(routes), actions, platformSignature
+            order, lines, _singletonListing(listing), authorization, route, actions, platformSignature
         );
 
         assertEq(cart.filledQuantity(_listingDigest(listing)), 1);
@@ -290,15 +291,15 @@ contract CartMerkleTest is CartTest {
         assertEq(cart.listingNonces(seller), 0);
 
         ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 1 ether);
-        ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
+        ICart.PayoutRoute memory route = _emptyRoute();
         ICart.FulfillmentAction[] memory actions = _emptyActions();
-        ICart.PurchaseOrder memory order = _order("foreign-nonce-order", lines, routes, actions);
+        ICart.PurchaseOrder memory order = _order("foreign-nonce-order", lines, route, actions);
         bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
 
         vm.deal(payer, 1 ether);
         vm.prank(payer);
         cart.executePurchase{value: 1 ether}(
-            order, lines, _singletonListing(listing), authorization, _combineRoutes(routes), actions, platformSignature
+            order, lines, _singletonListing(listing), authorization, route, actions, platformSignature
         );
 
         assertEq(cart.filledQuantity(_listingDigest(listing)), 1);
@@ -315,16 +316,16 @@ contract CartMerkleTest is CartTest {
         freshRoot.nonce = 1;
         ICart.ListingPurchaseAuthorization memory authorization = _listingAuthorization(freshRoot);
         ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 1 ether);
-        ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
+        ICart.PayoutRoute memory route = _emptyRoute();
         ICart.FulfillmentAction[] memory actions = _emptyActions();
-        ICart.PurchaseOrder memory order = _order("fresh-nonce-order", lines, routes, actions);
+        ICart.PurchaseOrder memory order = _order("fresh-nonce-order", lines, route, actions);
         bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
 
         assertEq(cart.listingNonces(seller), 1);
         vm.deal(payer, 1 ether);
         vm.prank(payer);
         cart.executePurchase{value: 1 ether}(
-            order, lines, _singletonListing(listing), authorization, _combineRoutes(routes), actions, platformSignature
+            order, lines, _singletonListing(listing), authorization, route, actions, platformSignature
         );
 
         assertEq(cart.filledQuantity(_listingDigest(listing)), 1);
@@ -343,16 +344,16 @@ contract CartMerkleTest is CartTest {
         assertTrue(cart.cancelledListings(seller, listingDigest));
 
         ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 1 ether);
-        ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
+        ICart.PayoutRoute memory route = _emptyRoute();
         ICart.FulfillmentAction[] memory actions = _emptyActions();
-        ICart.PurchaseOrder memory order = _order("exact-listing-cancel-order", lines, routes, actions);
+        ICart.PurchaseOrder memory order = _order("exact-listing-cancel-order", lines, route, actions);
         bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
 
         vm.expectRevert(abi.encodeWithSelector(ICart.CancelledListing.selector, listingDigest));
         vm.deal(payer, 1 ether);
         vm.prank(payer);
         cart.executePurchase{value: 1 ether}(
-            order, lines, _singletonListing(listing), authorization, _combineRoutes(routes), actions, platformSignature
+            order, lines, _singletonListing(listing), authorization, route, actions, platformSignature
         );
     }
 
@@ -371,15 +372,15 @@ contract CartMerkleTest is CartTest {
         assertFalse(cart.cancelledListings(seller, listingDigest));
 
         ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 1 ether);
-        ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
+        ICart.PayoutRoute memory route = _emptyRoute();
         ICart.FulfillmentAction[] memory actions = _emptyActions();
-        ICart.PurchaseOrder memory order = _order("foreign-listing-cancel-order", lines, routes, actions);
+        ICart.PurchaseOrder memory order = _order("foreign-listing-cancel-order", lines, route, actions);
         bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
 
         vm.deal(payer, 1 ether);
         vm.prank(payer);
         cart.executePurchase{value: 1 ether}(
-            order, lines, _singletonListing(listing), authorization, _combineRoutes(routes), actions, platformSignature
+            order, lines, _singletonListing(listing), authorization, route, actions, platformSignature
         );
 
         assertEq(cart.filledQuantity(listingDigest), 1);
@@ -391,9 +392,9 @@ contract CartMerkleTest is CartTest {
         );
         ICart.ListingPurchaseAuthorization memory authorization = _listingAuthorization(_singletonRoot(listing));
         ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 1 ether);
-        ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
+        ICart.PayoutRoute memory route = _emptyRoute();
         ICart.FulfillmentAction[] memory actions = _emptyActions();
-        ICart.PurchaseOrder memory firstOrder = _order("partial-fill-before-cancel", lines, routes, actions);
+        ICart.PurchaseOrder memory firstOrder = _order("partial-fill-before-cancel", lines, route, actions);
         bytes memory firstSignature = _sign(PLATFORM_PK, _orderDigest(firstOrder));
 
         vm.deal(payer, 2 ether);
@@ -403,7 +404,7 @@ contract CartMerkleTest is CartTest {
             lines,
             _singletonListing(listing),
             authorization,
-            _combineRoutes(routes),
+            route,
             actions,
             firstSignature
         );
@@ -413,7 +414,7 @@ contract CartMerkleTest is CartTest {
         vm.prank(seller);
         cart.cancelListing(listingDigest);
 
-        ICart.PurchaseOrder memory secondOrder = _order("partial-fill-after-cancel", lines, routes, actions);
+        ICart.PurchaseOrder memory secondOrder = _order("partial-fill-after-cancel", lines, route, actions);
         bytes memory secondSignature = _sign(PLATFORM_PK, _orderDigest(secondOrder));
         vm.expectRevert(abi.encodeWithSelector(ICart.CancelledListing.selector, listingDigest));
         vm.prank(payer);
@@ -422,7 +423,7 @@ contract CartMerkleTest is CartTest {
             lines,
             _singletonListing(listing),
             authorization,
-            _combineRoutes(routes),
+            route,
             actions,
             secondSignature
         );
@@ -448,17 +449,17 @@ contract CartMerkleTest is CartTest {
             keccak256("returned-erc721"), ICart.FulfillmentKind.ERC721_TRANSFER, address(token), 1, sellerPayout
         );
         ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 1 ether);
-        ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
+        ICart.PayoutRoute memory route = _emptyRoute();
         ICart.FulfillmentAction[] memory actions = new ICart.FulfillmentAction[](1);
         actions[0] = ICart.FulfillmentAction({lineIndex: 0, quantity: 1, recipient: collector});
         ICart.ListingPurchaseAuthorization memory authorization = _listingAuthorization(_singletonRoot(listing));
-        ICart.PurchaseOrder memory order = _order("returned-erc721-first-sale", lines, routes, actions);
+        ICart.PurchaseOrder memory order = _order("returned-erc721-first-sale", lines, route, actions);
         bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
 
         vm.deal(payer, 1 ether);
         vm.prank(payer);
         cart.executePurchase{value: 1 ether}(
-            order, lines, _singletonListing(listing), authorization, _combineRoutes(routes), actions, platformSignature
+            order, lines, _singletonListing(listing), authorization, route, actions, platformSignature
         );
         assertEq(token.ownerOf(1), collector);
         assertEq(cart.filledQuantity(_listingDigest(listing)), 1);
@@ -477,7 +478,7 @@ contract CartMerkleTest is CartTest {
         ICart.ListingPurchaseAuthorization memory relistedAuthorization =
             _listingAuthorization(_singletonRoot(relisted));
         ICart.PurchaseOrder memory relistedOrder =
-            _order("returned-erc721-second-sale", relistedLines, routes, relistedActions);
+            _order("returned-erc721-second-sale", relistedLines, route, relistedActions);
         bytes memory relistedPlatformSignature = _sign(PLATFORM_PK, _orderDigest(relistedOrder));
 
         vm.deal(payer, 1 ether);
@@ -487,7 +488,7 @@ contract CartMerkleTest is CartTest {
             relistedLines,
             _singletonListing(relisted),
             relistedAuthorization,
-            _combineRoutes(routes),
+            route,
             relistedActions,
             relistedPlatformSignature
         );
@@ -526,11 +527,11 @@ contract CartMerkleTest is CartTest {
     function _orderToken(
         string memory id,
         ICart.OrderLine[] memory lines,
-        ICart.PayoutRoute[] memory routes,
+        ICart.PayoutRoute memory route,
         ICart.FulfillmentAction[] memory actions,
         address paymentCurrency
     ) internal view returns (ICart.PurchaseOrder memory order) {
-        order = _order(id, lines, routes, actions);
+        order = _order(id, lines, route, actions);
         order.paymentCurrency = paymentCurrency;
         order.orderLinesHash = hashes.hashOrderLines(lines);
     }

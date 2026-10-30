@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.18;
-import {CartTest} from "./Cart.t.sol";
+import {CartFixture} from "./CartFixture.sol";
 import {ICart} from "../../cart/ICart.sol";
 
 interface QuoteCapacityVm {
     function cool(address target) external;
 }
 
-contract CartQuoteCapacityTest is CartTest {
+contract CartQuoteCapacityTest is CartFixture {
     event QuoteCapacity(
         uint256 merchandise,
         bool groupedFees,
@@ -70,11 +70,11 @@ contract CartQuoteCapacityTest is CartTest {
         );
         ICart.ListingPurchaseAuthorization memory auth = _rootAuthorization(listings, SELLER_PK);
         if (shared) auth = _sharedRoot(listings);
-        ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
-        ICart.PurchaseOrder memory order = _order("quote-capacity", lines, routes, actions);
+        ICart.PayoutRoute memory route = _emptyRoute();
+        ICart.PurchaseOrder memory order = _order("quote-capacity", lines, route, actions);
         bytes memory signature = _sign(PLATFORM_PK, _orderDigest(order));
         bytes memory payload = abi.encodeCall(
-            ICart.executePurchase, (order, lines, listings, auth, _combineRoutes(routes), actions, signature)
+            ICart.executePurchase, (order, lines, listings, auth, route, actions, signature)
         );
         uint256 intrinsic = 21000;
         for (uint256 i; i < payload.length; ++i) {

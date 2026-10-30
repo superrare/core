@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.18;
 
-import {CartListingGasTest} from "./CartListingGas.t.sol";
+import {CartListingGasFixture} from "./CartListingGasFixture.sol";
 import {ICart} from "../../cart/ICart.sol";
 import {RareERC1155} from "../../token/ERC1155/RareERC1155.sol";
 import {RareERC1155ContractFactory} from "../../token/ERC1155/RareERC1155ContractFactory.sol";
@@ -9,7 +9,7 @@ import {RareERC1155ContractFactory} from "../../token/ERC1155/RareERC1155Contrac
 interface RareGasVm { function cool(address target) external; }
 
 /// @notice Actual factory-cloned RareERC1155, single collection, distinct token IDs, two fee lines.
-contract CartRareERC1155GasTest is CartListingGasTest {
+contract CartRareERC1155GasTest is CartListingGasFixture {
     event RareERC1155Gas(bool minting, uint256 sales, uint256 lines, uint256 calldataBytes,
         uint256 grossCallGas, uint256 intrinsicGas, uint256 calldataFloorGas);
 
@@ -57,11 +57,11 @@ contract CartRareERC1155GasTest is CartListingGasTest {
         lines[count + 1] = ICart.OrderLine(keccak256("order-charge"), bytes32(0), ICart.FulfillmentKind.NONE,
             1, address(0), 0.2 ether, address(this));
         ICart.ListingPurchaseAuthorization memory auth = sharedRoot(listings);
-        ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
-        ICart.PurchaseOrder memory order = _order("rare-gas", lines, routes, actions);
+        ICart.PayoutRoute memory route = _emptyRoute();
+        ICart.PurchaseOrder memory order = _order("rare-gas", lines, route, actions);
         bytes memory signature = _sign(PLATFORM_PK, _orderDigest(order));
         bytes memory payload = abi.encodeCall(ICart.executePurchase,
-            (order, lines, listings, auth, _combineRoutes(routes), actions, signature));
+            (order, lines, listings, auth, route, actions, signature));
         uint256 intrinsic = 21000;
         uint256 floor = 21000;
         for (uint256 i; i < payload.length; ++i) {

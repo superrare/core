@@ -18,7 +18,7 @@ abstract contract CartStorage {
         address weth;
         // Stops new purchases while preserving read access and administrative control.
         bool paused;
-        // Receives favorable exact-input output that exceeds signed line obligations.
+        // Receives favorable route output and unused input above signed obligations.
         address protocolRecipient;
     }
 

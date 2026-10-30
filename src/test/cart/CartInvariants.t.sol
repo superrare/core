@@ -9,7 +9,7 @@ import {CartHashes} from "../../cart/CartHashes.sol";
 import {CartPayments} from "../../cart/CartPayments.sol";
 import {CartRoutePolicy} from "../../cart/CartRoutePolicy.sol";
 import {ICart} from "../../cart/ICart.sol";
-import {CartTestPermit2, CartTestRouter, CartTestToken, CartTestWETH} from "./Cart.t.sol";
+import {CartTestPermit2, CartTestRouter, CartTestToken, CartTestWETH} from "./CartMocks.sol";
 
 contract CartInvariantProtocolSink {
     receive() external payable {}
@@ -67,7 +67,7 @@ contract CartInvariantsTest is Test {
         targetContract(address(this));
     }
 
-    /// @dev Repeated native fixed-quote routes must leave Cart at its original baselines.
+    /// @dev Repeated native fixed-quote route must leave Cart at its original baselines.
     function stepNative(uint96 rawQuote, uint96 rawOutput) external {
         uint256 quote = bound(uint256(rawQuote), 1e12, 1 ether);
         uint256 obligation = bound(uint256(rawOutput), 1, 1 ether);
@@ -87,7 +87,7 @@ contract CartInvariantsTest is Test {
         assertLe(buyerBefore - address(this).balance, quote);
     }
 
-    /// @dev ERC-20 fixed-quote routes must clear both approval layers after every execution.
+    /// @dev ERC-20 fixed-quote route must clear both approval layers after every execution.
     function stepErc20(uint96 rawQuote, uint96 rawOutput) external {
         uint256 quote = bound(uint256(rawQuote), 1e12, 1 ether);
         uint256 obligation = bound(uint256(rawOutput), 1, 1 ether);

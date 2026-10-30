@@ -9,6 +9,7 @@ import {OwnableUpgradeable} from "openzeppelin-contracts-upgradeable/access/Owna
 import {ReentrancyGuardUpgradeable} from "openzeppelin-contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import {UUPSUpgradeable} from "openzeppelin-contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
+import {CartValidation} from "./CartValidation.sol";
 import {CartHashing} from "./CartHashing.sol";
 import {CartPayments} from "./CartPayments.sol";
 import {CartStorage} from "./CartStorage.sol";
@@ -135,29 +136,9 @@ contract Cart is
     FulfillmentAction[] calldata actions,
     bytes calldata platformSignature
   ) external payable override nonReentrant returns (MintResult[] memory mintResults) {
+    // Materialize and hash the signed route before envelope checks, preserving decoding order.
     PayoutRoute memory routeCopy = route;
-    return _executePurchaseCore(
-      order,
-      lines,
-      listings,
-      authorization,
-      routeCopy,
-      CartHashing.hashPayoutRoute(route),
-      actions,
-      platformSignature
-    );
-  }
-
-  function _executePurchaseCore(
-    PurchaseOrder calldata order,
-    OrderLine[] calldata lines,
-    Listing[] calldata listings,
-    ListingPurchaseAuthorization calldata authorization,
-    PayoutRoute memory route,
-    bytes32 routeHash,
-    FulfillmentAction[] calldata actions,
-    bytes calldata platformSignature
-  ) private returns (MintResult[] memory mintResults) {
+    bytes32 routeHash = CartHashing.hashPayoutRoute(route);
     // Reject a purchase before any external call or state change when the contract is paused.
     if (_cartConfig().paused) revert ContractPaused();
     // Require a unique order identifier and a live order deadline.
@@ -209,13 +190,13 @@ contract Cart is
 
     // Fund and route through the standalone payment executor. The delegatecall preserves Cart
     // custody, storage, msg.sender, and msg.value while keeping payment bytecode out of Cart.
-    ICartPayments.PaymentState memory paymentState = _beginPayment(order, lines, route);
+    ICartPayments.PaymentState memory paymentState = _beginPayment(order, lines, routeCopy);
     // Transfer or mint each on-chain item to its requested recipient.
     mintResults = _executeFulfillment(order.orderId, listings, lineListing, actions, mintActionCount);
     // Pay grouped recipients, capture protocol spread, and verify all settlement balances.
     _finishPayment(order.orderId, order.paymentCurrency, lines, paymentState);
 
-    // Report the total amount spent and the amount returned to the caller.
+    // Report the payer and exact signed quote after the entire purchase succeeds.
     emit PurchaseExecuted(order.orderId, msg.sender, order.paymentCurrency, order.paymentAmount);
     // Report the result of each order line after all settlement work succeeds.
     _emitLineEvents(order.orderId, lines);
@@ -429,7 +410,7 @@ contract Cart is
     if (listing.paymentRecipient == address(this)) revert InvalidPaymentRecipient(listing.paymentRecipient);
     // Currency conversions are platform-authorized Purchase Order lines, never seller Listings.
     if (listing.fulfillmentKind == FulfillmentKind.CURRENCY_SWAP) revert InvalidListing();
-    if (!_isOnChainKind(listing.fulfillmentKind)) {
+    if (!CartValidation.isOnChainKind(listing.fulfillmentKind)) {
       // Off-chain listings must not carry an NFT contract or token id.
       if (listing.tokenContract != address(0) || listing.tokenId != 0) revert InvalidListing();
     } else if (listing.tokenContract.code.length == 0) {
@@ -438,7 +419,7 @@ contract Cart is
       // the declared token behavior honestly.
       revert InvalidListing();
     }
-    if (_isMintKind(listing.fulfillmentKind) && !_isContractOwner(listing.tokenContract, listing.seller)) {
+    if (CartValidation.isMintKind(listing.fulfillmentKind) && !CartValidation.isContractOwner(listing.tokenContract, listing.seller)) {
       revert InvalidMintContractOwner(listing.tokenContract, listing.seller);
     }
     // An ERC-721 transfer can move only one existing token.
@@ -451,17 +432,6 @@ contract Cart is
     }
     // An ERC-721 mint returns the new token id, so the listing cannot fix a token id.
     if (listing.fulfillmentKind == FulfillmentKind.ERC721_MINT_TO && listing.tokenId != 0) revert InvalidListing();
-  }
-
-  function _isContractOwner(address tokenContract, address expectedOwner) private view returns (bool) {
-    (bool success, bytes memory data) = tokenContract.staticcall(abi.encodeWithSignature("owner()"));
-    if (!success || data.length < 32) return false;
-
-    uint256 encodedOwner;
-    assembly ("memory-safe") {
-      encodedOwner := mload(add(data, 0x20))
-    }
-    return encodedOwner <= type(uint160).max && address(uint160(encodedOwner)) == expectedOwner;
   }
 
   function _validateLineTerms(
@@ -540,7 +510,7 @@ contract Cart is
       // A fulfillment action must point to an on-chain listing.
       if (listingIndex == NO_LISTING) revert InvalidFulfillmentAction(i);
       FulfillmentKind kind = listings[listingIndex].fulfillmentKind;
-      if (!_isOnChainKind(kind)) revert InvalidFulfillmentAction(i);
+      if (!CartValidation.isOnChainKind(kind)) revert InvalidFulfillmentAction(i);
       if (kind == FulfillmentKind.ERC721_MINT_TO) ++mintActionCount;
       // An ERC-721 transfer is one transfer of one token. It cannot appear twice.
       if (kind == FulfillmentKind.ERC721_TRANSFER && (action.quantity != 1 || quantities[action.lineIndex] != 0)) {
@@ -555,7 +525,7 @@ contract Cart is
     for (uint256 i = 0; i < lines.length; ++i) {
       // On-chain lines must be fully covered. Off-chain and ERC-20 swap lines have no action.
       uint256 listingIndex = lineListing[i];
-      uint256 expected = listingIndex != NO_LISTING && _isOnChainKind(listings[listingIndex].fulfillmentKind)
+      uint256 expected = listingIndex != NO_LISTING && CartValidation.isOnChainKind(listings[listingIndex].fulfillmentKind)
         ? lines[i].quantity
         : 0;
       if (quantities[i] != expected) revert InvalidFulfillmentAction(i);
@@ -712,25 +682,6 @@ contract Cart is
   function _requireSignature(address signer, bytes32 digest, bytes calldata signature) private view {
     // Accept both EOA signatures and contract-wallet signatures supported by SignatureChecker.
     if (!SignatureChecker.isValidSignatureNow(signer, digest, signature)) revert InvalidSignature(signer, digest);
-  }
-
-  function _currencyToken(address currency, address wrappedNative) private pure returns (address) {
-    // Use WETH as the internal token representation for native currency.
-    return currency == address(0) ? wrappedNative : currency;
-  }
-
-  function _isOnChainKind(FulfillmentKind kind) private pure returns (bool) {
-    // These fulfillment kinds call an NFT contract during settlement.
-    return
-      kind == FulfillmentKind.ERC721_TRANSFER ||
-      kind == FulfillmentKind.ERC1155_TRANSFER ||
-      kind == FulfillmentKind.ERC721_MINT_TO ||
-      kind == FulfillmentKind.ERC1155_MINT_TO;
-  }
-
-  function _isMintKind(FulfillmentKind kind) private pure returns (bool) {
-    // These fulfillment kinds create a new token instead of transferring an existing token.
-    return kind == FulfillmentKind.ERC721_MINT_TO || kind == FulfillmentKind.ERC1155_MINT_TO;
   }
 
   receive() external payable {}

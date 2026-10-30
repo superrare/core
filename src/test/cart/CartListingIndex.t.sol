@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.18;
-import {CartTest} from "./Cart.t.sol";
+import {CartFixture} from "./CartFixture.sol";
 import {ICart} from "../../cart/ICart.sol";
 
-contract CartListingIndexTest is CartTest {
+contract CartListingIndexTest is CartFixture {
     function testFuzzListingIndexWraparoundAndRepeatedLines(uint8 seed) public {
         ICart.Listing[] memory listings = collidingListings();
         uint256 repeats = uint256(seed) % 5 + 1;
@@ -75,12 +75,12 @@ contract CartListingIndexTest is CartTest {
     function executeCase(ICart.Listing[] memory listings, ICart.OrderLine[] memory lines) external {
         require(msg.sender == address(this));
         ICart.ListingPurchaseAuthorization memory auth = _rootAuthorization(listings, SELLER_PK);
-        ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
+        ICart.PayoutRoute memory route = _emptyRoute();
         ICart.FulfillmentAction[] memory actions = new ICart.FulfillmentAction[](0);
-        ICart.PurchaseOrder memory order = _order("listing-index", lines, routes, actions);
+        ICart.PurchaseOrder memory order = _order("listing-index", lines, route, actions);
         bytes memory signature = _sign(PLATFORM_PK, _orderDigest(order));
         vm.deal(payer, order.paymentAmount);
         vm.prank(payer);
-        cart.executePurchase{value: order.paymentAmount}(order, lines, listings, auth, _combineRoutes(routes), actions, signature);
+        cart.executePurchase{value: order.paymentAmount}(order, lines, listings, auth, route, actions, signature);
     }
 }

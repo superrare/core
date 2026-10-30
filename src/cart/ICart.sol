@@ -220,7 +220,26 @@ interface ICart {
         address weth_
     ) external;
 
-    /// @notice Executes a Purchase Order with one order-wide payment route.
+    /// @notice Atomically funds, fulfills, and settles a platform-authorized Purchase Order.
+    /// @dev The caller is the payer. Native input requires msg.value == paymentAmount; ERC-20
+    ///      input requires zero msg.value and an allowance to the Cart proxy for the signed amount.
+    ///      Zero-total purchases still validate authorization, reserve inventory, and fulfill.
+    ///      The platform signature binds the ordered lines, route, and ordered actions through
+    ///      the three hashes in order. Reordering or changing signed payloads requires re-signing.
+    ///      Each distinct supplied Listing must be referenced, and duplicate line references share
+    ///      its inventory bucket. Listing witnesses are independently seller-authorized.
+    ///      Validation precedes inventory reservation and settlement. A later failure reverts all
+    ///      transfers, fills, replay writes, and logs. Indexed errors identify the failing line or
+    ///      action where available; nested external-call failures retain their revert data.
+    /// @param order Fixed quote, deadline, replay identifier, and hashes authorized by the platform.
+    /// @param lines Ordered charges. Their nonzero listingDigest resolves to one supplied Listing.
+    /// @param listings Deduplicated seller Listings. Every supplied Listing must be used by a line.
+    /// @param authorization One signature per root and one root index and proof per Listing, in
+    ///      listings order. Each index selects a root and signature from the matching root arrays.
+    /// @param route One signed Universal Router program for the complete order, or an empty direct route.
+    /// @param actions Ordered on-chain fulfillment actions. lineIndex selects lines; action quantities
+    ///      must exactly cover each on-chain line. Other lines have no actions.
+    /// @param platformSignature EOA or ERC-1271 authorization over this proxy's EIP-712 order digest.
     /// @return mintResults One entry per ERC721_MINT_TO action, in fulfillment-action order.
     ///         Other action kinds are omitted; no ERC-721 mint actions returns an empty array.
     function executePurchase(

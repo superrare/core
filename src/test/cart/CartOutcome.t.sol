@@ -5,8 +5,8 @@ import {Test} from "forge-std/Test.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {IERC721Receiver} from "openzeppelin-contracts/token/ERC721/IERC721Receiver.sol";
 
+import {CartFixture} from "./CartFixture.sol";
 import {
-    CartTest,
     CartTestERC721,
     CartTestFeeOnTransferToken,
     CartTestPermit2,
@@ -14,7 +14,7 @@ import {
     CartTestRouter,
     CartTestToken,
     CartTestWETH
-} from "./Cart.t.sol";
+} from "./CartMocks.sol";
 import {ICart} from "../../cart/ICart.sol";
 import {IPermit2Cart} from "../../cart/IPermit2Cart.sol";
 
@@ -41,7 +41,7 @@ contract CartAllowanceObserver is IERC721Receiver {
 }
 
 /// @notice Outcome-level coverage for Cart's opaque Universal Router settlement boundary.
-contract CartOutcomeTest is CartTest {
+contract CartOutcomeTest is CartFixture {
     function testDirectEthAndRoutedOutputsSettleTogether() public {
         CartTestToken usdc = new CartTestToken("USD Coin", "USDC");
         CartTestToken dai = new CartTestToken("Dai", "DAI");

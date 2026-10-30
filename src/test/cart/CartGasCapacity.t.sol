@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.18;
 
-import {CartTest, CartTestMintableERC721} from "./Cart.t.sol";
+import {CartFixture} from "./CartFixture.sol";
+import {CartTestMintableERC721} from "./CartMocks.sol";
 import {ICart} from "../../cart/ICart.sol";
 
 interface CapacityVm {
@@ -9,7 +10,7 @@ interface CapacityVm {
 }
 
 /// @notice Capacity experiments for the current working tree, not a gas guarantee for external contracts.
-contract CartGasCapacityTest is CartTest {
+contract CartGasCapacityTest is CartFixture {
     event Capacity(string scenario, uint256 lines, uint256 calldataBytes, uint256 grossCallGas, uint256 intrinsicGas);
 
     function testCapacitySimpleNative1() public { _capacity(1, 0, false, false); }
@@ -69,11 +70,11 @@ contract CartGasCapacityTest is CartTest {
                     hashes.hashListingRoot(cart.DOMAIN_SEPARATOR(), auth.listingRoots[i]));
             }
         }
-        ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
-        ICart.PurchaseOrder memory order = _order("capacity", lines, routes, actions);
+        ICart.PayoutRoute memory route = _emptyRoute();
+        ICart.PurchaseOrder memory order = _order("capacity", lines, route, actions);
         bytes memory signature = _sign(PLATFORM_PK, _orderDigest(order));
         bytes memory payload = abi.encodeCall(ICart.executePurchase,
-            (order, lines, listings, auth, _combineRoutes(routes), actions, signature));
+            (order, lines, listings, auth, route, actions, signature));
         uint256 intrinsic = 21000;
         for (uint256 i; i < payload.length; ++i) intrinsic += payload[i] == 0 ? 4 : 16;
         CapacityVm(address(vm)).cool(address(cart));

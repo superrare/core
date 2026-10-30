@@ -2,10 +2,10 @@
 pragma solidity 0.8.18;
 
 import {ICartRoutePolicy} from "../../cart/ICartRoutePolicy.sol";
-import {CartRoutePolicyTest} from "./CartRoutePolicy.t.sol";
+import {CartRoutePolicyFixture} from "./CartRoutePolicyFixture.sol";
 
 /// @notice Verification-oriented boundary tests for the opaque route policy.
-contract CartRoutePolicyVerificationTest is CartRoutePolicyTest {
+contract CartRoutePolicyVerificationTest is CartRoutePolicyFixture {
     function testGuardDoesNotDecodeV3Path() public {
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = abi.encode(address(0x9999), type(uint256).max, hex"01", address(0x7777), false);

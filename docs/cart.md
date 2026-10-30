@@ -15,6 +15,7 @@ The branch combines free Listings and zero-total Orders with the listing digest 
 | [CartRoutePolicy](../src/cart/CartRoutePolicy.sol) | Stateless command-family and array-shape checks for the opaque Universal Router program. Its address is immutable in both Cart and CartPayments. |
 | [CartLens](../src/cart/CartLens.sol) | Separately deployed advisory Listing, order-envelope, and route preflight. Full execution simulation is still required. |
 | [CartHashing](../src/cart/CartHashing.sol) and [CartHashes](../src/cart/CartHashes.sol) | Shared EIP-712 hashing library and optional stateless helper for clients. |
+| [CartValidation](../src/cart/CartValidation.sol) | Internal fulfillment classification and collection-owner checks shared by Cart and CartLens. Each caller retains its check order and diagnostics. |
 
 ## Current contract behavior
 
@@ -47,6 +48,8 @@ Run the Cart unit, fuzz, invariant, and storage-upgrade tests from the repositor
 FOUNDRY_PROFILE=cart forge test --offline
 ```
 
-The profile selects [src/test/cart](../src/test/cart). Live-dependency fork tests in [src/test/forks/ethereum/cart](../src/test/forks/ethereum/cart) require a separate RPC-backed run. Historical gas reports use their recorded environments and do not replace current RPC estimates.
+The profile selects [src/test/cart](../src/test/cart). Shared setup and builders live in abstract fixtures, and token/router mocks live in `CartMocks.sol`; executable suites inherit fixtures without inheriting other suites' tests. Live-dependency fork tests in [src/test/forks/ethereum/cart](../src/test/forks/ethereum/cart) require a separate RPC-backed run. Historical gas reports use their recorded environments and do not replace current RPC estimates.
 
 The [formal-verification project](../verification/cart/README.md) documents its modeled properties and limitations. Its saved results are separate evidence from the native test suite and must be checked against the source used for any new proof claim.
+
+The [cleanup verification](cart-cleanup-verification.md) records preserved test scenarios, ABI and storage checks, runtime sizes, and checkout-gas comparisons for the internal refactor.

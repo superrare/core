@@ -9,7 +9,7 @@ import {ERC1967Proxy} from "openzeppelin-contracts/proxy/ERC1967/ERC1967Proxy.so
 import {Cart} from "../../cart/Cart.sol";
 import {CartPayments} from "../../cart/CartPayments.sol";
 import {CartRoutePolicy} from "../../cart/CartRoutePolicy.sol";
-import {CartTestPermit2, CartTestRouter, CartTestWETH} from "./Cart.t.sol";
+import {CartTestPermit2, CartTestRouter, CartTestWETH} from "./CartMocks.sol";
 
 /// @dev Test-only implementation used to prove that a compatible UUPS upgrade preserves all
 ///      Cart-owned namespaced state.

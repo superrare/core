@@ -34,11 +34,11 @@ contract CartPayments is CartStorage, ICartPayments {
     address private immutable SELF;
 
     struct Payout {
-        address token;
+        // Preserve the signed currency: zero is ETH, while WETH remains a distinct payout.
+        address currency;
         address recipient;
         uint256 amount;
         uint256 lineIndex;
-        bool native;
     }
 
     constructor(address routePolicy_) {
@@ -56,13 +56,18 @@ contract CartPayments is CartStorage, ICartPayments {
         ICart.OrderLine[] calldata lines,
         ICart.PayoutRoute calldata route
     ) external payable onlyDelegateCall returns (PaymentState memory state) {
-        address[] memory settlementTokens = _validateRoute(order.paymentCurrency, lines, route);
+        // Validate the route before collecting the currencies whose balances must be preserved.
+        _validateRoute(route);
+        address[] memory settlementTokens = _settlementTokens(order.paymentCurrency, lines);
 
+        // Snapshot preexisting custody before collecting the caller's payment.
         state.nativeBaseline = address(this).balance - msg.value;
         state.assetSnapshots = _snapshotAssets(settlementTokens);
+        // Existing approvals cannot be borrowed by this purchase.
         if (order.paymentCurrency != address(0)) {
             _assertNoPreexistingApprovals(order.paymentCurrency, _cartConfig().permit2, _cartConfig().universalRouter);
         }
+        // Collect the fixed quote, run its signed route, then require enough incremental assets.
         _fundPayment(order, route);
         _executeRoute(order, route);
         _verifySolvency(lines, state.assetSnapshots, state.nativeBaseline);
@@ -74,8 +79,11 @@ contract CartPayments is CartStorage, ICartPayments {
         ICart.OrderLine[] calldata lines,
         PaymentState calldata state
     ) external payable onlyDelegateCall {
+        // Convert incremental ETH/WETH into the exact forms required by the signed payouts.
         _prepareNativeFamily(lines, state.assetSnapshots, state.nativeBaseline);
+        // Pay each recipient once per exact currency, retaining first-line failure attribution.
         _payLines(lines);
+        // Deliver favorable execution variance to the protocol and restore every custody baseline.
         _captureSupportedSpread(orderId, state);
         _verifyFinalBaselines(state);
         if (paymentCurrency != address(0)) {
@@ -83,11 +91,7 @@ contract CartPayments is CartStorage, ICartPayments {
         }
     }
 
-    function _validateRoute(
-        address paymentCurrency,
-        ICart.OrderLine[] calldata lines,
-        ICart.PayoutRoute calldata route
-    ) private view returns (address[] memory tokens) {
+    function _validateRoute(ICart.PayoutRoute calldata route) private view {
         if (route.commands.length == 0) {
             if (route.inputs.length != 0) {
                 revert ICart.OrderLineFailed(
@@ -105,7 +109,13 @@ contract CartPayments is CartStorage, ICartPayments {
                 revert ICart.OrderLineFailed(0, ICart.FailureStage.ROUTING, reason);
             }
         }
+    }
 
+    function _settlementTokens(address paymentCurrency, ICart.OrderLine[] calldata lines)
+        private
+        view
+        returns (address[] memory tokens)
+    {
         // The order defines the complete supported settlement universe. WETH is always tracked
         // because native ETH and WETH share solvency while retaining distinct payout forms.
         tokens = new address[](lines.length + 2);
@@ -177,12 +187,7 @@ contract CartPayments is CartStorage, ICartPayments {
         uint256 nativeBaseline
     ) private view {
         address wrappedNative = _cartConfig().weth;
-        uint256 requiredNative;
-        uint256 requiredWeth;
-        for (uint256 i = 0; i < lines.length; ++i) {
-            if (lines[i].settlementCurrency == address(0)) requiredNative += lines[i].amount;
-            if (lines[i].settlementCurrency == wrappedNative) requiredWeth += lines[i].amount;
-        }
+        (uint256 requiredNative, uint256 requiredWeth) = _nativeRequirements(lines, wrappedNative);
 
         uint256 currentNative = address(this).balance;
         if (currentNative < nativeBaseline) {
@@ -225,12 +230,7 @@ contract CartPayments is CartStorage, ICartPayments {
         uint256 nativeBaseline
     ) private {
         address wrappedNative = _cartConfig().weth;
-        uint256 requiredNative;
-        uint256 requiredWeth;
-        for (uint256 i = 0; i < lines.length; ++i) {
-            if (lines[i].settlementCurrency == address(0)) requiredNative += lines[i].amount;
-            if (lines[i].settlementCurrency == wrappedNative) requiredWeth += lines[i].amount;
-        }
+        (uint256 requiredNative, uint256 requiredWeth) = _nativeRequirements(lines, wrappedNative);
 
         uint256 currentNative = address(this).balance;
         uint256 currentWeth = IERC20(wrappedNative).balanceOf(address(this));
@@ -243,21 +243,28 @@ contract CartPayments is CartStorage, ICartPayments {
         }
     }
 
+    function _nativeRequirements(ICart.OrderLine[] calldata lines, address wrappedNative)
+        private
+        pure
+        returns (uint256 requiredNative, uint256 requiredWeth)
+    {
+        // Sum each representation independently; solvency pools them but payouts keep them distinct.
+        for (uint256 i = 0; i < lines.length; ++i) {
+            if (lines[i].settlementCurrency == address(0)) requiredNative += lines[i].amount;
+            if (lines[i].settlementCurrency == wrappedNative) requiredWeth += lines[i].amount;
+        }
+    }
+
     function _payLines(ICart.OrderLine[] calldata lines) private {
-        address wrappedNative = _cartConfig().weth;
         Payout[] memory payouts = new Payout[](lines.length);
         uint256 count;
         for (uint256 i = 0; i < lines.length; ++i) {
             // Free merchandise still fulfills; only its monetary payout is omitted.
             if (lines[i].amount == 0) continue;
-            bool native = lines[i].settlementCurrency == address(0);
-            address token = native ? wrappedNative : lines[i].settlementCurrency;
+            address currency = lines[i].settlementCurrency;
             uint256 payoutIndex = NO_GROUP;
             for (uint256 j = 0; j < count; ++j) {
-                if (
-                    payouts[j].token == token && payouts[j].recipient == lines[i].paymentRecipient
-                        && payouts[j].native == native
-                ) {
+                if (payouts[j].currency == currency && payouts[j].recipient == lines[i].paymentRecipient) {
                     payoutIndex = j;
                     break;
                 }
@@ -265,7 +272,7 @@ contract CartPayments is CartStorage, ICartPayments {
             if (payoutIndex == NO_GROUP) {
                 payoutIndex = count++;
                 payouts[payoutIndex] = Payout({
-                    token: token, recipient: lines[i].paymentRecipient, amount: 0, lineIndex: i, native: native
+                    currency: currency, recipient: lines[i].paymentRecipient, amount: 0, lineIndex: i
                 });
             }
             payouts[payoutIndex].amount += lines[i].amount;
@@ -273,11 +280,11 @@ contract CartPayments is CartStorage, ICartPayments {
 
         for (uint256 i = 0; i < count; ++i) {
             Payout memory payout = payouts[i];
-            if (payout.native) {
+            if (payout.currency == address(0)) {
                 (bool success,) = payout.recipient.call{value: payout.amount}("");
                 if (!success) revert ICart.OrderLineFailed(payout.lineIndex, ICart.FailureStage.PAYOUT, "");
             } else {
-                _transferExact(payout.token, payout.recipient, payout.amount, payout.lineIndex);
+                _transferExact(payout.currency, payout.recipient, payout.amount, payout.lineIndex);
             }
         }
     }

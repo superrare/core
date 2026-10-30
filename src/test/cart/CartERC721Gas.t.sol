@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.18;
 
-import {CartListingGasTest} from "./CartListingGas.t.sol";
+import {CartListingGasFixture} from "./CartListingGasFixture.sol";
 import {ICart} from "../../cart/ICart.sol";
 import {LazySovereignNFT} from "../../token/ERC721/sovereign/lazy/LazySovereignNFT.sol";
 import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
@@ -9,7 +9,7 @@ import {Clones} from "openzeppelin-contracts/proxy/Clones.sol";
 interface ERC721GasVm { function cool(address target) external; }
 
 /// @notice Real LazySovereignNFT in a minimal proxy, one collection, two fee lines.
-contract CartERC721GasTest is CartListingGasTest {
+contract CartERC721GasTest is CartListingGasFixture {
     event ERC721Gas(bool minting, uint256 sales, uint256 lines, uint256 calldataBytes,
         uint256 grossCallGas, uint256 intrinsicGas, uint256 calldataFloorGas);
 
@@ -58,11 +58,11 @@ contract CartERC721GasTest is CartListingGasTest {
         lines[count + 1] = ICart.OrderLine(keccak256("order-charge"), bytes32(0), ICart.FulfillmentKind.NONE,
             1, address(0), 0.2 ether, address(this));
         ICart.ListingPurchaseAuthorization memory auth = sharedRoot(listings);
-        ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
-        ICart.PurchaseOrder memory order = _order("rare-gas", lines, routes, actions);
+        ICart.PayoutRoute memory route = _emptyRoute();
+        ICart.PurchaseOrder memory order = _order("rare-gas", lines, route, actions);
         bytes memory signature = _sign(PLATFORM_PK, _orderDigest(order));
         bytes memory payload = abi.encodeCall(ICart.executePurchase,
-            (order, lines, listings, auth, _combineRoutes(routes), actions, signature));
+            (order, lines, listings, auth, route, actions, signature));
         uint256 intrinsic = 21000;
         uint256 floor = 21000;
         for (uint256 i; i < payload.length; ++i) {

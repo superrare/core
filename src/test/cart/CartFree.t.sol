@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.18;
 
-import {CartTest, CartTestToken, CartTestERC721, CartTestMintableERC721, CartTestERC1155} from "./Cart.t.sol";
+import {CartFixture} from "./CartFixture.sol";
+import {CartTestToken, CartTestERC721, CartTestMintableERC721, CartTestERC1155} from "./CartMocks.sol";
 import {ICart} from "../../cart/ICart.sol";
 import {CartLens} from "../../cart/CartLens.sol";
 import {ICartLens} from "../../cart/ICartLens.sol";
@@ -19,7 +20,7 @@ contract CartZeroTransferRejectingToken is CartTestToken {
 /// @dev A free seller payout must not require a payable recipient.
 contract CartNonpayableSeller {}
 
-contract CartFreeTest is CartTest {
+contract CartFreeTest is CartFixture {
   function testFreeErc721TransferStillMovesTheToken() public {
     CartTestERC721 token = new CartTestERC721();
     token.mint(seller, 7);
@@ -49,8 +50,8 @@ contract CartFreeTest is CartTest {
     lines[0] = _lineForListing(listings[0], 1, 0)[0];
     lines[1] = _lineForListing(listings[1], 1, 1 ether)[0];
     ICart.FulfillmentAction[] memory actions = new ICart.FulfillmentAction[](0);
-    ICart.PayoutRoute[] memory routes = _emptyRoutes(2);
-    ICart.PurchaseOrder memory order = _order("mixed-free-paid", lines, routes, actions);
+    ICart.PayoutRoute memory route = _emptyRoute();
+    ICart.PurchaseOrder memory order = _order("mixed-free-paid", lines, route, actions);
     ICart.ListingPurchaseAuthorization memory authorization = _rootAuthorization(listings, SELLER_PK);
     bytes memory signature = _sign(PLATFORM_PK, _orderDigest(order));
     vm.deal(payer, 1 ether);
@@ -60,7 +61,7 @@ contract CartFreeTest is CartTest {
       lines,
       listings,
       authorization,
-      _combineRoutes(routes),
+      route,
       actions,
       signature
     );
@@ -89,9 +90,8 @@ contract CartFreeTest is CartTest {
     }
     ICart.ListingPurchaseAuthorization memory authorization = _rootAuthorization(listings, SELLER_PK);
     ICart.FulfillmentAction[] memory actions = new ICart.FulfillmentAction[](0);
-    ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
-    ICart.PayoutRoute memory route = _combineRoutes(routes);
-    ICart.PurchaseOrder memory order = _order("large-free-order", lines, routes, actions);
+    ICart.PayoutRoute memory route = _emptyRoute();
+    ICart.PurchaseOrder memory order = _order("large-free-order", lines, route, actions);
     bytes memory signature = _sign(PLATFORM_PK, _orderDigest(order));
     CartLens lens = new CartLens();
     for (uint256 i; i < count; ++i) {
@@ -131,15 +131,15 @@ contract CartFreeTest is CartTest {
     );
     listing.minimumUnitPrice = 0;
     ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 0);
-    ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
+    ICart.PayoutRoute memory route = _emptyRoute();
     ICart.FulfillmentAction[] memory actions = new ICart.FulfillmentAction[](0);
-    ICart.PurchaseOrder memory order = _order("unsigned-free-order", lines, routes, actions);
+    ICart.PurchaseOrder memory order = _order("unsigned-free-order", lines, route, actions);
     ICart.Listing[] memory listings = _singletonListing(listing);
     ICart.ListingPurchaseAuthorization memory authorization = _rootAuthorization(listings, SELLER_PK);
     bytes memory signature = _sign(SELLER_PK, _orderDigest(order));
     vm.expectRevert(abi.encodeWithSelector(ICart.InvalidSignature.selector, vm.addr(PLATFORM_PK), _orderDigest(order)));
     vm.prank(payer);
-    cart.executePurchase(order, lines, listings, authorization, _combineRoutes(routes), actions, signature);
+    cart.executePurchase(order, lines, listings, authorization, route, actions, signature);
     assertFalse(cart.executedOrderIds(order.orderId));
     assertEq(cart.filledQuantity(_listingDigest(listing)), 0);
   }
@@ -211,7 +211,7 @@ contract CartFreeTest is CartTest {
     listing.settlementCurrency = address(token);
     ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 0);
     lines[0].settlementCurrency = address(token);
-    ICart.PayoutRoute memory route = _combineRoutes(_emptyRoutes(1));
+    ICart.PayoutRoute memory route = _emptyRoute();
     ICart.PurchaseOrder memory order = _orderSingle("free-erc20-order", token, lines, route, 0);
     token.mint(address(cart), 5 ether);
     vm.deal(address(cart), 2 ether);
@@ -245,9 +245,9 @@ contract CartFreeTest is CartTest {
     listing.minimumUnitPrice = 0;
     ICart.ListingPurchaseAuthorization memory authorization = _rootAuthorization(_singletonListing(listing), SELLER_PK);
     ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 0);
-    ICart.PayoutRoute[] memory routes = _emptyRoutes(1);
+    ICart.PayoutRoute memory route = _emptyRoute();
     ICart.FulfillmentAction[] memory actions = new ICart.FulfillmentAction[](0);
-    ICart.PurchaseOrder memory order = _order("free-native-order", lines, routes, actions);
+    ICart.PurchaseOrder memory order = _order("free-native-order", lines, route, actions);
     CartLens lens = new CartLens();
     ICartLens.ValidationResult memory result = lens.validateListing(
       address(cart),
@@ -262,7 +262,7 @@ contract CartFreeTest is CartTest {
       address(cart),
       order,
       lines,
-      _combineRoutes(routes),
+      route,
       actions,
       _sign(PLATFORM_PK, _orderDigest(order))
     );
@@ -300,9 +300,9 @@ contract CartFreeTest is CartTest {
       0.6 ether,
       collector
     );
-    ICart.PayoutRoute[] memory routes = _emptyRoutes(3);
-    ICart.PurchaseOrder memory order = _order("free-with-fees-order", lines, routes, new ICart.FulfillmentAction[](0));
-    _execute(order, lines, listing, _combineRoutes(routes));
+    ICart.PayoutRoute memory route = _emptyRoute();
+    ICart.PurchaseOrder memory order = _order("free-with-fees-order", lines, route, new ICart.FulfillmentAction[](0));
+    _execute(order, lines, listing, route);
     assertEq(collector.balance, 0.7 ether);
     assertEq(sellerPayout.balance, 0);
     assertEq(cart.filledQuantity(_listingDigest(listing)), 3);
@@ -328,8 +328,8 @@ contract CartFreeTest is CartTest {
       1 ether,
       collector
     );
-    ICart.PayoutRoute[] memory routes = _emptyRoutes(2);
-    ICart.PurchaseOrder memory order = _order("unfunded-fee-order", lines, routes, new ICart.FulfillmentAction[](0));
+    ICart.PayoutRoute memory route = _emptyRoute();
+    ICart.PurchaseOrder memory order = _order("unfunded-fee-order", lines, route, new ICart.FulfillmentAction[](0));
     order.paymentAmount = 0;
     vm.deal(address(cart), 1 ether);
     vm.expectRevert(
@@ -340,7 +340,7 @@ contract CartFreeTest is CartTest {
         abi.encode(uint256(0), uint256(1 ether))
       )
     );
-    this.executeAgain(order, lines, listing, _combineRoutes(routes));
+    this.executeAgain(order, lines, listing, route);
     assertFalse(cart.executedOrderIds(order.orderId));
     assertEq(cart.filledQuantity(_listingDigest(listing)), 0);
     assertEq(address(cart).balance, 1 ether);
