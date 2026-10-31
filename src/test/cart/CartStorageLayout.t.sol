@@ -88,6 +88,11 @@ contract CartStorageLayoutTest is Test {
             bytes32(uint256(7))
         );
 
+        bytes32 cancelledListingSlot = _nestedMappingSlot(
+            seller, listingDigest, _fieldSlot(layout, listingsLocation, "listings", 3)
+        );
+        vm.prank(seller);
+        cart.cancelListing(listingDigest);
         vm.prank(seller);
         cart.cancelListingRoot(rootDigest);
         vm.prank(seller);
@@ -103,6 +108,10 @@ contract CartStorageLayoutTest is Test {
             bytes32(uint256(7))
         );
         assertTrue(cart.cancelledListingRoots(seller, rootDigest));
+        assertTrue(cart.cancelledListings(seller, listingDigest));
+        assertEq(vm.load(address(cart), cancelledListingSlot), bytes32(uint256(1)));
+        assertFalse(cart.cancelledListings(platformSigner, listingDigest));
+        assertFalse(cart.cancelledListings(seller, rootDigest));
         assertEq(cart.listingNonces(seller), 1);
 
         CartStorageLayoutCanary canary = new CartStorageLayoutCanary(address(routePolicy), address(paymentExecutor));
@@ -126,6 +135,10 @@ contract CartStorageLayoutTest is Test {
             bytes32(uint256(7))
         );
         assertTrue(cart.cancelledListingRoots(seller, rootDigest));
+        assertTrue(cart.cancelledListings(seller, listingDigest));
+        assertEq(vm.load(address(cart), cancelledListingSlot), bytes32(uint256(1)));
+        assertFalse(cart.cancelledListings(platformSigner, listingDigest));
+        assertFalse(cart.cancelledListings(seller, rootDigest));
         assertEq(cart.listingNonces(seller), 1);
     }
 
