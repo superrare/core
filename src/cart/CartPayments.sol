@@ -282,17 +282,22 @@ contract CartPayments is CartStorage, ICartPayments {
             capacity += length == 0 ? 1 : length;
         }
         Payout[] memory payouts = new Payout[](capacity);
+        // Keep at most half the buckets occupied. Buckets hold payout index + 1;
+        // the separate payout array retains first-seen transfer/failure order.
+        uint256 tableSize = 2;
+        while (tableSize < capacity * 2) tableSize <<= 1;
+        uint256[] memory slots = new uint256[](tableSize);
         uint256 count;
         for (uint256 i; i < lines.length; ++i) {
             if (lines[i].amount == 0) continue;
             uint256 index = lineListing[i];
             if (index == NO_GROUP || listings[index].splits.length == 0) {
                 count = _addPayout(
-                    payouts, count, lines[i].settlementCurrency, lines[i].paymentRecipient, lines[i].amount, i
+                    payouts, slots, count, lines[i].settlementCurrency, lines[i].paymentRecipient, lines[i].amount, i
                 );
                 continue;
             }
-            count = _allocateLine(orderId, lines[i], listings[index].splits, payouts, count, i);
+            count = _allocateLine(orderId, lines[i], listings[index].splits, payouts, slots, count, i);
         }
 
         for (uint256 i = 0; i < count; ++i) {
@@ -311,6 +316,7 @@ contract CartPayments is CartStorage, ICartPayments {
         ICart.OrderLine calldata line,
         ICart.Split[] calldata splits,
         Payout[] memory payouts,
+        uint256[] memory slots,
         uint256 count,
         uint256 lineIndex
     ) private returns (uint256) {
@@ -318,12 +324,12 @@ contract CartPayments is CartStorage, ICartPayments {
         for (uint256 j = 1; j < splits.length; ++j) {
             uint256 amount = Math.mulDiv(line.amount, splits[j].basisPoints, 10_000);
             remainder -= amount;
-            count = _addPayout(payouts, count, line.settlementCurrency, splits[j].recipient, amount, lineIndex);
+            count = _addPayout(payouts, slots, count, line.settlementCurrency, splits[j].recipient, amount, lineIndex);
             emit ListingSplitPaid(
                 orderId, lineIndex, line.listingDigest, line.settlementCurrency, splits[j].recipient, amount
             );
         }
-        count = _addPayout(payouts, count, line.settlementCurrency, splits[0].recipient, remainder, lineIndex);
+        count = _addPayout(payouts, slots, count, line.settlementCurrency, splits[0].recipient, remainder, lineIndex);
         emit ListingSplitPaid(
             orderId, lineIndex, line.listingDigest, line.settlementCurrency, splits[0].recipient, remainder
         );
@@ -332,6 +338,7 @@ contract CartPayments is CartStorage, ICartPayments {
 
     function _addPayout(
         Payout[] memory payouts,
+        uint256[] memory slots,
         uint256 count,
         address currency,
         address recipient,
@@ -339,12 +346,18 @@ contract CartPayments is CartStorage, ICartPayments {
         uint256 lineIndex
     ) private pure returns (uint256) {
         if (amount == 0) return count;
-        for (uint256 j; j < count; ++j) {
-            if (payouts[j].currency == currency && payouts[j].recipient == recipient) {
-                payouts[j].amount += amount;
+        uint256 mask = slots.length - 1;
+        uint256 slot = uint256(keccak256(abi.encode(currency, recipient))) & mask;
+        while (slots[slot] != 0) {
+            uint256 index = slots[slot] - 1;
+            // Hash collisions must never combine different recipients or currencies.
+            if (payouts[index].currency == currency && payouts[index].recipient == recipient) {
+                payouts[index].amount += amount;
                 return count;
             }
+            slot = (slot + 1) & mask;
         }
+        slots[slot] = count + 1;
         payouts[count] = Payout(currency, recipient, amount, lineIndex);
         return count + 1;
     }

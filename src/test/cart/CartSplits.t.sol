@@ -581,7 +581,47 @@ contract CartSplitsTest is CartFixture {
         assertFalse(cart.executedOrderIds(lastOrderId));
     }
 
+    function testPayoutIndexCollisionsWrapAndMergeWithoutChangingAttribution() public {
+        address[] memory recipients = new address[](5);
+        uint256 found;
+        for (uint256 candidate = 0xA000; found < 5; ++candidate) {
+            address recipient = address(uint160(candidate));
+            if (uint256(keccak256(abi.encode(address(0), recipient))) & 15 == 15) recipients[found++] = recipient;
+        }
+        ICart.Listing[] memory listings = new ICart.Listing[](3);
+        ICart.OrderLine[] memory lines = new ICart.OrderLine[](3);
+        for (uint256 i; i < 3; ++i) {
+            listings[i] = _splitListing(bytes32(i + 1), 2000);
+            listings[i].paymentRecipient = recipients[i * 2];
+            listings[i].splits[0].recipient = recipients[i * 2];
+            listings[i].splits[1].recipient = recipients[i == 1 ? 3 : 1];
+            lines[i] = _lineForListing(listings[i], 1, 100)[0];
+        }
+        _execute(listings, lines, new ICart.FulfillmentAction[](0), address(0), "");
+        assertEq(recipients[0].balance, 80);
+        assertEq(recipients[1].balance, 40);
+        assertEq(recipients[2].balance, 80);
+        assertEq(recipients[3].balance, 20);
+        assertEq(recipients[4].balance, 80);
+        // Every key hashes to the last bucket of a 16-slot table, forcing wraparound.
+        // The repeated recipient remains attributed to its first line on failure.
+        vm.etch(recipients[1], address(new RevertingPayoutRecipient()).code);
+        for (uint256 i; i < 3; ++i) {
+            listings[i].listingSalt = bytes32(i + 100);
+            lines[i] = _lineForListing(listings[i], 1, 100)[0];
+        }
+        _execute(
+            listings,
+            lines,
+            new ICart.FulfillmentAction[](0),
+            address(0),
+            abi.encodeWithSelector(ICart.OrderLineFailed.selector, 0, ICart.FailureStage.PAYOUT, bytes(""))
+        );
+        assertEq(recipients[1].balance, 40);
+    }
+
     function testSplitOrderGasBenchmarks() public {
+        uint256 gasAt32;
         for (uint256 scenario; scenario < 4; ++scenario) {
             uint256 count = scenario == 0 ? 1 : scenario == 1 ? 8 : scenario == 2 ? 32 : 64;
             ICart.Listing[] memory listings = new ICart.Listing[](count);
@@ -596,6 +636,8 @@ contract CartSplitsTest is CartFixture {
                 lines[i] = _lineForListing(listings[i], 1, 10_000)[0];
             }
             _execute(listings, lines, new ICart.FulfillmentAction[](0), address(0), "");
+            if (count == 32) gasAt32 = lastCheckoutGas;
+            if (count == 64) assertLe(lastCheckoutGas, gasAt32 * 23 / 10, "payout gas growth must remain near linear");
             emit log_named_uint("listings", count);
             emit log_named_uint("distinct split recipients", count * 16);
             emit log_named_uint("checkout call gas", lastCheckoutGas);
