@@ -620,6 +620,71 @@ contract CartSplitsTest is CartFixture {
         assertEq(recipients[1].balance, 40);
     }
 
+    function testCollidingPayoutCallbacksPreserveFirstSeenOrder() public {
+        SplitOrderRecorder recorder = new SplitOrderRecorder();
+        SplitOrderReceiver receiver = new SplitOrderReceiver(recorder);
+        address[] memory recipients = new address[](4);
+        uint256 found;
+        for (uint256 candidate = 0xB000; found < 4; ++candidate) {
+            address recipient = address(uint160(candidate));
+            if (uint256(keccak256(abi.encode(address(0), recipient))) & 15 != 15) continue;
+            recipients[found++] = recipient;
+            vm.etch(recipient, address(receiver).code);
+        }
+        ICart.Listing[] memory listings = new ICart.Listing[](3);
+        ICart.OrderLine[] memory lines = new ICart.OrderLine[](3);
+        for (uint256 i; i < 3; ++i) {
+            uint256 pair = i == 1 ? 2 : 0;
+            listings[i] = _splitListing(bytes32(i + 1), i == 2 ? 5000 : 2000);
+            listings[i].paymentRecipient = recipients[pair];
+            listings[i].splits[0].recipient = recipients[pair];
+            listings[i].splits[1].recipient = recipients[pair + 1];
+            lines[i] = _lineForListing(listings[i], 1, 100)[0];
+        }
+        _execute(listings, lines, new ICart.FulfillmentAction[](0), address(0), "");
+        assertEq(recorder.count(), 4);
+        // All keys start at slot 15, wrapping to slot 0. Bucket order must not
+        // replace allocation order, and later allocations must merge in place.
+        assertEq(recorder.recipient(0), recipients[1]);
+        assertEq(recorder.amount(0), 70);
+        assertEq(recorder.recipient(1), recipients[0]);
+        assertEq(recorder.amount(1), 130);
+        assertEq(recorder.recipient(2), recipients[3]);
+        assertEq(recorder.amount(2), 20);
+        assertEq(recorder.recipient(3), recipients[2]);
+        assertEq(recorder.amount(3), 80);
+    }
+
+    function testCollidingCurrenciesRemainSeparateForSharedRecipients() public {
+        address[] memory recipients = new address[](2);
+        uint256 found;
+        for (uint256 candidate = 0xC000; found < 2; ++candidate) {
+            address recipient = address(uint160(candidate));
+            if (uint256(keccak256(abi.encode(address(0), recipient))) & 7 != 7) continue;
+            if (uint256(keccak256(abi.encode(address(weth), recipient))) & 7 != 7) continue;
+            recipients[found++] = recipient;
+        }
+        ICart.Listing[] memory listings = new ICart.Listing[](2);
+        ICart.OrderLine[] memory lines = new ICart.OrderLine[](2);
+        for (uint256 i; i < 2; ++i) {
+            listings[i] = _splitListing(bytes32(i + 1), i == 0 ? 2000 : 5000);
+            listings[i].paymentRecipient = recipients[0];
+            listings[i].splits[0].recipient = recipients[0];
+            listings[i].splits[1].recipient = recipients[1];
+            listings[i].settlementCurrency = i == 0 ? address(0) : address(weth);
+            lines[i] = _lineForListing(listings[i], 1, i == 0 ? 100 : 200)[0];
+            lines[i].settlementCurrency = listings[i].settlementCurrency;
+        }
+        // Four distinct keys all start at the last slot of an eight-slot table.
+        _execute(listings, lines, new ICart.FulfillmentAction[](0), address(0), "");
+        assertEq(recipients[0].balance, 80);
+        assertEq(recipients[1].balance, 20);
+        assertEq(weth.balanceOf(recipients[0]), 100);
+        assertEq(weth.balanceOf(recipients[1]), 100);
+        assertEq(address(cart).balance, 0);
+        assertEq(weth.balanceOf(address(cart)), 0);
+    }
+
     function testSplitOrderGasBenchmarks() public {
         uint256 gasAt32;
         for (uint256 scenario; scenario < 4; ++scenario) {
@@ -689,4 +754,30 @@ interface LegacySplitCart {
         ICart.FulfillmentAction[] calldata actions,
         bytes calldata signature
     ) external payable returns (ICart.MintResult[] memory);
+}
+
+contract SplitOrderRecorder {
+    address[] public recipient;
+    uint256[] public amount;
+
+    function record(uint256 value) external {
+        recipient.push(msg.sender);
+        amount.push(value);
+    }
+
+    function count() external view returns (uint256) {
+        return recipient.length;
+    }
+}
+
+contract SplitOrderReceiver {
+    SplitOrderRecorder private immutable recorder;
+
+    constructor(SplitOrderRecorder recorder_) {
+        recorder = recorder_;
+    }
+
+    receive() external payable {
+        recorder.record(msg.value);
+    }
 }
