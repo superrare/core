@@ -2,7 +2,7 @@
 
 Use this runbook for on-chain administrative changes and seller authorization invalidation. Execute owner calls against the Cart proxy on the intended chain. Use the configured owner wallet or multisig. Keep transaction hashes, before-and-after reads, and the reason for each change in the operational record.
 
-The signed spread-recipient source change has not been deployed. Confirm the deployed implementation and ABI before using these procedures. The [deployment index](cart.md#deployment-records) links the recorded Sepolia state. Constructor errors and transaction-builder payload retries are outside this runbook.
+The fresh November 1 Sepolia suite includes signed spread recipients and per-listing splits; the previous proxy is paused. Confirm the configured proxy and ABI before using these procedures. The [deployment index](cart.md#deployment-records) links the recorded Sepolia state. Constructor errors and transaction-builder payload retries are outside this runbook.
 
 ## Rotate the platform signer
 
@@ -49,7 +49,7 @@ Ownership transfer does not change the platform signer or any signed spread reci
 5. Confirm the implementation slot and deployed runtime bytecode. Confirm that ownership, signer, pause state, routing dependencies, domain separator, inventory, seller invalidation, and replay state match the intended migration.
 6. Update verified helper addresses, generated bindings, and the signing service together. Simulate a complete checkout, then resume execution and quote release when appropriate.
 
-For the signed spread-recipient migration, deploy matching CartPayments, Cart, CartLens, and CartHashes artifacts. Preserve the existing proxy and route policy when the reviewed change permits it. Keep the retired global recipient slot reserved and unchanged. Do not reuse the older payment executor or hashing helper. Rebuild and sign old checkout payloads using the new order type. Seller Listing and Listing Root typehashes and the EIP-712 domain remain unchanged.
+For the signed spread-recipient migration, deploy matching CartPayments, Cart, CartLens, and CartHashes artifacts. Preserve the existing proxy and route policy when the reviewed change permits it. Keep the retired global recipient slot reserved and unchanged. Do not reuse the older payment executor or hashing helper. Rebuild and sign old checkout payloads using the new order type. The per-listing split change also changes the Listing typehash, including listings with empty split arrays. Rebuild seller listing roots and signatures. A fresh proxy changes the EIP-712 domain; an upgrade at the same proxy preserves it.
 
 `CartFreeListingUpgrade.s.sol` and `upgradeCartFreeListings.py` deploy the replacement executor and current helpers. Their historical names do not limit them to the old free-listing ABI. Review and simulate the exact artifacts before broadcasting. The implementation-only helper is disabled for this migration because the old executor is incompatible.
 

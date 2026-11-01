@@ -110,7 +110,7 @@ Generate bindings from the current `ICart` ABI. `PurchaseOrder.spreadRecipient` 
 
 Rebuild and sign old checkout payloads after this contract change. The old ABI and old Purchase Order signatures are incompatible. Seller Listing and Listing Root signatures remain valid under the unchanged domain and listing types, subject to their existing deadline, nonce, cancellation, and inventory checks. Treasury rotation changes the recipient on new quotes. It does not redirect outstanding signed quotes.
 
-Roll out matching CartPayments, Cart, CartLens, and CartHashes artifacts together. An old payment executor uses an incompatible settlement ABI, and an old CartHashes helper hashes the old order type. Regenerate SDK, CLI, and service bindings and verify the exact deployed code before enabling the new payload. This source change has not been deployed.
+Roll out matching CartPayments, Cart, CartLens, and CartHashes artifacts together. An old payment executor uses an incompatible settlement ABI, and an old CartHashes helper hashes the old order type. Regenerate SDK, CLI, and service bindings and verify the exact deployed code before enabling the new payload. The [fresh November 1 Sepolia deployment](cart-sepolia-fresh-2026-11-01.md) includes this change and per-listing splits. SDK and application rollout remains pending.
 
 ## Build per-listing split payloads
 

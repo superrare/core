@@ -37,11 +37,11 @@ The transaction builder, SDK, CLI, and settlement consumers are maintained outsi
 
 ## Deployment records
 
-[NetworkConfig](../script/NetworkConfig.s.sol) records the Sepolia addresses. The [October 27 deployment record](cart-sepolia-free-listings-2026-10-27.md) and [receipt ledger](data/cart-sepolia-free-listings-2026-10-27.json) describe the confirmed free-listing repair, preserving the proxy, route policy, and CartHashes while replacing CartPayments, Cart, and CartLens. The [October 26 record](cart-sepolia-upgrade-2026-10-26.md) is deployment history; its implementation, payment executor, and Lens were superseded.
+[NetworkConfig](../script/NetworkConfig.s.sol) records the fresh Sepolia suite deployed on November 1, 2026. The [deployment record](cart-sepolia-fresh-2026-11-01.md) and [receipt ledger](data/cart-sepolia-fresh-2026-11-01.json) document the new proxy, implementation, route policy, payments executor, Lens, and Hashes helper. This deployment includes signed spread recipients, per-listing splits, and indexed payout aggregation.
 
-The signed spread-recipient change has not been deployed. These records describe the older order ABI and its global protocol recipient. A future rollout must replace CartPayments, Cart, CartLens, and CartHashes together and regenerate client bindings. Old checkout payloads require new signatures.
+The previous proxy is paused. The [October 27](cart-sepolia-free-listings-2026-10-27.md) and [October 26](cart-sepolia-upgrade-2026-10-26.md) records retain deployment history. SDK and application rollout to the new suite remains pending. Old proxy signatures cannot authorize the new proxy, and clients need the current ABI, fresh signatures, and approvals for the new address.
 
-These records establish the recorded Sepolia deployment. Other chains require separate deployment evidence. Use the scripts in [script/cart](../script/cart) for the intended upgrade scope: the implementation-only helper is disabled for the signed-checkout migration. The combined helpers replace the executor and current integration helpers together. Policy changes also require a matching new policy. The checkout guard protects deployment sources against detached, dirty, or stale checkouts.
+These records establish Sepolia deployment only. Other chains require separate deployment evidence. Existing scripts in [script/cart](../script/cart) cover fresh deployment and scoped upgrades; the checkout guard rejects detached, dirty, or stale deployment sources.
 
 ## Verification
 
