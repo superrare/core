@@ -1,0 +1,12 @@
+{
+  "name": "cart-split-vectors",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node generate.mjs --check"
+  },
+  "dependencies": {
+    "ethers": "6.15.0"
+  }
+}

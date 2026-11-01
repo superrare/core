@@ -1,0 +1,32 @@
+{
+  "compiler": "solc 0.8.18 viaIR optimizer_runs=100",
+  "shape": "native ETH; OFF_CHAIN; 16 equal shares; distinct fresh EOAs per listing; one root per listing; no route or fulfillment actions",
+  "measurement": "gasleft around checkout call including caller ABI encoding; excludes fixture/signing setup and transaction intrinsic calldata gas; not a network gas-admission result",
+  "testSourceSha256": "d797fe65f5980988df8976c8d3c7e426abf539bebdf42558bd6589d44f98a0b7",
+  "cases": [
+    {
+      "listings": 1,
+      "recipients": 16,
+      "checkoutCallGas": 923274,
+      "calldataBytes": 3108
+    },
+    {
+      "listings": 8,
+      "recipients": 128,
+      "checkoutCallGas": 9954762,
+      "calldataBytes": 17220
+    },
+    {
+      "listings": 32,
+      "recipients": 512,
+      "checkoutCallGas": 83611303,
+      "calldataBytes": 65604
+    },
+    {
+      "listings": 64,
+      "recipients": 1024,
+      "checkoutCallGas": 284594133,
+      "calldataBytes": 130116
+    }
+  ]
+}

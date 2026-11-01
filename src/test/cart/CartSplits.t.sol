@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.18;
 
+import {Cart} from "../../cart/Cart.sol";
+import {CartPayments} from "../../cart/CartPayments.sol";
+import {ERC1967Proxy} from "openzeppelin-contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {stdJson} from "forge-std/StdJson.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {CartFixture} from "./CartFixture.sol";
 import {ICart} from "../../cart/ICart.sol";
@@ -9,6 +13,9 @@ import {ICartLens} from "../../cart/ICartLens.sol";
 import {CartTestToken, CartTestERC721, CartTestRevertingTransferToken, RevertingPayoutRecipient} from "./CartMocks.sol";
 
 contract CartSplitsTest is CartFixture {
+    using stdJson for string;
+    uint256 internal lastCheckoutGas;
+    uint256 internal lastCalldataBytes;
     uint256 internal orderSequence;
     bytes32 internal lastOrderId;
     address internal collaborator = address(0x6001);
@@ -42,11 +49,15 @@ contract CartSplitsTest is CartFixture {
             vm.prank(payer);
             CartTestToken(currency).approve(address(cart), order.paymentAmount);
         }
+        lastCalldataBytes =
+        abi.encodeCall(cart.executePurchase, (order, lines, listings, authorization, route, actions, signature)).length;
         if (failure.length != 0) vm.expectRevert(failure);
         vm.prank(payer);
+        uint256 gasBefore = gasleft();
         cart.executePurchase{value: currency == address(0) ? order.paymentAmount : 0}(
             order, lines, listings, authorization, route, actions, signature
         );
+        lastCheckoutGas = gasBefore - gasleft();
     }
 
     function _pay(ICart.Listing memory listing, uint256 amount, bytes memory failure) internal {
@@ -369,4 +380,271 @@ contract CartSplitsTest is CartFixture {
         assertEq(token.balanceOf(collaborator), secondary);
         assertEq(token.balanceOf(sellerPayout), type(uint256).max - secondary);
     }
+
+    function testSdkTypedDataVectors() public {
+        string memory data = vm.readFile("docs/data/cart-split-sdk-vectors.json");
+        ICart.Listing memory listing = _listing(
+            bytes32(uint256(type(uint256).max / 15)), ICart.FulfillmentKind.OFF_CHAIN, address(0), 0, address(0x3333)
+        );
+        listing.seller = address(0x2222);
+        listing.sku = bytes32(uint256(type(uint256).max / 15 * 2));
+        listing.minimumUnitPrice = 100;
+        listing.availableQuantity = 3;
+        bytes32 domain = data.readBytes32(".domainSeparator");
+        assertEq(hashes.hashListing(domain, listing), data.readBytes32(".empty"));
+        listing.splits = new ICart.Split[](2);
+        listing.splits[0] = ICart.Split(address(0x3333), 8000);
+        listing.splits[1] = ICart.Split(address(0x4444), 2000);
+        assertEq(hashes.hashListing(domain, listing), data.readBytes32(".populated"));
+    }
+
+    function testActualPreSplitProxyMigrationPreservesHistoryAndRequiresNewAuthorization() public {
+        string memory data = vm.readFile("docs/data/cart-pre-split-bytecode.json");
+        address oldPayments =
+            _deployFixture(abi.encodePacked(data.readBytes(".CartPayments"), abi.encode(address(routePolicy))));
+        address oldImplementation =
+            _deployFixture(abi.encodePacked(data.readBytes(".Cart"), abi.encode(address(routePolicy), oldPayments)));
+        cart = Cart(
+            payable(address(
+                    new ERC1967Proxy(
+                        oldImplementation,
+                        abi.encodeCall(
+                            Cart.initialize,
+                            (address(this), platformSigner, address(router), address(permit2), address(weth))
+                        )
+                    )
+                ))
+        );
+        ICart.Listing memory listing =
+            _listingWithQuantity("migration", ICart.FulfillmentKind.OFF_CHAIN, address(0), 0, sellerPayout, 3);
+        listing.minimumUnitPrice = 100;
+        LegacySplitCart.Listing[] memory oldListings = new LegacySplitCart.Listing[](1);
+        oldListings[0] = LegacySplitCart.Listing(
+            listing.listingSalt,
+            listing.seller,
+            listing.sku,
+            listing.fulfillmentKind,
+            listing.tokenContract,
+            listing.tokenId,
+            listing.settlementCurrency,
+            listing.minimumUnitPrice,
+            listing.availableQuantity,
+            listing.paymentRecipient
+        );
+        bytes32 oldStructHash = keccak256(
+            abi.encode(
+                keccak256(
+                    "Listing(bytes32 listingSalt,address seller,bytes32 sku,uint8 fulfillmentKind,address tokenContract,uint256 tokenId,address settlementCurrency,uint256 minimumUnitPrice,uint256 availableQuantity,address paymentRecipient)"
+                ),
+                oldListings[0]
+            )
+        );
+        bytes32 oldDigest = keccak256(abi.encodePacked(hex"1901", cart.DOMAIN_SEPARATOR(), oldStructHash));
+        ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 100);
+        lines[0].listingDigest = oldDigest;
+        ICart.ListingPurchaseAuthorization memory authorization =
+            _rootAuthorization(_singletonListing(listing), SELLER_PK);
+        authorization.listingRoots[0].listingsRoot = hashes.hashListingLeaf(oldDigest);
+        authorization.listingRootSignatures[0] =
+            _sign(SELLER_PK, hashes.hashListingRoot(cart.DOMAIN_SEPARATOR(), authorization.listingRoots[0]));
+        ICart.PayoutRoute memory route = _emptyRoute();
+        ICart.FulfillmentAction[] memory actions = new ICart.FulfillmentAction[](0);
+        ICart.PurchaseOrder memory order = _order("legacy-order", lines, route, actions);
+        bytes memory signature = _sign(PLATFORM_PK, _orderDigest(order));
+        vm.deal(payer, 100);
+        vm.prank(payer);
+        LegacySplitCart(address(cart)).executePurchase{value: 100}(
+            order, lines, oldListings, authorization, route, actions, signature
+        );
+        assertEq(cart.filledQuantity(oldDigest), 1);
+        vm.prank(seller);
+        cart.cancelListing(oldDigest);
+        cart.upgradeTo(address(new Cart(address(routePolicy), address(paymentExecutor))));
+        assertEq(cart.filledQuantity(oldDigest), 1);
+        assertTrue(cart.cancelledListings(seller, oldDigest));
+        assertTrue(cart.executedOrderIds(order.orderId));
+        // Unchanged seller terms now hash differently; the old root cannot authorize them.
+        lines[0].listingDigest = _listingDigest(listing);
+        order = _order("old-root-new-schema", lines, route, actions);
+        signature = _sign(PLATFORM_PK, _orderDigest(order));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ICart.InvalidMerkleProof.selector,
+                authorization.listingRoots[0].listingsRoot,
+                hashes.hashListingLeaf(lines[0].listingDigest)
+            )
+        );
+        vm.prank(payer);
+        cart.executePurchase{value: 0}(
+            order, lines, _singletonListing(listing), authorization, route, actions, signature
+        );
+        // Seller explicitly authorizes only the remaining two units under new terms.
+        listing.availableQuantity = 2;
+        listing.splits = new ICart.Split[](2);
+        listing.splits[0] = ICart.Split(sellerPayout, 8000);
+        listing.splits[1] = ICart.Split(collaborator, 2000);
+        lines = _lineForListing(listing, 2, 200);
+        _execute(_singletonListing(listing), lines, actions, address(0), "");
+        assertEq(cart.filledQuantity(_listingDigest(listing)), 2);
+        assertEq(cart.filledQuantity(oldDigest), 1);
+        assertTrue(cart.cancelledListings(seller, oldDigest));
+        assertEq(sellerPayout.balance, 260);
+        assertEq(collaborator.balance, 40);
+    }
+
+    function _deployFixture(bytes memory code) internal returns (address deployed) {
+        assembly ("memory-safe") { deployed := create(0, add(code, 32), mload(code)) }
+        require(deployed != address(0), "fixture deployment failed");
+    }
+
+    function testFuzzArbitraryVectors(uint256 seed, uint8 size, uint96 amount) public {
+        uint256 count = bound(size, 1, 16);
+        amount = uint96(bound(amount, 1, type(uint96).max));
+        ICart.Listing memory listing = _splitListing("vector", 2000);
+        listing.minimumUnitPrice = 0;
+        listing.splits = new ICart.Split[](count);
+        uint256 remaining = 10_000;
+        for (uint256 i; i < count; ++i) {
+            uint256 share = i + 1 == count
+                ? remaining
+                : 1 + uint256(keccak256(abi.encode(seed, i))) % (remaining - (count - i - 1));
+            listing.splits[i] = ICart.Split(i == 0 ? sellerPayout : address(uint160(0x8000 + i)), uint16(share));
+            remaining -= share;
+        }
+        vm.recordLogs();
+        _pay(listing, amount, "");
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        uint256 total;
+        uint256 events;
+        for (uint256 i; i < count; ++i) {
+            uint256 expected;
+            if (i == 0) {
+                expected = amount;
+                for (uint256 j = 1; j < count; ++j) {
+                    expected -= uint256(amount) * listing.splits[j].basisPoints / 10_000;
+                }
+            } else {
+                expected = uint256(amount) * listing.splits[i].basisPoints / 10_000;
+            }
+            assertEq(listing.splits[i].recipient.balance, expected);
+            total += expected;
+            uint256 matches;
+            for (uint256 j; j < logs.length; ++j) {
+                if (logs[j].topics[0] != keccak256("ListingSplitPaid(bytes32,uint256,bytes32,address,address,uint256)"))
+                {
+                    continue;
+                }
+                (address currency, address recipient, uint256 paid) =
+                    abi.decode(logs[j].data, (address, address, uint256));
+                if (recipient == listing.splits[i].recipient) {
+                    assertEq(currency, address(0));
+                    assertEq(paid, expected);
+                    assertEq(logs[j].topics[3], _listingDigest(listing));
+                    ++matches;
+                    ++events;
+                }
+            }
+            assertEq(matches, 1);
+        }
+        assertEq(events, count);
+        assertEq(total, amount);
+    }
+
+    function testSecondaryCallbackCannotReenter() public {
+        SplitCallback receiver = new SplitCallback(address(cart), _signedInnerPurchase(), false);
+        ICart.Listing memory listing = _splitListing("callback", 2000);
+        listing.splits[1].recipient = address(receiver);
+        _pay(listing, 150, "");
+        assertTrue(receiver.attempted());
+        assertFalse(receiver.succeeded());
+        assertEq(receiver.result(), abi.encodeWithSignature("Error(string)", "ReentrancyGuard: reentrant call"));
+        assertEq(address(receiver).balance, 30);
+        assertEq(sellerPayout.balance, 120);
+    }
+
+    function testLaterSecondaryFailureRevertsEarlierCallbackAndPayouts() public {
+        SplitCallback receiver = new SplitCallback(address(cart), _signedInnerPurchase(), false);
+        ICart.Listing memory listing = _splitListing("later-failure", 2000);
+        listing.splits = new ICart.Split[](3);
+        listing.splits[0] = ICart.Split(sellerPayout, 6000);
+        listing.splits[1] = ICart.Split(address(receiver), 2000);
+        listing.splits[2] = ICart.Split(address(new RevertingPayoutRecipient()), 2000);
+        _pay(
+            listing,
+            150,
+            abi.encodeWithSelector(ICart.OrderLineFailed.selector, 0, ICart.FailureStage.PAYOUT, bytes(""))
+        );
+        assertFalse(receiver.attempted());
+        assertEq(address(receiver).balance, 0);
+        assertEq(payer.balance, 150);
+        assertEq(cart.filledQuantity(_listingDigest(listing)), 0);
+        assertFalse(cart.executedOrderIds(lastOrderId));
+    }
+
+    function testSplitOrderGasBenchmarks() public {
+        for (uint256 scenario; scenario < 4; ++scenario) {
+            uint256 count = scenario == 0 ? 1 : scenario == 1 ? 8 : scenario == 2 ? 32 : 64;
+            ICart.Listing[] memory listings = new ICart.Listing[](count);
+            ICart.OrderLine[] memory lines = new ICart.OrderLine[](count);
+            for (uint256 i; i < count; ++i) {
+                listings[i] = _splitListing(keccak256(abi.encode("gas", scenario, i)), 2000);
+                listings[i].paymentRecipient = address(uint160(0x100000 + scenario * 10000 + i * 16));
+                listings[i].splits = new ICart.Split[](16);
+                for (uint256 j; j < 16; ++j) {
+                    listings[i].splits[j] = ICart.Split(address(uint160(0x100000 + scenario * 10000 + i * 16 + j)), 625);
+                }
+                lines[i] = _lineForListing(listings[i], 1, 10_000)[0];
+            }
+            _execute(listings, lines, new ICart.FulfillmentAction[](0), address(0), "");
+            emit log_named_uint("listings", count);
+            emit log_named_uint("distinct split recipients", count * 16);
+            emit log_named_uint("checkout call gas", lastCheckoutGas);
+            emit log_named_uint("checkout calldata bytes", lastCalldataBytes);
+        }
+    }
+}
+
+contract SplitCallback {
+    address internal immutable cart;
+    bytes internal payload;
+    bool internal immutable reject;
+    bool public attempted;
+    bool public succeeded;
+    bytes public result;
+
+    constructor(address cart_, bytes memory payload_, bool reject_) {
+        cart = cart_;
+        payload = payload_;
+        reject = reject_;
+    }
+
+    receive() external payable {
+        attempted = true;
+        (succeeded, result) = cart.call(payload);
+        require(!reject, "reject");
+    }
+}
+
+interface LegacySplitCart {
+    struct Listing {
+        bytes32 listingSalt;
+        address seller;
+        bytes32 sku;
+        ICart.FulfillmentKind fulfillmentKind;
+        address tokenContract;
+        uint256 tokenId;
+        address settlementCurrency;
+        uint256 minimumUnitPrice;
+        uint256 availableQuantity;
+        address paymentRecipient;
+    }
+    function executePurchase(
+        ICart.PurchaseOrder calldata order,
+        ICart.OrderLine[] calldata lines,
+        Listing[] calldata listings,
+        ICart.ListingPurchaseAuthorization calldata authorization,
+        ICart.PayoutRoute calldata route,
+        ICart.FulfillmentAction[] calldata actions,
+        bytes calldata signature
+    ) external payable returns (ICart.MintResult[] memory);
 }

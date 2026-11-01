@@ -58,3 +58,5 @@ The [formal-verification project](../verification/cart/README.md) documents its 
 The [cleanup verification](cart-cleanup-verification.md) records preserved test scenarios, ABI and storage checks, runtime sizes, and checkout-gas comparisons for the internal refactor.
 
 The [signed spread-recipient verification](cart-signed-spread-verification.md) records tests, gas, runtime sizes, ABI changes, and reserved-slot checks for the checkout interface change.
+
+[Split verification](cart-split-verification.md) records SDK vectors, the historical-proxy migration rehearsal, callback coverage, and split-order gas measurements.
