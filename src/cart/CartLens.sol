@@ -70,6 +70,9 @@ contract CartLens is ICartLens {
         if (listing.paymentRecipient == cart) {
             return _failure(ValidationCode.INVALID_LISTING, 0, bytes32(0), "");
         }
+        if (!CartValidation.validSplits(listing, cart)) {
+            return _failure(ValidationCode.INVALID_LISTING, 0, bytes32(0), "");
+        }
         if (root.listingsRoot == bytes32(0)) {
             return _failure(ValidationCode.INVALID_ROOT, 0, bytes32(0), "");
         }

@@ -111,3 +111,20 @@ Generate bindings from the current `ICart` ABI. `PurchaseOrder.spreadRecipient` 
 Rebuild and sign old checkout payloads after this contract change. The old ABI and old Purchase Order signatures are incompatible. Seller Listing and Listing Root signatures remain valid under the unchanged domain and listing types, subject to their existing deadline, nonce, cancellation, and inventory checks. Treasury rotation changes the recipient on new quotes. It does not redirect outstanding signed quotes.
 
 Roll out matching CartPayments, Cart, CartLens, and CartHashes artifacts together. An old payment executor uses an incompatible settlement ABI, and an old CartHashes helper hashes the old order type. Regenerate SDK, CLI, and service bindings and verify the exact deployed code before enabling the new payload. This source change has not been deployed.
+
+## Build per-listing split payloads
+
+Include `splits` in every Listing tuple, including an empty array for single-recipient Listings.
+For split Listings, use `Split(address recipient,uint16 basisPoints)` entries with positive shares
+that total 10,000 and at most 16 distinct recipients. Set the first recipient to `paymentRecipient`.
+The seller signs the Listing Root that commits to these terms. Recipients do not sign.
+
+Apply the split to the final merchandise Order Line amount in the Listing's settlement currency.
+The minimum unit price protects the aggregate Listing proceeds. Compute secondary shares with
+integer division by 10,000 and give the remainder to the first recipient. Compute allocations
+separately for each Order Line, then aggregate transfers by currency and recipient. Keep fee lines
+and Protocol Spread separate. Use `ListingSplitPaid` events for allocation reconciliation.
+
+Regenerate bindings and rebuild Listing digests, roots, proofs, and orders with the new EIP-712
+type. Existing signed payloads are incompatible, including Listings without splits. See
+[per-listing splits](cart-contract-design.md#per-listing-splits) for settlement and migration rules.

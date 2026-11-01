@@ -8,8 +8,9 @@ import {ICart} from "./ICart.sol";
 ///      the off-chain hashing helper so the two can never drift.
 library CartHashing {
     bytes32 internal constant LISTING_TYPEHASH = keccak256(
-        "Listing(bytes32 listingSalt,address seller,bytes32 sku,uint8 fulfillmentKind,address tokenContract,uint256 tokenId,address settlementCurrency,uint256 minimumUnitPrice,uint256 availableQuantity,address paymentRecipient)"
+        "Listing(bytes32 listingSalt,address seller,bytes32 sku,uint8 fulfillmentKind,address tokenContract,uint256 tokenId,address settlementCurrency,uint256 minimumUnitPrice,uint256 availableQuantity,address paymentRecipient,Split[] splits)Split(address recipient,uint16 basisPoints)"
     );
+    bytes32 internal constant SPLIT_TYPEHASH = keccak256("Split(address recipient,uint16 basisPoints)");
     bytes32 internal constant ORDER_TYPEHASH = keccak256(
         "PurchaseOrder(bytes32 orderId,address paymentCurrency,uint256 deadline,uint256 paymentAmount,address spreadRecipient,bytes32 orderLinesHash,bytes32 payoutRouteHash,bytes32 fulfillmentActionsHash)"
     );
@@ -37,9 +38,18 @@ library CartHashing {
                 listing.settlementCurrency,
                 listing.minimumUnitPrice,
                 listing.availableQuantity,
-                listing.paymentRecipient
+                listing.paymentRecipient,
+                hashSplits(listing.splits)
             )
         );
+    }
+
+    function hashSplits(ICart.Split[] calldata splits) internal pure returns (bytes32) {
+        bytes32[] memory hashes = new bytes32[](splits.length);
+        for (uint256 i; i < splits.length; ++i) {
+            hashes[i] = keccak256(abi.encode(SPLIT_TYPEHASH, splits[i].recipient, splits[i].basisPoints));
+        }
+        return _concatHash(hashes);
     }
 
     function hashOrderStruct(ICart.PurchaseOrder calldata order) internal pure returns (bytes32) {

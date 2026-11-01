@@ -181,7 +181,8 @@ contract CartInventoryProof is CartProofBase {
             settlementCurrency: address(0),
             minimumUnitPrice: 1,
             availableQuantity: cap,
-            paymentRecipient: recipient
+            paymentRecipient: recipient,
+            splits: new ICart.Split[](0)
         });
         digest = hashes.hashListing(cart.DOMAIN_SEPARATOR(), listings[0]);
         auth.listingRoots = new ICart.ListingRoot[](1);

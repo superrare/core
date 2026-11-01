@@ -63,7 +63,8 @@ abstract contract CartAuthorizationBase is CartProofBase {
             settlementCurrency: address(0),
             minimumUnitPrice: 1,
             availableQuantity: quantity,
-            paymentRecipient: PAYEE
+            paymentRecipient: PAYEE,
+            splits: new ICart.Split[](0)
         });
         p.listingDigest = hashes.hashListing(cart.DOMAIN_SEPARATOR(), p.listings[0]);
         p.auth.listingRoots = new ICart.ListingRoot[](1);

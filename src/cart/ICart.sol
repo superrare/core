@@ -31,6 +31,11 @@ interface ICart {
         SPREAD
     }
 
+    struct Split {
+        address recipient;
+        uint16 basisPoints;
+    }
+
     struct Listing {
         /// @dev A client-generated random salt that makes this listing instance unique. Re-listing
         /// returned inventory with the same terms requires a fresh listingSalt.
@@ -47,12 +52,15 @@ interface ICart {
         uint256 tokenId;
         /// @dev Currency that the seller receives for this listing.
         address settlementCurrency;
-        /// @dev Lowest accepted total price per unit. Zero permits free fulfillment.
+        /// @dev Minimum total proceeds per unit across all listing recipients. Zero permits free fulfillment.
         uint256 minimumUnitPrice;
         /// @dev Zero means the Listing is uncapped; positive values authorize a finite quantity.
         uint256 availableQuantity;
-        /// @dev Address that receives the listing payment.
+        /// @dev Sole recipient without splits; first split recipient and rounding-remainder destination otherwise.
         address paymentRecipient;
+        /// @dev Empty pays paymentRecipient. Otherwise shares total 10,000; the first
+        /// recipient is paymentRecipient and receives rounding remainder per order line.
+        Split[] splits;
     }
 
     struct OrderLine {
@@ -146,6 +154,16 @@ interface ICart {
         bytes32 indexed orderId, address indexed currency, address indexed recipient, uint256 amount
     );
     event ListingRootCancelled(address indexed seller, bytes32 indexed rootDigest);
+    /// @notice One listing line allocation before transfers are aggregated.
+    event ListingSplitPaid(
+        bytes32 indexed orderId,
+        uint256 indexed lineIndex,
+        bytes32 indexed listingDigest,
+        address currency,
+        address recipient,
+        uint256 amount
+    );
+
     event ListingCancelled(address indexed seller, bytes32 indexed listingDigest);
     event ListingNonceInvalidated(address indexed seller, uint256 nonce);
     event PurchaseExecuted(

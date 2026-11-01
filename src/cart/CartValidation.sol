@@ -6,6 +6,24 @@ import {ICart} from "./ICart.sol";
 /// @notice Shared fulfillment classification and collection-owner checks for Cart and CartLens.
 /// @dev Callers retain their validation order and translate failed checks into their own diagnostics.
 library CartValidation {
+    uint256 internal constant MAX_SPLIT_RECIPIENTS = 16;
+
+    function validSplits(ICart.Listing calldata listing, address cart) internal pure returns (bool) {
+        uint256 length = listing.splits.length;
+        if (length == 0) return true;
+        if (length > MAX_SPLIT_RECIPIENTS || listing.splits[0].recipient != listing.paymentRecipient) return false;
+        uint256 total;
+        for (uint256 i; i < length; ++i) {
+            ICart.Split calldata split = listing.splits[i];
+            if (split.recipient == address(0) || split.recipient == cart || split.basisPoints == 0) return false;
+            for (uint256 j; j < i; ++j) {
+                if (listing.splits[j].recipient == split.recipient) return false;
+            }
+            total += split.basisPoints;
+        }
+        return total == 10_000;
+    }
+
     function isOnChainKind(ICart.FulfillmentKind kind) internal pure returns (bool) {
         // Identify the fulfillment kinds that call an NFT contract during settlement.
         return kind == ICart.FulfillmentKind.ERC721_TRANSFER || kind == ICart.FulfillmentKind.ERC1155_TRANSFER

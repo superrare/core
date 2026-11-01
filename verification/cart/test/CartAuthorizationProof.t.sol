@@ -83,7 +83,8 @@ contract CartAuthorizationProof is CartAuthorizationBase {
             settlementCurrency: address(0),
             minimumUnitPrice: 1,
             availableQuantity: quantity,
-            paymentRecipient: PAYEE
+            paymentRecipient: PAYEE,
+            splits: new ICart.Split[](0)
         });
         bytes32 secondDigest = hashes.hashListing(cart.DOMAIN_SEPARATOR(), listings[1]);
         p.listings = listings;

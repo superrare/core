@@ -28,6 +28,8 @@ interface ICartPayments {
         address paymentCurrency,
         address spreadRecipient,
         ICart.OrderLine[] calldata lines,
+        ICart.Listing[] calldata listings,
+        uint256[] calldata lineListing,
         PaymentState calldata state
     ) external payable;
 }

@@ -46,6 +46,11 @@ enum FulfillmentKind {
     CURRENCY_SWAP
 }
 
+struct Split {
+    address recipient;
+    uint16 basisPoints;
+}
+
 struct Listing {
     bytes32 listingSalt;
     address seller;
@@ -58,6 +63,7 @@ struct Listing {
     // Zero means uncapped; a positive value is a finite authorized quantity.
     uint256 availableQuantity;
     address paymentRecipient;
+    Split[] splits;
 }
 
 struct OrderLine {
@@ -337,3 +343,36 @@ Implementation acceptance includes unit, invariant, fuzz, and fork coverage for:
 - Event completeness and off-chain idempotency keys.
 - Pause behavior, seller invalidation while paused, signer rotation, UUPS authorization, storage preservation, and EIP-712 compatibility across upgrades.
 - End-to-end mainnet fork execution through Cart against the pinned Universal Router, Permit2, and WETH deployment, including V2/V3/V4 mixed plans, native/WETH transitions, exact-output refunds, payouts, spread capture, baseline restoration, and allowance cleanup.
+
+## Per-listing splits
+
+`Listing.splits` is an optional seller-signed EIP-712 array of
+`Split(address recipient,uint16 basisPoints)`. An empty array pays the existing `paymentRecipient`.
+A nonempty array has at most 16 distinct nonzero recipients, positive shares totaling 10,000,
+and a first recipient equal to `paymentRecipient`. Cart itself cannot be a recipient.
+
+Cart checks `minimumUnitPrice * quantity` against the full final Order Line amount. The floor
+protects the total proceeds distributed to the Listing's recipients. For a floor of 100 and an
+80/20 split, a final line amount of 150 pays 120 and 30. Fees on separate lines and Protocol Spread
+are outside this allocation.
+
+Cart resolves the seller-authorized Listing for each line before allocating its final amount.
+Secondary shares round down with full-precision multiplication; the first recipient receives
+the remainder. This happens separately for each line, including repeated fills of one Listing.
+Only then does Cart combine transfers by exact currency and recipient. Shared recipients never
+cause a different Listing or a listing-less fee line to inherit a split.
+
+`ListingSplitPaid` reports each nonzero-priced split line's allocations, including shares rounded
+to zero, with its order ID, line index, Listing digest, currency, recipient, and amount. Free lines
+skip monetary allocations and payouts. Any payout failure reverts funding, fulfillment, inventory
+reservations, events, and order consumption. Splits do not change NFT ownership checks, approvals,
+fulfillment quantities, or the seller and platform authorization requirements. Recipients do not sign.
+Native ETH and exact-transfer ERC-20 settlement, including WETH, use the same allocation rules.
+
+### Interface migration
+
+This change extends the Listing ABI and EIP-712 type, including for empty split arrays. Existing
+Listing digests, Merkle roots, proofs, platform orders referencing those digests, and signatures
+must be rebuilt. Old calldata is incompatible. Deploy matching Cart and CartPayments implementations,
+update CartLens and CartHashes, and regenerate client bindings together. No storage slots change.
+Historical deployment and gas reports describe their recorded ABI and need fresh measurements.

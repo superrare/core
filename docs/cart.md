@@ -20,6 +20,7 @@ The branch combines free Listings and zero-total Orders with the listing digest 
 ## Current contract behavior
 
 - The platform signs the complete Purchase Order. Sellers sign reusable Merkle Listing Roots. The transaction caller supplies the exact fixed quote; fulfillment recipients are independent of the payer.
+- Seller-signed Listings can split each final Order Line amount among up to 16 recipients. Allocations are calculated per line before transfers are combined. See [per-listing splits](cart-contract-design.md#per-listing-splits) for rounding and the required ABI/signature migration.
 - Each Order Line names its payout currency, amount, and recipient. Seller-backed lines must meet the Listing's per-unit proceeds floor. Fees and other platform-authorized charges use peer lines.
 - Fulfillment supports ERC-721 and ERC-1155 transfers and the supported `mintTo` interfaces, plus off-chain fulfillment. `NONE` requires no fulfillment job. `CURRENCY_SWAP` is a listing-less conversion through the order-wide route.
 - Free Listings and zero-total Orders retain signature, inventory, replay, fulfillment, and balance protections. ERC-721 mint actions return token IDs through `MintResult[]` and emit fulfillment events.

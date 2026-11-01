@@ -183,7 +183,7 @@ contract Cart is
     // Transfer or mint each on-chain item to its requested recipient.
     mintResults = _executeFulfillment(order.orderId, listings, lineListing, actions, mintActionCount);
     // Pay grouped recipients, capture protocol spread, and verify all settlement balances.
-    _finishPayment(order.orderId, order.paymentCurrency, order.spreadRecipient, lines, paymentState);
+    _finishPayment(order.orderId, order.paymentCurrency, order.spreadRecipient, lines, listings, lineListing, paymentState);
 
     // Report the payer and exact signed quote after the entire purchase succeeds.
     emit PurchaseExecuted(order.orderId, msg.sender, order.paymentCurrency, order.paymentAmount);
@@ -397,6 +397,7 @@ contract Cart is
       revert InvalidListing();
     }
     if (listing.paymentRecipient == address(this)) revert InvalidPaymentRecipient(listing.paymentRecipient);
+    if (!CartValidation.validSplits(listing, address(this))) revert InvalidListing();
     // Currency conversions are platform-authorized Purchase Order lines, never seller Listings.
     if (listing.fulfillmentKind == FulfillmentKind.CURRENCY_SWAP) revert InvalidListing();
     if (!CartValidation.isOnChainKind(listing.fulfillmentKind)) {
@@ -552,10 +553,12 @@ contract Cart is
     address paymentCurrency,
     address spreadRecipient,
     OrderLine[] calldata lines,
+    Listing[] calldata listings,
+    uint256[] memory lineListing,
     ICartPayments.PaymentState memory state
   ) private {
     (bool success, bytes memory result) = address(PAYMENT_EXECUTOR).delegatecall(
-      abi.encodeCall(ICartPayments.finish, (orderId, paymentCurrency, spreadRecipient, lines, state))
+      abi.encodeCall(ICartPayments.finish, (orderId, paymentCurrency, spreadRecipient, lines, listings, lineListing, state))
     );
     if (!success) _bubble(result);
   }

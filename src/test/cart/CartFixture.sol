@@ -105,7 +105,8 @@ abstract contract CartFixture is Test {
             settlementCurrency: address(0),
             minimumUnitPrice: 1 ether,
             availableQuantity: availableQuantity,
-            paymentRecipient: paymentRecipient
+            paymentRecipient: paymentRecipient,
+            splits: new ICart.Split[](0)
         });
     }
 

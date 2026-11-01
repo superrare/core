@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.18;
 
+import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
+
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -23,6 +25,15 @@ contract CartPayments is CartStorage, ICartPayments {
     using SafeERC20 for IERC20;
 
     error DirectCallNotAllowed();
+
+    event ListingSplitPaid(
+        bytes32 indexed orderId,
+        uint256 indexed lineIndex,
+        bytes32 indexed listingDigest,
+        address currency,
+        address recipient,
+        uint256 amount
+    );
 
     event ProtocolSpreadCaptured(
         bytes32 indexed orderId, address indexed currency, address indexed recipient, uint256 amount
@@ -78,12 +89,14 @@ contract CartPayments is CartStorage, ICartPayments {
         address paymentCurrency,
         address spreadRecipient,
         ICart.OrderLine[] calldata lines,
+        ICart.Listing[] calldata listings,
+        uint256[] calldata lineListing,
         PaymentState calldata state
     ) external payable onlyDelegateCall {
         // Convert incremental ETH/WETH into the exact forms required by the signed payouts.
         _prepareNativeFamily(lines, state.assetSnapshots, state.nativeBaseline);
         // Pay each recipient once per exact currency, retaining first-line failure attribution.
-        _payLines(lines);
+        _payLines(orderId, lines, listings, lineListing);
         // Deliver favorable execution variance to the signed recipient and restore every custody baseline.
         _captureSupportedSpread(orderId, spreadRecipient, state);
         _verifyFinalBaselines(state);
@@ -256,27 +269,30 @@ contract CartPayments is CartStorage, ICartPayments {
         }
     }
 
-    function _payLines(ICart.OrderLine[] calldata lines) private {
-        Payout[] memory payouts = new Payout[](lines.length);
+    function _payLines(
+        bytes32 orderId,
+        ICart.OrderLine[] calldata lines,
+        ICart.Listing[] calldata listings,
+        uint256[] calldata lineListing
+    ) private {
+        uint256 capacity;
+        for (uint256 i; i < lines.length; ++i) {
+            uint256 index = lineListing[i];
+            uint256 length = index == NO_GROUP ? 0 : listings[index].splits.length;
+            capacity += length == 0 ? 1 : length;
+        }
+        Payout[] memory payouts = new Payout[](capacity);
         uint256 count;
-        for (uint256 i = 0; i < lines.length; ++i) {
-            // Free merchandise still fulfills; only its monetary payout is omitted.
+        for (uint256 i; i < lines.length; ++i) {
             if (lines[i].amount == 0) continue;
-            address currency = lines[i].settlementCurrency;
-            uint256 payoutIndex = NO_GROUP;
-            for (uint256 j = 0; j < count; ++j) {
-                if (payouts[j].currency == currency && payouts[j].recipient == lines[i].paymentRecipient) {
-                    payoutIndex = j;
-                    break;
-                }
+            uint256 index = lineListing[i];
+            if (index == NO_GROUP || listings[index].splits.length == 0) {
+                count = _addPayout(
+                    payouts, count, lines[i].settlementCurrency, lines[i].paymentRecipient, lines[i].amount, i
+                );
+                continue;
             }
-            if (payoutIndex == NO_GROUP) {
-                payoutIndex = count++;
-                payouts[payoutIndex] = Payout({
-                    currency: currency, recipient: lines[i].paymentRecipient, amount: 0, lineIndex: i
-                });
-            }
-            payouts[payoutIndex].amount += lines[i].amount;
+            count = _allocateLine(orderId, lines[i], listings[index].splits, payouts, count, i);
         }
 
         for (uint256 i = 0; i < count; ++i) {
@@ -288,6 +304,49 @@ contract CartPayments is CartStorage, ICartPayments {
                 _transferExact(payout.currency, payout.recipient, payout.amount, payout.lineIndex);
             }
         }
+    }
+
+    function _allocateLine(
+        bytes32 orderId,
+        ICart.OrderLine calldata line,
+        ICart.Split[] calldata splits,
+        Payout[] memory payouts,
+        uint256 count,
+        uint256 lineIndex
+    ) private returns (uint256) {
+        uint256 remainder = line.amount;
+        for (uint256 j = 1; j < splits.length; ++j) {
+            uint256 amount = Math.mulDiv(line.amount, splits[j].basisPoints, 10_000);
+            remainder -= amount;
+            count = _addPayout(payouts, count, line.settlementCurrency, splits[j].recipient, amount, lineIndex);
+            emit ListingSplitPaid(
+                orderId, lineIndex, line.listingDigest, line.settlementCurrency, splits[j].recipient, amount
+            );
+        }
+        count = _addPayout(payouts, count, line.settlementCurrency, splits[0].recipient, remainder, lineIndex);
+        emit ListingSplitPaid(
+            orderId, lineIndex, line.listingDigest, line.settlementCurrency, splits[0].recipient, remainder
+        );
+        return count;
+    }
+
+    function _addPayout(
+        Payout[] memory payouts,
+        uint256 count,
+        address currency,
+        address recipient,
+        uint256 amount,
+        uint256 lineIndex
+    ) private pure returns (uint256) {
+        if (amount == 0) return count;
+        for (uint256 j; j < count; ++j) {
+            if (payouts[j].currency == currency && payouts[j].recipient == recipient) {
+                payouts[j].amount += amount;
+                return count;
+            }
+        }
+        payouts[count] = Payout(currency, recipient, amount, lineIndex);
+        return count + 1;
     }
 
     function _captureSupportedSpread(bytes32 orderId, address recipient, PaymentState calldata state) private {

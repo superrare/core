@@ -35,8 +35,9 @@ from favorable route execution.
 _Avoid_: Seller price, Listing amount
 
 **Seller Proceeds Floor**:
-The minimum proceeds per unit a seller authorizes for a Listing, denominated in its settlement
-currency. A Purchase Order may pay the seller more than this floor but never less.
+The minimum total proceeds per unit a seller authorizes for a Listing, denominated in its settlement
+currency. With splits, this floor protects the total distributed to all Listing recipients. Without
+splits, it protects the single recipient. The final Order Line amount may exceed this floor.
 _Avoid_: Sale Price, gross price
 
 **Currency Swap**:
@@ -71,6 +72,13 @@ filled until its root is cancelled or expires, subject to the availability of it
 mechanism; on-chain merchandise additionally carries one or more Fulfillment Actions. Re-listing
 returned inventory uses a fresh listing identity.
 _Avoid_: order
+
+**Listing Split**:
+A seller-authorized allocation of a Listing's final Order Line amount among up to 16 distinct
+recipients. Shares total 10,000 basis points. Each Order Line is allocated independently before
+transfers are combined by currency and recipient. The first recipient equals the Listing's
+`paymentRecipient` and receives rounding remainder. Recipients do not sign or gain asset authority.
+An empty split array retains single-recipient settlement.
 
 **Listing Root**:
 A seller-signed Merkle commitment whose nonce and deadline govern one or more Listing leaves. Each
