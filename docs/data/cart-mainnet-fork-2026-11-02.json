@@ -1,0 +1,83 @@
+{
+  "chainId": 1,
+  "forkBlock": 25800000,
+  "runDate": "2026-11-02",
+  "productionRevision": "b05d955a28b5e338e0c8325a691614d291b993c4",
+  "testSourceSha256": "8d6ca77ce9d957bf67dc4c4c45b2eece35bee61710c69122446995d03707198b",
+  "compiler": "0.8.18",
+  "viaIR": true,
+  "optimizerRuns": 100,
+  "passed": 17,
+  "failed": 0,
+  "skipped": 0,
+  "tests": [
+    {
+      "name": "testEthereumPinnedDependenciesHaveCodeAndCartAcceptsThem",
+      "wholeTestGas": 6591300
+    },
+    {
+      "name": "testV2ExactInputTemplate",
+      "wholeTestGas": 103320
+    },
+    {
+      "name": "testV2ExactOutputRefundSweepTemplate",
+      "wholeTestGas": 111762
+    },
+    {
+      "name": "testV3ExactInputTemplate",
+      "wholeTestGas": 114904
+    },
+    {
+      "name": "testV3ExactOutputRefundSweepTemplate",
+      "wholeTestGas": 125820
+    },
+    {
+      "name": "testV4Erc20ToNativeExactOutputTemplate",
+      "wholeTestGas": 244566
+    },
+    {
+      "name": "testV4NativeEthToUsdcTemplate",
+      "wholeTestGas": 113418
+    },
+    {
+      "name": "testWrapAndUnwrapEthTemplate",
+      "wholeTestGas": 55826
+    },
+    {
+      "name": "testCartDirectEthV3DaiAndV4UsdcPlan",
+      "wholeTestGas": 529251
+    },
+    {
+      "name": "testCartMixedV2V3V4Plan",
+      "wholeTestGas": 603985
+    },
+    {
+      "name": "testCartRealRouterMixedCurrencyListingSplits",
+      "wholeTestGas": 898164
+    },
+    {
+      "name": "testCartRealRouterPositiveOutputShortfallReverts",
+      "wholeTestGas": 386094
+    },
+    {
+      "name": "testCartRealRouterSplitPayoutFailureRollsBack",
+      "wholeTestGas": 944333
+    },
+    {
+      "name": "testCartRealRouterSweepCannotSpendUnnamedCartToken",
+      "wholeTestGas": 890029
+    },
+    {
+      "name": "testCartRealRouterThirdPartyV3OutputRollsBack",
+      "wholeTestGas": 676636
+    },
+    {
+      "name": "testCartV3ExactOutputRefundBecomesProtocolSpread",
+      "wholeTestGas": 412272
+    },
+    {
+      "name": "testCartWethTransferUnwrapAndNativeV4Route",
+      "wholeTestGas": 424001
+    }
+  ]
+}

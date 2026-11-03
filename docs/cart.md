@@ -51,7 +51,7 @@ Run the Cart unit, fuzz, invariant, and storage-upgrade tests from the repositor
 FOUNDRY_PROFILE=cart forge test --offline
 ```
 
-The profile selects [src/test/cart](../src/test/cart). Shared setup and builders live in abstract fixtures, and token/router mocks live in `CartMocks.sol`; executable suites inherit fixtures without inheriting other suites' tests. Live-dependency fork tests in [src/test/forks/ethereum/cart](../src/test/forks/ethereum/cart) require a separate RPC-backed run. Historical gas reports use their recorded environments and do not replace current RPC estimates.
+The profile selects [src/test/cart](../src/test/cart). Shared setup and builders live in abstract fixtures, and token/router mocks live in `CartMocks.sol`; executable suites inherit fixtures without inheriting other suites' tests. Live-dependency fork tests in [src/test/forks/ethereum/cart](../src/test/forks/ethereum/cart) require a separate RPC-backed run. The [November 2 fork report](cart-mainnet-fork-verification.md) records 17 passing tests against mainnet block 25,800,000, including mixed-currency seller-signed splits and payout-failure rollback. Historical gas reports use their recorded environments and do not replace current RPC estimates.
 
 The [formal-verification project](../verification/cart/README.md) documents its modeled properties and limitations. Its saved results are separate evidence from the native test suite and must be checked against the source used for any new proof claim.
 

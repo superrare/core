@@ -425,6 +425,84 @@ contract CartUniversalRouterCartEthereumTest is Test {
         _assertCartBaselines(cartEthBaseline, cartWethBaseline, cartUsdcBaseline, cartDaiBaseline);
     }
 
+    function testCartRealRouterMixedCurrencyListingSplits() public {
+        _mixedCurrencyListingSplits(false);
+    }
+
+    function testCartRealRouterSplitPayoutFailureRollsBack() public {
+        _mixedCurrencyListingSplits(true);
+    }
+
+    function _mixedCurrencyListingSplits(bool rejectFee) private {
+        address primary = address(0x7101);
+        address secondary = address(0x7102);
+        address fee = rejectFee ? address(new ForkRejectingPayout()) : primary;
+        ICart.Listing[] memory listings = new ICart.Listing[](3);
+        ICart.OrderLine[] memory lines = new ICart.OrderLine[](4);
+        ICart.ListingPurchaseAuthorization memory auth;
+        auth.listingRoots = new ICart.ListingRoot[](3);
+        auth.listingRootSignatures = new bytes[](3);
+        auth.listingRootIndexes = new uint256[](3);
+        auth.listingProofs = new bytes32[][](3);
+        for (uint256 i; i < 3; ++i) {
+            ICart.Split[] memory splits = new ICart.Split[](i == 2 ? 0 : 2);
+            if (i < 2) {
+                splits[0] = ICart.Split(primary, i == 0 ? 8000 : 5000);
+                splits[1] = ICart.Split(secondary, i == 0 ? 2000 : 5000);
+            }
+            listings[i] = ICart.Listing({
+                listingSalt: bytes32(i + 1), seller: vm.addr(PLATFORM_PK), sku: bytes32(i + 1),
+                fulfillmentKind: ICart.FulfillmentKind.OFF_CHAIN, tokenContract: address(0), tokenId: 0,
+                settlementCurrency: i == 1 ? USDC : DAI, minimumUnitPrice: 1,
+                availableQuantity: 1, paymentRecipient: primary, splits: splits
+            });
+            bytes32 digest = hashes.hashListing(cart.DOMAIN_SEPARATOR(), listings[i]);
+            auth.listingRoots[i] = ICart.ListingRoot(hashes.hashListingLeaf(digest), 0, block.timestamp + 1 days);
+            auth.listingRootSignatures[i] = _sign(hashes.hashListingRoot(cart.DOMAIN_SEPARATOR(), auth.listingRoots[i]));
+            auth.listingRootIndexes[i] = i;
+            auth.listingProofs[i] = new bytes32[](0);
+            lines[i] = ICart.OrderLine(listings[i].sku, digest, ICart.FulfillmentKind.OFF_CHAIN, 1,
+                listings[i].settlementCurrency, i == 0 ? 1 ether + 3 : i == 1 ? 1_000_001 : 0.1 ether, primary);
+        }
+        lines[3] = _directLine(address(0), 0.001 ether, fee, "fee");
+        ICart.PayoutRoute memory route = _nativeV3V4Route(0.001 ether, 0.001 ether);
+        ICart.PurchaseOrder memory order = _order("mixed-listing-splits", address(0), 0.003 ether, lines, route);
+        uint256[] memory beforeBalances = new uint256[](8);
+        beforeBalances[0] = IERC20Template(DAI).balanceOf(primary);
+        beforeBalances[1] = IERC20Template(DAI).balanceOf(secondary);
+        beforeBalances[2] = IERC20Template(USDC).balanceOf(primary);
+        beforeBalances[3] = IERC20Template(USDC).balanceOf(secondary);
+        beforeBalances[4] = primary.balance;
+        beforeBalances[5] = IERC20Template(DAI).balanceOf(address(this));
+        beforeBalances[6] = IERC20Template(USDC).balanceOf(address(this));
+        // Real deposits seed protected custody; swaps may spend only the new quote.
+        vm.deal(address(this), 1 ether);
+        IWETHTemplate(WETH).deposit{value: 0.01 ether}();
+        assertTrue(IERC20Template(WETH).transfer(address(cart), 0.01 ether));
+        vm.deal(address(cart), 17);
+        beforeBalances[7] = address(this).balance;
+        bytes memory signature = _sign(_orderDigest(order));
+        if (rejectFee) vm.expectRevert(abi.encodeWithSelector(ICart.OrderLineFailed.selector, 3, ICart.FailureStage.PAYOUT, bytes("")));
+        cart.executePurchase{value: order.paymentAmount}(order, lines, listings, auth, route,
+            new ICart.FulfillmentAction[](0), signature);
+        assertEq(IERC20Template(DAI).balanceOf(primary), beforeBalances[0] + (rejectFee ? 0 : 0.9 ether + 3));
+        assertEq(IERC20Template(DAI).balanceOf(secondary), beforeBalances[1] + (rejectFee ? 0 : 0.2 ether));
+        assertEq(IERC20Template(USDC).balanceOf(primary), beforeBalances[2] + (rejectFee ? 0 : 500_001));
+        assertEq(IERC20Template(USDC).balanceOf(secondary), beforeBalances[3] + (rejectFee ? 0 : 500_000));
+        assertEq(primary.balance, beforeBalances[4] + (rejectFee ? 0 : 0.001 ether));
+        assertEq(cart.executedOrderIds(order.orderId), !rejectFee);
+        for (uint256 i; i < 3; ++i) assertEq(cart.filledQuantity(lines[i].listingDigest), rejectFee ? 0 : 1);
+        if (rejectFee) {
+            assertEq(address(this).balance, beforeBalances[7]);
+            assertEq(IERC20Template(DAI).balanceOf(address(this)), beforeBalances[5]);
+            assertEq(IERC20Template(USDC).balanceOf(address(this)), beforeBalances[6]);
+        } else {
+            assertGt(IERC20Template(DAI).balanceOf(address(this)), beforeBalances[5]);
+            assertGt(IERC20Template(USDC).balanceOf(address(this)), beforeBalances[6]);
+        }
+        _assertCartBaselines(17, 0.01 ether, 0, 0);
+    }
+
     function testCartRealRouterPositiveOutputShortfallReverts() public {
         uint256 amountIn = 0.001 ether;
         uint256 snapshotId = vm.snapshot();
@@ -879,4 +957,8 @@ contract CartUniversalRouterCartEthereumTest is Test {
     }
 
     receive() external payable {}
+}
+
+contract ForkRejectingPayout {
+    receive() external payable { revert("reject"); }
 }
