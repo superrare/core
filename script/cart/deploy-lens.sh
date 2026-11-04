@@ -53,6 +53,9 @@ forge_args=(
   -vv
 )
 if [[ "${should_broadcast}" == true ]]; then
-  forge_args+=(--broadcast)
+  forge_args+=(
+    --broadcast --slow --skip-simulation
+    --gas-estimate-multiplier "${CART_GAS_ESTIMATE_MULTIPLIER:-150}"
+  )
 fi
 FOUNDRY_PROFILE="${FOUNDRY_PROFILE:-cart}" forge "${forge_args[@]}"
