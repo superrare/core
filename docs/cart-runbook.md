@@ -2,7 +2,7 @@
 
 Use this runbook for on-chain administrative changes and seller authorization invalidation. Execute owner calls against the Cart proxy on the intended chain. Use the configured owner wallet or multisig. Keep transaction hashes, before-and-after reads, and the reason for each change in the operational record.
 
-The fresh November 1 Sepolia suite includes signed spread recipients and per-listing splits; the previous proxy is paused. Confirm the configured proxy and ABI before using these procedures. The [deployment index](cart.md#deployment-records) links the recorded Sepolia state. Constructor errors and transaction-builder payload retries are outside this runbook.
+The configured Sepolia suite was deployed fresh on November 6. The November 1 proxy was not modified by that deployment. Confirm the configured proxy and ABI before using these procedures. The [deployment index](cart.md#deployment-records) links the recorded Sepolia state. Constructor errors and transaction-builder payload retries are outside this runbook.
 
 ## Rotate the platform signer
 

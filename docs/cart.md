@@ -6,16 +6,16 @@ The branch combines free Listings and zero-total Orders with the listing digest 
 
 ## Contract responsibilities
 
-| Contract or source | Responsibility |
-| --- | --- |
-| [Cart](../src/cart/Cart.sol) | UUPS implementation behind the stable approval and EIP-712 proxy address. Validates Purchase Orders and seller authorizations, reserves inventory, executes settlement and NFT fulfillment, and emits reconciliation events. |
-| [ICart](../src/cart/ICart.sol) | Canonical purchase arguments, fulfillment kinds, mint results, events, and errors. |
-| [CartStorage](../src/cart/CartStorage.sol) | Namespaced configuration, seller authorization and inventory state, and order replay state. The [storage baseline](../src/cart/Cart.storage-layout.json) and upgrade canary guard compatibility. |
-| [CartPayments](../src/cart/CartPayments.sol) | Delegatecalled payment executor. Collects the exact caller-funded quote, routes funds, pays signed obligations, captures protocol spread, and restores tracked balance and allowance baselines. Its address is immutable in the Cart implementation. |
-| [CartRoutePolicy](../src/cart/CartRoutePolicy.sol) | Stateless command-family and array-shape checks for the opaque Universal Router program. Its address is immutable in both Cart and CartPayments. |
-| [CartLens](../src/cart/CartLens.sol) | Separately deployed advisory Listing, order-envelope, and route preflight. Full execution simulation is still required. |
-| [CartHashing](../src/cart/CartHashing.sol) and [CartHashes](../src/cart/CartHashes.sol) | Shared EIP-712 hashing library and optional stateless helper for clients. |
-| [CartValidation](../src/cart/CartValidation.sol) | Internal fulfillment classification and collection-owner checks shared by Cart and CartLens. Each caller retains its check order and diagnostics. |
+| Contract or source                                                                      | Responsibility                                                                                                                                                                                                                                       |
+| --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Cart](../src/cart/Cart.sol)                                                            | UUPS implementation behind the stable approval and EIP-712 proxy address. Validates Purchase Orders and seller authorizations, reserves inventory, executes settlement and NFT fulfillment, and emits reconciliation events.                         |
+| [ICart](../src/cart/ICart.sol)                                                          | Canonical purchase arguments, fulfillment kinds, mint results, events, and errors.                                                                                                                                                                   |
+| [CartStorage](../src/cart/CartStorage.sol)                                              | Namespaced configuration, seller authorization and inventory state, and order replay state. The [storage baseline](../src/cart/Cart.storage-layout.json) and upgrade canary guard compatibility.                                                     |
+| [CartPayments](../src/cart/CartPayments.sol)                                            | Delegatecalled payment executor. Collects the exact caller-funded quote, routes funds, pays signed obligations, captures protocol spread, and restores tracked balance and allowance baselines. Its address is immutable in the Cart implementation. |
+| [CartRoutePolicy](../src/cart/CartRoutePolicy.sol)                                      | Stateless command-family and array-shape checks for the opaque Universal Router program. Its address is immutable in both Cart and CartPayments.                                                                                                     |
+| [CartLens](../src/cart/CartLens.sol)                                                    | Separately deployed advisory Listing, order-envelope, and route preflight. Full execution simulation is still required.                                                                                                                              |
+| [CartHashing](../src/cart/CartHashing.sol) and [CartHashes](../src/cart/CartHashes.sol) | Shared EIP-712 hashing library and optional stateless helper for clients.                                                                                                                                                                            |
+| [CartValidation](../src/cart/CartValidation.sol)                                        | Internal fulfillment classification and collection-owner checks shared by Cart and CartLens. Each caller retains its check order and diagnostics.                                                                                                    |
 
 ## Current contract behavior
 
@@ -37,11 +37,11 @@ The transaction builder, SDK, CLI, and settlement consumers are maintained outsi
 
 ## Deployment records
 
-[NetworkConfig](../script/NetworkConfig.s.sol) records the fresh Sepolia suite deployed on November 1, 2026. The [deployment record](cart-sepolia-fresh-2026-11-01.md) and [receipt ledger](data/cart-sepolia-fresh-2026-11-01.json) document the new proxy, implementation, route policy, payments executor, Lens, and Hashes helper. This deployment includes signed spread recipients, per-listing splits, and indexed payout aggregation.
+[NetworkConfig](../script/NetworkConfig.s.sol) records the fresh Sepolia suite deployed on November 6, 2026. The [deployment record](cart-sepolia-fresh-2026-11-06.md) and [receipt ledger](data/cart-sepolia-fresh-2026-11-06.json) document all six contracts and their verification. The SDK Cart PR contains the matching addresses and ABIs.
 
-The previous proxy is paused. The [October 27](cart-sepolia-free-listings-2026-10-27.md) and [October 26](cart-sepolia-upgrade-2026-10-26.md) records retain deployment history. SDK and application rollout were pending at the deployment checkpoint. Confirm current consumer configuration separately. Old proxy signatures cannot authorize the new proxy, and clients need the current ABI, fresh signatures, and approvals for the new address.
+The November 1 proxy was not modified and remained unpaused at the November 6 checkpoint. The [November 1](cart-sepolia-fresh-2026-11-01.md), [October 27](cart-sepolia-free-listings-2026-10-27.md), and [October 26](cart-sepolia-upgrade-2026-10-26.md) records retain deployment history. Confirm application consumer configuration separately. Old proxy signatures cannot authorize the new proxy, and clients need the current ABI, fresh signatures, and approvals for the new address.
 
-These records establish Sepolia deployment only. Other chains require separate deployment evidence. Existing scripts in [script/cart](../script/cart) cover fresh deployment and scoped upgrades; the checkout guard rejects detached, dirty, or stale deployment sources.
+These records establish Sepolia deployment only. Other chains require separate deployment evidence. The [fresh deployment guide](cart-deployment.md) covers setup, preflight, source verification, and interrupted deployments. Existing scripts in [script/cart](../script/cart) cover fresh deployment and scoped upgrades; the checkout guard rejects detached, dirty, or stale deployment sources.
 
 ## Verification
 
