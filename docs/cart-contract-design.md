@@ -107,7 +107,7 @@ Execution adds only authorization witnesses around this same Purchase Order:
   digests. The caller supplies each selected Listing and its proof; roots are reusable across
   purchases and can be cancelled as a whole.
 - A large Listing Root is assembled off-chain; only selected leaves and proofs are sent in each transaction.
-  The backend admits purchases against gas and transaction-size budgets. Cart imposes no numerical resource caps.
+  The backend admits purchases against gas and transaction-size budgets. See the [resource policy](cart-resource-policy.md) for backend limits and on-chain checks, including the per-Listing split cap.
 
 `paymentAmount` is part of the platform signature and is the fixed customer quote, not a caller-chosen
 spending limit. Cart collects it exactly. The complete total has no base amount: every charge is a peer
@@ -227,7 +227,7 @@ The Universal Router and Permit2 are configured once with no runtime dependency 
 
 `CartRoutePolicy` is a shallow default-deny boundary around Universal Router. It accepts only Permit2 transfer-from, sweep, wrap ETH, unwrap WETH, V2/V3 exact-input and exact-output swaps, and V4 swap commands. It rejects command flags, unsupported command families, empty programs, and input-count mismatches. It imposes no numerical command-count or input-byte cap. It deliberately treats every command input as opaque; Universal Router remains responsible for decoding and validating paths, recipients, payer flags, V4 actions, settlement/refund behavior, and exact-input/output semantics.
 
-The policy is deployed as its own stateless contract and referenced by a cart implementation immutable rather than compiled into the cart. The call boundary keeps the policy out of the cart's EIP-170 budget and gives the cart a `try`/`catch` seam that attributes a rejected route to the Order Line that produced it. Because the reference is an immutable rather than storage, replacing the policy still requires an audited implementation upgrade.
+The policy is deployed as its own stateless contract and referenced by immutables in both Cart and CartPayments. This keeps the policy outside the Cart runtime bytecode budget. CartPayments wraps policy rejection in `OrderLineFailed(0, ROUTING, reason)`. Line index zero is used for this order-wide failure. Because the reference is an immutable rather than storage, replacing the policy still requires an audited implementation upgrade.
 
 Permit2 configuration is performed by Cart, not embedded in route commands. The only temporary approval is the exact fixed quote for the payment token: Cart approves Permit2, Permit2 approves Universal Router, and both are revoked immediately after routing. Nonzero pre-existing approvals are rejected before either layer is changed, preserving approval state. A successful Purchase Order restores every tracked Cart balance to its pre-transaction baseline, preventing accidental Cart funds from subsidizing a purchase. Universal Router is shared infrastructure, so its incidental ETH and token balances are not production invariants; client route templates and fork simulations must ensure refunds and outputs return to Cart rather than strand value there.
 
@@ -262,7 +262,15 @@ enum FailureStage {
 
 error OrderLineFailed(uint256 lineIndex, FailureStage stage, bytes reason);
 error FulfillmentActionFailed(uint256 lineIndex, uint256 actionIndex, bytes reason);
+error InvalidFulfillmentCoverage(uint256 lineIndex, uint256 expected, uint256 actual);
 ```
+
+Native payout and spread errors preserve the first 2,048 bytes of receiver revert
+data. Larger reasons are truncated and may require raw-byte inspection.
+ERC-20 transfer failures bubble from SafeERC20. A recipient balance mismatch uses
+`OrderLineFailed` with the actual payout or spread stage. Coverage errors report
+the line index and expected and supplied action quantities. Regenerate error
+decoders from the current ABI for `InvalidFulfillmentCoverage` and `InvalidOwner`.
 
 Low-level router and mint failures preserve nested revert data. A backend simulates with `eth_call`, decodes the failing index, repairs or removes the item, and obtains a new platform signature. Seller Listings remain reusable and do not require re-signing unless their terms change.
 
@@ -308,11 +316,11 @@ event FulfillmentActionExecuted(
 );
 ```
 
-Each line recipient receives exactly its signed `amount`. `ProtocolSpreadCaptured` separately records favorable execution variance by currency for telemetry, reporting, and reconciliation. Successful logs are authoritative because they survive only complete atomic execution. Off-chain workers use `(chainId, cartProxy, orderId, lineIndex)` as their idempotency key. `OFF_CHAIN` lines emit `OrderLineSettled` without a Fulfillment Action event and are the backend trigger for external work; `NONE` and `CURRENCY_SWAP` lines emit the same settlement event but require no external fulfillment job. Each Fulfillment Action log identifies its recipient, fulfilled quantity, and token ID; repeated ERC-721 mints use `unitIndex` to distinguish the individual operations within one action.
+For an unsplit line, the recipient receives the signed `amount`. For a split line, `OrderLineSettled` reports the full line amount and primary recipient. Use `ListingSplitPaid` to recover individual allocations. Transfers can combine allocations across lines by exact currency and recipient. `ProtocolSpreadCaptured` separately records favorable execution variance by currency for telemetry, reporting, and reconciliation. Successful logs are authoritative because they survive only complete atomic execution. Off-chain workers use `(chainId, cartProxy, orderId, lineIndex)` as their idempotency key. `OFF_CHAIN` lines emit `OrderLineSettled` without a Fulfillment Action event and are the backend trigger for external work; `NONE` and `CURRENCY_SWAP` lines emit the same settlement event but require no external fulfillment job. Each Fulfillment Action log identifies its recipient, fulfilled quantity, and token ID; repeated ERC-721 mints use `unitIndex` to distinguish the individual operations within one action.
 
 ## Administration and Upgrade Safety
 
-The cart uses a UUPS proxy, with protocol multisig ownership as the governance design. Deployment ownership is configured separately. OpenZeppelin's inherited linear storage and Cart's namespaced storage must be preserved across upgrades. Cart-owned state is organized into three ERC-7201 namespaces: `CartConfig` for configuration and pause state, `CartListings` for seller Listing state, and `CartSettlement` for Purchase Order replay state. The storage baseline is documented in `src/cart/Cart.storage-layout.json` and exercised by the proxy-upgrade canary in `src/test/cart/CartStorageLayout.t.sol`. Existing proxy state and signatures must survive compatible upgrades. The signed spread-recipient change intentionally changes the Purchase Order ABI and EIP-712 typehash. Old checkout payloads must be rebuilt and signed again; seller Listing and Listing Root typehashes and the EIP-712 domain remain unchanged. The owner can rotate the platform signer, pause or unpause purchases, transfer ownership, and authorize implementation upgrades. The platform signer chooses the spread recipient in each Purchase Order. Treasury changes affect newly signed orders; outstanding orders retain their signed recipient. The old global recipient slot remains reserved and unused for proxy storage compatibility. See [ADR 0003](adr/0003-signed-cart-spread-recipient.md) and the [Cart runbook](cart-runbook.md). Pausing blocks only Purchase Order execution; seller Listing and Listing Root cancellation and nonce invalidation remain available.
+The cart uses a UUPS proxy, with protocol multisig ownership as the governance design. Deployment ownership is configured separately. OpenZeppelin's inherited linear storage and Cart's namespaced storage must be preserved across upgrades. Cart-owned state is organized into three ERC-7201 namespaces: `CartConfig` for configuration and pause state, `CartListings` for seller Listing state, and `CartSettlement` for Purchase Order replay state. The storage baseline is documented in `src/cart/Cart.storage-layout.json` and exercised by the proxy-upgrade canary in `src/test/cart/CartStorageLayout.t.sol`. Existing proxy state and signatures must survive compatible upgrades. The signed spread-recipient change intentionally changes the Purchase Order ABI and EIP-712 typehash. Old checkout payloads must be rebuilt and signed again; the spread-only change preserves the seller Listing and Listing Root typehashes and the domain. The later split-format change requires rebuilding seller authorizations as described in [Interface migration](#interface-migration). Initialization rejects a zero owner. The owner can rotate the platform signer, pause or unpause purchases, transfer ownership, and authorize implementation upgrades. The platform signer chooses the spread recipient in each Purchase Order. Treasury changes affect newly signed orders; outstanding orders retain their signed recipient. The old global recipient slot remains reserved and unused for proxy storage compatibility. See [ADR 0003](adr/0003-signed-cart-spread-recipient.md) and the [Cart runbook](cart-runbook.md). Pausing blocks only Purchase Order execution; seller Listing and Listing Root cancellation and nonce invalidation remain available.
 
 Every cart implementation is constructed with the route policy address, so each upgrade names the policy it was audited against.
 

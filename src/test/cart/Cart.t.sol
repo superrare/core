@@ -796,7 +796,8 @@ contract CartTest is CartFixture {
     function testIncidentalUniversalRouterTokenBalanceDoesNotBlockSettlement() public {
         (CartTestToken inputToken, CartTestToken outputToken, ICart.Listing memory listing) =
             _routedTokensAndListing("router-retention");
-        router.configure(address(outputToken), 1 ether, 1 ether, false);
+        outputToken.mint(address(router), 1 ether);
+        router.configure(address(outputToken), 1 ether, 0, false);
 
         (ICart.OrderLine[] memory lines, ICart.PayoutRoute memory route) =
             _routedLineAndRoute(listing, address(inputToken), address(outputToken));
@@ -853,7 +854,7 @@ contract CartTest is CartFixture {
         bytes memory platformSignature = _sign(PLATFORM_PK, _orderDigest(order));
 
         vm.deal(payer, 1 ether);
-        vm.expectRevert(abi.encodeWithSelector(ICart.OrderLineFailed.selector, 0, ICart.FailureStage.PAYOUT, bytes("")));
+        vm.expectRevert(abi.encodeWithSelector(ICart.OrderLineFailed.selector, 0, ICart.FailureStage.PAYOUT, abi.encodeWithSignature("Error(string)", "payout rejected")));
         vm.prank(payer);
         cart.executePurchase{value: 1 ether}(
             order, lines, authorizationListings, authorization, route, actions, platformSignature

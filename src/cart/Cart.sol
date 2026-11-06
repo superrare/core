@@ -49,6 +49,7 @@ contract Cart is
     _disableInitializers();
   }
 
+  /// @inheritdoc ICart
   function initialize(
     address owner_,
     address platformSigner_,
@@ -56,6 +57,8 @@ contract Cart is
     address permit2_,
     address weth_
   ) external override initializer {
+    // Prevent deployment from permanently disabling owner-only recovery controls.
+    if (owner_ == address(0)) revert InvalidOwner();
     // Set up the inherited upgradeable modules in the proxy storage.
     __Ownable_init();
     __ReentrancyGuard_init();
@@ -518,7 +521,7 @@ contract Cart is
       uint256 expected = listingIndex != NO_LISTING && CartValidation.isOnChainKind(listings[listingIndex].fulfillmentKind)
         ? lines[i].quantity
         : 0;
-      if (quantities[i] != expected) revert InvalidFulfillmentAction(i);
+      if (quantities[i] != expected) revert InvalidFulfillmentCoverage(i, expected, quantities[i]);
     }
   }
 

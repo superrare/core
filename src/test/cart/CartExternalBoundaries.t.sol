@@ -462,6 +462,7 @@ contract CartExternalBoundariesTest is CartFixture {
     p = _build(listing, 1);
     p.order.paymentCurrency = address(payment);
     p.route = ICart.PayoutRoute(hex"08", new bytes[](1), 0);
+    p.route.inputs[0] = _mockRouteInput(0x08);
     router.configure(address(output), 1 ether, 0, false);
     output.mint(address(cart), 5 ether);
   }

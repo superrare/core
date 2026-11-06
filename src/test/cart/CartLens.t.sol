@@ -10,7 +10,9 @@ import {ICartLens} from "../../cart/ICartLens.sol";
 import {ICartRoutePolicy} from "../../cart/ICartRoutePolicy.sol";
 
 contract CartLensTestPolicy is ICartRoutePolicy {
-    function validate(bytes calldata, bytes[] calldata) external pure override {}
+    function validate(bytes calldata, bytes[] calldata) external pure override returns (address[] memory) {
+        return new address[](0);
+    }
 }
 
 contract CartLensTestSigner {

@@ -65,15 +65,7 @@ abstract contract CartFixture is Test {
         ICart.PurchaseOrder memory order = _order("signed-inner-purchase", lines, route, actions);
         return abi.encodeCall(
             Cart.executePurchase,
-            (
-                order,
-                lines,
-                listings,
-                authorization,
-                route,
-                actions,
-                _sign(PLATFORM_PK, _orderDigest(order))
-            )
+            (order, lines, listings, authorization, route, actions, _sign(PLATFORM_PK, _orderDigest(order)))
         );
     }
 
@@ -210,6 +202,21 @@ abstract contract CartFixture is Test {
             payoutRouteHash: hashes.hashPayoutRoute(route),
             fulfillmentActionsHash: hashes.hashFulfillmentActions(new ICart.FulfillmentAction[](0))
         });
+    }
+
+    /// @dev Structurally valid payloads for outcome mocks; exchange behavior is configured separately.
+    function _mockRouteInput(bytes1 command) internal view returns (bytes memory) {
+        if (command == 0x0b || command == 0x0c) return abi.encode(address(1), uint256(0));
+        if (command == 0x10) {
+            bytes[] memory params = new bytes[](3);
+            params[1] = abi.encode(address(weth), uint256(0));
+            params[2] = abi.encode(address(weth), uint256(0));
+            return abi.encode(hex"080c0f", params);
+        }
+        address[] memory path = new address[](2);
+        path[0] = address(weth);
+        path[1] = address(weth);
+        return abi.encode(address(1), uint256(0), uint256(0), path, true);
     }
 
     function _multiOutputRoute(

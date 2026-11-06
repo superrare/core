@@ -897,7 +897,7 @@ contract CartVerificationTest is CartFixture {
         NativePurchase memory purchase = _nativePurchase(listing, "action-quantity-order", 2, actions);
 
         vm.deal(payer, purchase.amount);
-        vm.expectRevert(abi.encodeWithSelector(ICart.InvalidFulfillmentAction.selector, 0));
+        vm.expectRevert(abi.encodeWithSelector(ICart.InvalidFulfillmentCoverage.selector, 0, 2, 1));
         vm.prank(payer);
         cart.executePurchase{value: purchase.amount}(
             purchase.order,
@@ -990,6 +990,10 @@ contract CartVerificationTest is CartFixture {
         ICart.PayoutRoute memory route = _emptyRoute();
         route.commands = new bytes(33);
         route.inputs = new bytes[](33);
+        for (uint256 i; i < 33; ++i) {
+            route.commands[i] = 0x04;
+            route.inputs[i] = abi.encode(address(0), address(1), uint256(0));
+        }
         ICart.FulfillmentAction[] memory actions = _noActions();
         ICart.PurchaseOrder memory order = _order("many-commands", lines, route, actions);
         bytes memory signature = _sign(PLATFORM_PK, _orderDigest(order));

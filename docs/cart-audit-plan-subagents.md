@@ -1,13 +1,12 @@
 # Audit the Cart contracts
 
 Use this plan to audit SuperRare's atomic Cart checkout before a release or
-upgrade. Pin the source, deployed configuration, and client versions first.
+upgrade. Pin the source, deployed configuration, and build inputs first.
 Report reproducible failures of authorization, inventory, fulfillment, settlement,
 or recovery, with separate evidence for each deployment and integration claim.
 
-The starting reference is commit `d91c1d9be9d5ddba07cc29b9be92a2d1a4c3c891`
-on the Cart branch. The coordinator records the actual audit SHA and any
-changes since this reference. Use the [Cart design](cart-contract-design.md),
+The coordinator records the audited revision and any uncommitted changes when
+the audit starts. Use the [Cart design](cart-contract-design.md),
 [Commerce terminology](../CONTEXT.md), and the three Cart ADRs to establish
 intent. Use the Solidity source to establish what a call does. Record
 disagreements between the two as audit questions until resolved.
@@ -19,17 +18,20 @@ disagreements between the two as audit questions until resolved.
 | [Cart and ICart](../src/cart/Cart.sol) | Proxy entry points, two layers of authorization, Listing resolution and inventory, action execution, admin, and receipt semantics. Use [ICart](../src/cart/ICart.sol) for canonical tuples, errors, and events. |
 | [CartStorage](../src/cart/CartStorage.sol) | Config, seller authorization and inventory, and replay namespaces. Compare inherited storage and the [committed baseline](../src/cart/Cart.storage-layout.json). |
 | [CartPayments and ICartPayments](../src/cart/CartPayments.sol) | Delegatecalled `begin` and `finish`, custody snapshots, Fixed Quote, route execution, approvals, split allocation, grouped payouts, and Protocol Spread. Review the [handoff types](../src/cart/ICartPayments.sol) across the implementation boundary. |
-| [CartRoutePolicy](../src/cart/CartRoutePolicy.sol) | The exact accepted command bytes, flag mask, array shape, and pinned router interpretation. Compare the policy embedded in Cart with the one embedded in CartPayments. |
+| [CartRoutePolicy](../src/cart/CartRoutePolicy.sol) | Accepted commands, flags, paths, recipient aliases, supported V4 actions, decoded endpoint assets, and pinned router interpretation. Review the asset-list return ABI used by CartPayments. Compare the policy embedded in Cart with the one embedded in CartPayments. |
 | [CartHashing and CartHashes](../src/cart/CartHashing.sol) | Canonical EIP-712, ordered arrays, Merkle leaf encoding, optimized Order Line buffer, and the [client helper](../src/cart/CartHashes.sol). |
 | [CartLens and CartValidation](../src/cart/CartLens.sol) | Advisory Listing, envelope, and route checks. Compare overlapping behavior with Cart and trace intentional differences. Review [shared validation](../src/cart/CartValidation.sol) and [Lens result types](../src/cart/ICartLens.sol). |
-| [Deployment and upgrades](../script/cart) | Initialization, owner and signer handoff, implementation-only and dependency-rotation scripts, helper deployment, checkout guard, and [NetworkConfig](../script/NetworkConfig.s.sol). |
+| [Deployment and upgrades](../script/cart) | Initialization, owner and signer handoff, matching-bundle and dependency-rotation scripts, helper deployment, checkout guard, and [NetworkConfig](../script/NetworkConfig.s.sol). |
 | [Test and proof projects](../src/test/cart) | Local, adversarial, fuzz, invariant, historical-upgrade, and gas suites. Use [Ethereum fork tests](../src/test/forks/ethereum/cart), the [SDK vectors](data/cart-split-sdk-vectors.json), and [Kontrol](../verification/cart/README.md) as separate evidence. |
 
 Review the actual Universal Router, Permit2, WETH, and supported token interfaces
-as Cart dependencies. Review transaction-builder, signer, payer processor, SDK,
-wallet, indexer, and fulfillment worker behavior where they rely on Cart's
-contract. Pin external repos and deployments when access is available. Where
-access is missing, record the consumer, assumption, and evidence still required.
+as Cart dependencies. The audit covers contract code, deployed configuration,
+and the on-chain ABI, events, and errors. Backend transaction construction,
+signing-service implementation and quote release, and downstream consumer
+behavior belong to separate reviews. Use fixture signatures to exercise the
+on-chain boundary, including deliberately unsafe signed inputs. Record where
+security depends on trusted quote construction, route semantics, or collection
+admission.
 Keep unrelated markets, auction houses, token issuance, and the rest of Uniswap
 outside the audit unless a concrete Cart call crosses that boundary.
 
@@ -38,27 +40,26 @@ outside the audit unless a concrete Cart call crosses that boundary.
 | Actor | Authority and audit assumptions |
 | --- | --- |
 | Cart owner | Pauses checkout, changes the platform signer, transfers ownership, and authorizes UUPS upgrades. Assume honest administration. Test missing authorization, initialization, bad inputs, interrupted rollout, and unsafe handoff. Deliberate owner installation of hostile code is outside scope. |
-| Platform signer and builder | Authorize the Purchase Order, all lines, the exact route and actions, and the spread destination. The signer cannot replace seller authorization for a Listing. Test ordinary bugs, input manipulation, stale state, misconfigured integrations, and compromised release gates. Treat deliberate abuse of authorized commercial choices as a trust assumption. |
+| Platform signer | Authorizes the Purchase Order, all lines, the exact route and actions, and the spread destination. Verify signature enforcement and signer rotation on-chain. Even a valid platform signature must satisfy independent seller authorization and contract invariants. |
 | Seller | Signs reusable Listing Roots. Can revoke a root, exact Listing, or earlier nonce. Controls Listing proceeds and may operate a hostile ERC-1271 account or token contract. Authority to sign a Listing does not grant authority over another account's NFTs. |
 | Payer or payment processor | Calls the proxy and funds the Fixed Quote. A party with a usable quote can try to submit it using its own assets. Test replay and order consumption even when the payer, action recipients, and spread recipient are different accounts. |
 | Payout, spread, and NFT recipients | May be unrelated contracts. Treat callbacks, reverting recipients, and overlapping roles as adversarial inputs. Listing Split recipients have payout rights only. |
 | Configured router, Permit2, and WETH | Assume the reviewed deployment code. Test its actual response to allowed programs, shared balances, stale routes, real allowance state, and integration mistakes. Use hostile stand-ins to probe stated invariants and identify the production assumptions needed to reach a failure. |
 | NFT and currency contracts | Test ordinary supported behavior and deliberate lies at every external boundary. Track which claims require exact-transfer ERC-20 behavior, conforming NFT contracts, or explicit builder admission. |
-| Consumers | Attribute receipts and fulfill off-chain Orders using the configured chain, Cart proxy, ABI, and event data. Test mistaken attribution, duplicate processing, and inconsistent rollout. |
 
 ### Keep deliberate choices visible during triage
 
 | Design choice | What to verify |
 | --- | --- |
-| Caller-funded checkout without a payer field or buyer signature. | `msg.sender` is the only ERC-20 funding source. A copied quote cannot take the original payer's assets or change delivery. Determine whether another caller consuming the quote breaks a documented processor or user flow. |
-| The Fixed Quote is the exact signed charge. | Underfunding fails. Unused input and tracked surplus go to the signed `spreadRecipient`. Check processor receipts and retry logic for refund assumptions. |
+| Caller-funded checkout without a payer field or buyer signature. | `msg.sender` is the only ERC-20 funding source. A copied quote cannot take the original payer's assets or change delivery. Verify which order and inventory state a successful competing submission consumes. |
+| Every purchase fixes the buyer charge and seller payouts. | Slippage changes platform spread when the signed `spreadRecipient` is the platform. Unused input and excess output return through Cart to that recipient. A shortfall reverts; the buyer is not charged more. Router exact-input/output coverage does not imply two user-facing checkout modes. |
 | Seller witnesses are separate from the Purchase Order. | An alternate valid root can authorize the same Listing. All paths still enforce the exact signed digest, live root, proof, seller, nonce, and cancellation, with one fill bucket per digest. |
 | Zero totals, free Listings, and zero-as-uncapped inventory are supported. | Free checkout preserves replay and fulfillment checks. Uncapped inventory still records fills. Test unavailable underlying assets and the intended relisting behavior. |
-| Fees and Currency Swaps are platform-authorized peer lines. | Enforce their Listing and action restrictions. Check fee consolidation and routing policy in the signer. Cart receives explicit charge amounts and does not calculate commercial fees. |
-| The route policy is a command allowlist. | Treat allowed command inputs as attacker-controlled at the signer boundary. Prove which invariants Cart enforces through balance and allowance checks, and which outcomes require correct route templates. |
+| Fees and Currency Swaps are platform-authorized peer lines. | Enforce their Listing and action restrictions. Cart receives explicit charge amounts and does not calculate commercial fees. |
+| Route protection checks destinations and custody. | Test recipients, paths, supported V4 actions, and decoded endpoint assets under valid fixture signatures. Reject wrong destinations and additional tracked funds left in the router even when seller obligations could be met. Pool selection and pricing remain construction assumptions. |
 | ETH and WETH share incremental solvency. | Keep exact payout currencies, independent protected baselines, and currency-specific payout aggregation. |
-| The builder controls order size. | Confirm bounded admission and gas estimation of the exact payload. On-chain structural rules and the per-Listing split cap still apply. |
-| NFT fulfillment uses supported external calls. | Confirm behavior for supported collections. A successful call or a returned ERC-721 token ID establishes the call result. Actual delivery depends on collection behavior, so review admission and consumer claims separately. |
+| The builder controls order size. | Measure checkout gas and enforce on-chain structural rules and the per-Listing split cap. Treat backend admission as an external control. |
+| NFT fulfillment uses supported external calls. | Confirm behavior for supported collections. A successful call or a returned ERC-721 token ID establishes the call result. Actual delivery depends on collection behavior. Record the collection behavior the contracts rely on. |
 | Stable proxy, separately deployed helpers. | Compatible upgrades preserve approvals and domain. Schema migrations require explicit signature and client handling. Lens previews are advisory. |
 
 ## Verify the invariants
@@ -67,21 +68,42 @@ Use these IDs in findings, reproductions, and the final coverage table.
 
 | ID | Required result |
 | --- | --- |
-| AUTH-1 | An executable order has a nonzero unused order ID, valid current platform signature, live deadline, and exact signed line, route, and action hashes. Signatures bind the chain and Cart proxy. A mutation or replay fails before funds move. |
+| AUTH-1 | An executable order has a nonzero unused order ID, valid current platform signature, live deadline, and exact signed line, route, and action hashes. Signatures bind the chain and Cart proxy. A change to signed fields without a new valid signature, or replay of a consumed order, fails before funds move. |
 | AUTH-2 | Every referenced Listing resolves to one supplied digest and a valid seller witness. Root verification caches remain seller-bound. A root can be reused while valid. A cancelled root, cancelled Listing, or stale seller nonce cannot authorize a purchase. |
 | INV-1 | All Order Lines referencing one Listing contribute to one cumulative fill, even across alternate roots or different Orders. Finite capacity cannot be exceeded. Failed checkout leaves prior fills and replay state intact. |
 | INV-2 | Seller-backed line kind, SKU, settlement currency, and primary recipient match the Listing. The full line amount meets the per-unit proceeds floor times quantity, without arithmetic truncation. |
 | ACT-1 | Each supported on-chain line is covered exactly by valid actions. The action source, recipient, quantity, token ID, and mint selector follow the authenticated Listing and signed action. Non-NFT lines have zero actions. |
 | ACT-2 | For conforming collections, success delivers every authorized NFT transfer or mint. ERC-721 mint results and fulfillment logs correspond to action and unit order. A failed later action rolls back earlier delivery. |
-| PAY-1 | The caller supplies exactly the Fixed Quote. Cart enforces signed router value, validates supported route commands, and pays each obligation in its exact currency. For a split line, independent per-line allocations conserve its full amount. |
-| PAY-2 | A purchase cannot spend tracked preexisting funds. Cart protects independent ETH, WETH, payment-token, and named settlement-token balances. ETH/WETH may fund each other only through incremental assets. Success restores every tracked balance exactly. |
+| PAY-1 | The caller supplies exactly the Fixed Quote. Cart enforces signed router value, validates supported route commands and inputs, and pays each obligation in its exact currency. For a split line, independent per-line allocations conserve its full amount. |
+| PAY-2 | A purchase cannot spend tracked preexisting funds. Cart protects independent ETH, WETH, payment-token, named settlement-token, and decoded route endpoint-token balances. Endpoint tracking is not a token whitelist. ETH/WETH may fund each other only through incremental assets. Success restores every tracked balance exactly. |
 | PAY-3 | ERC-20 routing grants access to the quoted payment token through the configured two-layer Permit2 path. Nonzero preexisting allowances for that path are rejected. Temporary allowance amounts are zero before NFT fulfillment and again at successful completion. |
 | PAY-4 | Positive tracked residuals after obligations go to the nonzero signed `spreadRecipient` in their actual currencies. Grouped payouts use exact currency and recipient, preserve first-seen order, and retain the first contributing line for failure attribution. |
+| PAY-5 | Routing cannot increase the shared router's ETH or tracked token balances. Compare against pre-execution balances rather than requiring zero. Final swap output and sweeps return to Cart; only supported intermediate funding and wrap/unwrap steps may use the router alias. |
 | ATOM-1 | A revert at any stage leaves no purchase, partial payout, asset delivery, fill, order consumption, or purchase logs. A callback cannot execute another purchase or mutate seller invalidation state through guarded entry points. |
 | ADMIN-1 | Only the configured owner can pause, rotate the signer, or authorize upgrade. Proxy initialization runs once, the implementation is locked, and a compatible upgrade preserves live storage, approvals, and EIP-712 identity. Seller invalidation stays available while paused. |
-| OPS-1 | The deployed proxy, implementation, executor, policies, dependencies, Lens, Hashes, bindings, and signer agree for each target chain. Migration preserves required state and coordinates incompatible signatures and Listing capacity. |
-| EVENT-1 | Consumers can reconstruct the payer and Fixed Quote, original lines, exact split allocations, individual fulfillment operations, and Protocol Spread from committed logs. Off-chain fulfillment runs once per applicable line under the consumer's reorg policy. |
-| SIZE-1 | The signer releases only payloads that pass configured work, gas, and byte admission. The measured payload, actual payer, value, deployment, and authorization witnesses match the released checkout. |
+| OPS-1 | The deployed proxy, implementation, executor, policies, dependencies, Lens, Hashes, and on-chain signer configuration agree for each target chain. Migration preserves required state and coordinates incompatible signatures and Listing capacity. |
+| EVENT-1 | Committed proxy logs identify the payer and Fixed Quote, original lines and their kinds, exact split allocations, individual fulfillment operations, and Protocol Spread. |
+| SIZE-1 | On-chain structural limits hold across payload shapes. Characterize gas and calldata growth for checkout and identify any inputs that can impair unrelated purchases. |
+
+### State the assumptions behind each claim
+
+For each invariant, record the permitted attacker control, required dependency
+behavior, and observable failure. Use these boundaries when designing tests.
+
+| Invariants | Assumptions and attacker control | Failure to detect |
+| --- | --- | --- |
+| AUTH-1, AUTH-2, INV-1, INV-2 | Assume standard signature and hash security. Callers control witnesses and calldata. Use valid hostile platform signatures as well as invalid signatures. Sellers can sign adversarial roots and share leaves across roots. | Accepting altered signed fields, another seller's authority, cancelled authorization, under-floor terms, or excess finite fills. These checks must hold even with a valid platform signature. |
+| ACT-1, ACT-2 | Callers control signed action recipients and quantities. Conforming collections perform their declared operation and revert on failure. Test dishonest collections separately to establish the limit of the delivery guarantee. | Incorrect action coverage or asset source, incorrect delivery for a conforming collection, or surviving delivery after transaction failure. A dishonest collection's successful no-op requires an explicit trust-assumption disposition. |
+| PAY-1, PAY-2, PAY-4 | Exact-transfer currencies report truthful balances. Use the actual reviewed router and WETH. A valid signature can authorize adversarial routing and arbitrary nonzero spread destinations. Payout recipients can run callbacks or reject payment. | Wrong currency or allocation, spending protected baselines, residuals sent outside the signed destination by Cart, or a committed partial settlement. Report route-directed transfers separately from Cart's residual transfers. |
+| PAY-5 | Use pinned router alias/action semantics, truthful tracked-token balances, and valid fixture signatures. Preload router balances independently from Cart. | Accepted wrong final destinations, additional tracked funds left in the router, or omitted endpoint custody accounting. Probe intermediate assets and hooks separately to establish the limits of endpoint tracking and balance comparisons. |
+| PAY-3 | The reviewed token and Permit2 implement their allowance interfaces. Callers control the signed route. Test dishonest approval implementations as dependency-boundary probes. | Excess temporary authority, overwriting preexisting authority, or nonzero temporary allowances at the required checkpoints. |
+| ATOM-1, ADMIN-1 | EVM revert semantics hold. Public callers and callback contracts are hostile. The owner administers honestly and may make mistakes. Test owner-authorized callback behavior with its required authority stated. | Unauthorized entry, nested protected mutation, partial committed state, initialization takeover, or incompatible preserved state. Deliberate hostile owner upgrades remain outside scope. |
+| OPS-1 | Pin the target chain, artifact bundle, configuration, and prior implementation. Assume no compatibility until checked for that pair. | Unexplained artifact mismatch, wrong dependency or immutable, or lost state or unintended signature validity across migration. |
+| EVENT-1, SIZE-1 | Derive expected logs and workload costs from fixture inputs and independent state observations. Backend admission and downstream consumers remain external assumptions. | Incorrect committed receipt fields, violated on-chain structural rules, or persistent interference with independent valid purchases. |
+
+For nonconforming tokens and hostile dependency stand-ins, record the minimum
+behavior needed to trigger the result. A mock that can arbitrarily rewrite
+balances does not establish that the reviewed deployment can do so.
 
 ## Coordinate the audit
 
@@ -98,6 +120,9 @@ Use these IDs in findings, reproductions, and the final coverage table.
    Derive the embedded executor and both policy addresses from verified build
    artifacts or deployment evidence. The proxy's `routePolicy()` only exposes
    the policy embedded in Cart.
+   Record the compiler input and EVM target for the release artifact. If a
+   rebuild differs from the deployed runtime, recover the original inputs
+   or review and test the new artifact as a separate build.
 3. Run the local suite and collect test counts, fuzz settings, invariant calls,
    handler reverts, and skipped cases. Save full output for any failure. Run a
    separate gas report and storage/ABI inspection.
@@ -130,18 +155,31 @@ Use these IDs in findings, reproductions, and the final coverage table.
    FOUNDRY_PROFILE=cart FOUNDRY_TEST=src/test/forks/ethereum/cart forge test --offline -vv
    ```
 
-   The [mainnet fork report](cart-mainnet-fork-verification.md) records 17
-   passing tests at block 25,800,000. That run deploys Cart locally on the
-   fork. Treat it as evidence for the recorded source and dependency state.
+   The [mainnet fork guide](cart-mainnet-fork-verification.md) describes
+   what the pinned fixture covers. Record results for the audited revision.
 6. Compare the [fresh Sepolia record](cart-sepolia-fresh-2026-11-01.md) and
    [receipt ledger](data/cart-sepolia-fresh-2026-11-01.json) to the current
    target chain and addresses. Confirm both the intended proxy and the retired
-   proxy state if a migration relies on it. Capture SDK, builder, signer, and
-   worker revisions separately.
+   proxy state if a migration relies on it. Verify the configured signer and
+   helper addresses against the release configuration.
 7. Record each baseline failure as a reproducible test failure, environment
    blocker, or missing artifact. Assign each blocker an owner and continue
    independent source review. Keep historical proof, unit, fork, and receipt
    evidence distinct.
+
+### Review the highest-impact guarantees first
+
+Complete the first pass for AUTH-1, AUTH-2, INV-1, INV-2, ACT-1, ACT-2,
+PAY-1 through PAY-5, and ATOM-1 before allocating remaining effort to
+diagnostic polish and optional optimization. Review ADMIN-1 and OPS-1 early
+enough to catch artifact or migration blockers.
+
+Require an independent second pass on signature enforcement, seller inventory,
+custody, payout conservation, temporary approvals, and rollback even when the
+first reviewer reports no finding. Each reviewer derives expected behavior from
+the signed inputs and trust model before comparing the other reviewer's results.
+Record disagreements and the evidence that resolves them. A serial reread by the
+same reviewer leaves the independent-review requirement open.
 
 ### Assign subagents and cross-checks
 
@@ -158,34 +196,34 @@ read-only and retain repro changes separately from proposed fixes.
 | 1 | Custody | 3. Funding, balances, and spread | Routing agent traces token access and intermediate currencies. |
 | 1 | Routing | 4. Router and Permit2 | Custody agent verifies quote, baseline, and approval invariants. |
 | 1 | Payouts | 5. Splits and grouped transfers | Callback agent checks transfer order and failure attribution. |
-| 1 | Fulfillment | 6. NFT execution and collection behavior | Integration agent checks admission and receipts. |
+| 1 | Fulfillment | 6. NFT execution and collection behavior | Interface reviewer checks emitted receipts. |
 | 1 | Callbacks | 7. Atomicity and failure paths | Payouts and fulfillment agents review the same late-failure cases. |
 | 1 | Upgrade | 8. Proxy, configuration, and rollout | Authorization agent checks domain and signature migration. |
-| 1 | Integration | 9. Lens, signing, and reconciliation | Upgrade agent checks deployment drift. |
-| 1 | Capacity | 10. Gas and transaction admission | Routing, payouts, and fulfillment agents provide workload cases. |
+| 1 | Interfaces | 9. Lens, ABI, and receipts | Upgrade agent checks deployment drift. |
+| 1 | Capacity | 10. On-chain gas and griefing | Routing, payouts, and fulfillment agents provide workload cases. |
 | 2 | Verification | 11. Test and proof claims | Coordinator matches independently reviewed evidence to every invariant. |
+| 2 | Independent review | Signature enforcement, seller inventory, custody, payout conservation, approvals, and rollback | Re-derive the claims and challenge the first pass even when it reports no finding. |
 | 2 | Reproduction | Credible high and medium candidates | Assign a second reviewer who did not file the candidate. |
 
 With four total execution slots, keep the coordinator in one slot. Run
 authorization and inventory, custody and routing, and proxy and rollout in the
 three agent slots first. Then run payouts and callbacks, fulfillment and
-integration, and capacity and verification. Start a focused follow-up as a slot
+interfaces, and capacity and verification. Start a focused follow-up as a slot
 opens if evidence could change a high- or medium-severity decision. With a
 single reviewer, run the same workstreams serially and revisit the independent
-cross-checks after reproductions. Record any second-review gap.
+cross-checks after reproductions. Record any second-review gap as an open completion requirement.
 
 ### Require evidence from each agent
 
 Return the source SHA, files and functions reviewed, invariant IDs, commands,
 and results. For each candidate include the attacker, preconditions, call order,
 expected and observed results, impact, proposed severity, and confidence. Mark
-which facts came from a mock, a pinned fork, a live read, or a consumer source
-file. Identify existing tests and missing assertions. Include the minimal
+which facts came from a mock, a pinned fork, or a live read. Identify existing tests and missing assertions. Include the minimal
 reproduction, preferably a Foundry test, or the exact transaction sequence.
 
 For a proposed finding that spans boundaries, provide both sides of the call.
-Examples include the signer payload and router trace, the seller witness and fill
-state, or the implementation upgrade and old consumer decoding. Return review
+Examples include the signed fixture payload and router trace, the seller witness and fill
+state, or the implementation upgrade and old ABI decoding. Return review
 gaps with a concrete next check. Mark a reviewed design choice as confirmed
 when the evidence matches its documented behavior.
 
@@ -193,8 +231,10 @@ when the evidence matches its documented behavior.
 
 ### 1. Verify signed data and seller witnesses
 
+Own the evidence for CASE-01, CASE-02.
+
 Review `ICart`, `CartHashing`, `CartHashes`, and `Cart._validateOrderHashes`
-and `_resolveRootListings`. Compare `CartLens` and the transaction builder.
+and `_resolveRootListings`. Compare `CartLens` and the independent typed-data vectors.
 Cover AUTH-1 and AUTH-2 with the inventory reviewer.
 
 - Reconstruct all struct hashes and digests independently. Include empty and
@@ -218,12 +258,12 @@ Cover AUTH-1 and AUTH-2 with the inventory reviewer.
   fail even when the same keys and payload are used.
 - Build a Merkle tree independently with singleton, multi-leaf, odd-size, and
   deep cases. Verify the leaf hashing and sorted pair construction used by
-  the builder. Put leaves from two sellers in one actual tree and prove
+  the fixture. Put leaves from two sellers in one actual tree and prove
   caching a valid first signature cannot authorize the second seller.
 - Swap valid witnesses for the same Listing digest. Reject a mismatched root
   index, wrong proof, missing or extra Listing, duplicate supplied digest,
   root/signature array mismatch, and wrong seller nonce. Check if redundant
-  witness data can affect execution, diagnostics, or admission.
+  witness data can affect execution, diagnostics, or gas.
 - Verify signer rotation with outstanding orders, including rotating away
   and back before expiry. Confirm a successful order ID remains consumed
   even when a new valid signature uses the same ID and different terms.
@@ -234,6 +274,8 @@ Start with `CartVerification.t.sol`, `CartMerkle.t.sol`,
 Return independent payload and digest vectors for any mismatch.
 
 ### 2. Verify Listing terms and inventory
+
+Own the evidence for CASE-03, CASE-04, CASE-05.
 
 Review `Cart._validateListing`, `_indexListingDigest`, `_findListingDigest`,
 `_validateLineTerms`, and `_reserveListings`. Cover AUTH-2, INV-1, and INV-2
@@ -265,8 +307,7 @@ with authorization and fulfillment.
   seller inventory. Check that `CURRENCY_SWAP` requires a different
   settlement currency and cannot use a seller Listing or NFT action.
   Try a zero-amount Currency Swap and an empty route with ETH/WETH
-  conversion. Determine which cases the builder and indexer classify as
-  conversions and whether that agrees with the value actually exchanged.
+  conversion. Compare the emitted line kind with the asset movements.
 
 Start with `CartMerkle.t.sol`, `CartListingIndex.t.sol`,
 `CartVerification.t.sol`, and `CartFree.t.sol`. Return a compact inventory
@@ -274,9 +315,11 @@ state model and a test for any difference between the model and Cart.
 
 ### 3. Reconcile funding, custody, and Protocol Spread
 
+Own the evidence for CASE-08, CASE-10, CASE-12.
+
 Review `CartPayments.begin`, `finish`, `_fundPayment`, `_settlementTokens`,
 `_verifySolvency`, `_prepareNativeFamily`, `_captureSupportedSpread`, and
-`_verifyFinalBaselines`. Cover PAY-1, PAY-2, PAY-3, and PAY-4 with routing
+`_verifyFinalBaselines`. Cover PAY-1, PAY-2, PAY-3, PAY-4, and PAY-5 with routing
 and callbacks.
 
 - Build a per-currency ledger for payer debit, router input and output,
@@ -287,14 +330,18 @@ and callbacks.
   a contract payer with a different fulfillment recipient and treasury.
   A relayer with approval from somebody else cannot charge that account.
 - Preload distinct nonzero ETH, WETH, payment-token, and named output
-  balances. Route too little of one required token while overfunding another.
+  balances. Include a decoded endpoint token absent from settlement lines.
+  Verify its baseline, spread distribution, and final custody restoration. Route too little of one required token while overfunding another.
   Verify that a baseline or a surplus in another currency cannot fill the
   shortfall. Repeat with no actions, NFT callbacks, and payout callbacks.
 - For ETH and WETH, cover a native shortfall filled by WETH, a WETH shortfall
   filled by native ETH, both exact forms funded, and combined shortfall.
   Check each individual baseline before and after conversions. Include the
   same recipient receiving ETH and WETH.
-- Compare exact-input output excess and exact-output unused input. Test
+- Keep the buyer charge and line payouts fixed on every purchase. Compare
+  router exact-input output excess and exact-output unused input; both become
+  signed spread after settlement. For native exact-output routes, unused ETH
+  must first return to Cart through a sweep. This is not a buyer refund. Test
   separate signed spread recipients on consecutive orders and spread to a
   contract. Check zero spread, a zero destination, a rejecting destination,
   and Cart itself as a destination when surplus is due.
@@ -304,8 +351,7 @@ and callbacks.
 - Exercise tokens that return no value, return false, revert, tax the
   transfer, charge the sender extra, rebase, or misreport balances. Distinguish
   a clean rejection from underpayment, overcharge, or access to preexisting
-  assets. State which behavior can occur with a currency admitted by the
-  builder.
+  assets. State which behavior requires a nonconforming currency.
 - Test tracked assets sent back during final spread callbacks, and assets
   added or removed during earlier callbacks. Trace the order of token and ETH
   spread processing. For an unnamed intermediate asset, identify what the
@@ -318,10 +364,12 @@ late-failure case.
 
 ### 4. Trace the router and Permit2
 
+Own the evidence for CASE-10, CASE-11, CASE-21, CASE-22, CASE-23.
+
 Review `CartRoutePolicy.validate`, `CartPayments._validateRoute`,
 `_executeRoute`, `_assertNoPreexistingApprovals`, `_assertAllowancesCleared`,
-and [IPermit2Cart](../src/cart/IPermit2Cart.sol). Cover PAY-1, PAY-2, PAY-3, and
-OPS-1 with custody and deployment.
+and [IPermit2Cart](../src/cart/IPermit2Cart.sol). Cover PAY-1, PAY-2, PAY-3,
+PAY-5, and OPS-1 with custody and deployment.
 
 - Compare the accepted byte values with the dispatcher in the pinned
   Universal Router. Test all 256 byte values against the expected set.
@@ -335,17 +383,27 @@ OPS-1 with custody and deployment.
   and a Listing Split. Compare all actual outputs to the signed lines.
   Include mixed ETH/WETH, an ordinary intermediate token, and a signed
   `CURRENCY_SWAP` line.
-- Try allowed commands with wrong recipient aliases, malformed path bytes,
-  unsafe V4 actions, missing sweeps, or hostile pool hooks where production
-  policy permits them. Observe whether the router rejects, Cart rejects for
-  insufficient deltas, or the order succeeds with an unintended movement.
-  A successful wrong-recipient route with all signed obligations met still
-  requires an attribution and custody analysis.
+- Require V2/V3 final output and sweeps to use `MSG_SENDER`, address `1`,
+  which resolves to Cart. Reject other wallets, including a seller or an
+  explicit Cart address. Wrap/unwrap may use caller or router aliases;
+  Permit2 prefunding may use only the router alias, address `2`.
+- Restrict V4 to one swap action, `0x06` through `0x09`, followed by
+  `SETTLE_ALL` and `TAKE_ALL`. Reject arbitrary take recipients, extra actions,
+  unsupported settlement forms, malformed arrays, and invalid V2/V3 paths.
+  The router still validates swap payloads and executes pools and hooks.
+- Sign a wrong-recipient route whose quote can still pay every seller.
+  Require rejection before routing. Separately omit a native refund or leave
+  tracked ERC-20 input/output behind. Require the post-execution balance check
+  to reject and roll back the purchase. Probe hostile hooks and token side
+  effects to identify transfers outside the supported route guarantees.
 - Preload the shared router separately from Cart. Determine whether an
   existing router balance can fund a payout or spread under an admitted
   template. Identify exactly which account owned each unit of value before
   the route. Check malformed plans that strand an untracked intermediate
-  asset even if every named obligation is met.
+  asset even if every named obligation is met. Include a decoded endpoint
+  absent from settlement lines. Verify independent router ETH/token snapshots
+  immediately before execution and require no increase afterward. A shared
+  balance comparison does not prove the provenance of individual funds.
 - Trace spender, owner, token, amount, and expiry for both temporary
   allowance layers. Exercise exact spend, partial spend, zero spend, a
   revert, and `uint160` amount and `uint48` deadline boundaries. Check
@@ -361,10 +419,14 @@ OPS-1 with custody and deployment.
   move arbitrary funds from a reproducible router or Permit2 path.
 
 Start with `CartRoutePolicy.t.sol`, `CartRoutePolicyVerification.t.sol`,
-`CartOutcome.t.sol`, and the Ethereum fork suites. Return a per-template
+`CartRouteProtection.t.sol`, `CartOutcome.t.sol`, and the Ethereum fork suites.
+Use the [route protection specification](cart-route-protection.md) for accepted
+forms and ABI compatibility. Return a per-template
 trace with actual command bytes, token deltas, and allowance states.
 
 ### 5. Recompute splits and grouped payouts
+
+Own the evidence for CASE-09, CASE-13.
 
 Review `CartValidation.validSplits`, `CartHashing.hashSplits`, and
 `CartPayments._payLines`, `_allocateLine`, `_addPayout`, and
@@ -409,12 +471,14 @@ Start with `CartSplits.t.sol`, `CartAdvancedGas.t.sol`, and the two
 mixed-currency split cases in the fork suite. Return the reference model and
 a comparison of balances, allocation events, call order, and error index.
 
-### 6. Verify NFT fulfillment and collection admission
+### 6. Verify NFT fulfillment and collection behavior
+
+Own the evidence for CASE-06, CASE-07.
 
 Review `Cart._validateListing`, `_validateActions`,
 `_executeFulfillment`, `CartValidation.isContractOwner`, and
 `CartLens._assetAvailable`. Cover ACT-1, ACT-2, and EVENT-1 with inventory
-and integration.
+and interfaces.
 
 | Kind | Execute these cases |
 | --- | --- |
@@ -434,8 +498,8 @@ and integration.
   changes during routing or an earlier action before a later mint call.
 - Re-run the dishonest collection cases. Compare successful no-op
   transfers, mints to a different recipient, and false return data with
-  actual state changes. Trace whether the real signing service admits the
-  collection and how receipts represent the call.
+  actual state changes. Identify what the contract proves about delivery and
+  what the receipt reports when the collection lies.
 - Test supported collection implementations and representative
   upgradeable collections. Capture the concrete mint selector, return
   shape, approval rules, and receiver behavior for each supported family.
@@ -446,10 +510,12 @@ and integration.
 
 Start with `CartAdversarial.t.sol`, `CartExternalBoundaries.t.sol`,
 `CartVerification.t.sol`, `CartFree.t.sol`, and `CartSplits.t.sol`.
-Return a table of supported collection contracts, admission criteria,
-and test evidence for each delivery claim.
+Return the collection contracts tested, the behavior each claim assumes,
+and evidence for each delivery claim.
 
 ### 7. Challenge callbacks, rollback, and revocation
+
+Own the evidence for CASE-11, CASE-12, CASE-13, CASE-14, CASE-18.
 
 Trace the entire `executePurchase` sequence from validation through final
 allowance checks. Cover ATOM-1, PAY-2, PAY-3, and ADMIN-1. Cross-check with
@@ -490,6 +556,8 @@ recipient cases. Return a call-boundary and rollback matrix.
 
 ### 8. Verify the proxy, executor, and rollout
 
+Own the evidence for CASE-15, CASE-20, CASE-24.
+
 Review `Cart.initialize`, `_authorizeUpgrade`, `_beginPayment`,
 `_finishPayment`, `CartStorage`, both executor entry points, the
 OpenZeppelin UUPS base, and the deployment scripts. Cover ADMIN-1 and OPS-1.
@@ -512,8 +580,11 @@ OpenZeppelin UUPS base, and the deployment scripts. Cover ADMIN-1 and OPS-1.
   using the supported signatures and preexisting approvals.
 - Verify dependency rotation with matching Cart and executor policy
   immutables. Simulate a stale executor alongside a new Cart policy.
-  Compare Lens preview with execution on payloads above historical
-  command limits and report each stale configuration signal.
+  Verify that `validate(bytes,bytes[])` returns the asset list required by
+  the executor even though its selector is unchanged. Detect a legacy policy
+  paired with the new executor and regenerate affected policy ABI consumers.
+  Compare Lens preview with execution on decoded inputs and payloads above
+  historical command limits; report each stale configuration signal.
 - Exercise explicit owner transfer and signer rotation. Test the retiring
   owner and signer afterward. Include a wrong chain, unexpected proxy
   override, stale script checkout, absent code, and mismatched dependency
@@ -527,61 +598,42 @@ the pre-split bytecode fixture in `CartSplits.t.sol`, and the historical
 deployment records. Return a storage, selector, and dependency comparison
 tied to the exact implementation pair.
 
-### 9. Verify client preflight, signing, and reconciliation
+### 9. Verify Lens, ABI, and on-chain receipts
+
+Own the evidence for CASE-16.
 
 Review [CartLens](../src/cart/CartLens.sol), [CartHashes](../src/cart/CartHashes.sol),
-[ICart events and errors](../src/cart/ICart.sol), and the
-[transaction-builder handoff](cart-transaction-builder-handoff.md).
-Cover AUTH-1, EVENT-1, OPS-1, and SIZE-1 with authorization, fulfillment,
-and deployment.
+and [ICart events and errors](../src/cart/ICart.sol). Cover AUTH-1, EVENT-1,
+and OPS-1 with authorization, fulfillment, and deployment.
 
 - Compare `listingStatus`, `validateListing`, `validatePurchaseEnvelope`,
   and `previewRoute` with checkout using the same state and payload.
-  Document what each preflight actually checks. Include swapped witnesses,
-  stale inventory, missing actions, invalid funding, and opaque bad route
-  inputs that pass the earlier preview.
-- Inspect the signer entry point. Verify the service constructs canonical
-  payloads or validates every client-provided field before signing. Test
-  unauthorized fee or spread destinations, mutable SKU metadata, unsupported
-  tokens and collections, inconsistent fee consolidation, and route inputs
-  with undesired recipients or refund behavior.
-- Check that the signer and builder bind the admission result to the exact
-  payload and intended payer used for simulation. Change payer, value,
-  witnesses, signed fields, or deployment between admission and release.
-  Verify failed admission never releases a usable signature.
-- Decode a real or fixture receipt using generated bindings. Reconcile the
-  transaction payer, signed quote, line amounts, split allocations, router
-  movement, tracked spread, and all NFT action units. Filter logs by the
-  intended chain and proxy, including logs emitted through the executor.
-- Verify that `OrderLineSettled.paymentRecipient` is interpreted as the
-  primary recipient for split lines. Use `ListingSplitPaid` for allocation
-  details and avoid treating each allocation as an independent transfer.
-  Handle a zero rounded share, a free split Listing, and grouped transfers
-  across repeated lines.
-- Verify only `OFF_CHAIN` lines trigger external fulfillment. Process
-  duplicate, out-of-order, and reorged receipts, as well as the same order ID
-  on separate proxies or chains. Check the idempotency key
-  `(chainId, cartProxy, orderId, lineIndex)` and actual reorg handling.
+  Include swapped witnesses, stale inventory, missing actions, invalid
+  funding, wrong recipients, rejected V4 actions, and runtime failures that
+  a static preview cannot establish. Preview must share policy input checks;
+  it does not execute the router or perform before/after custody checks.
+- Decode a receipt with the compiled ABI. Compare payer, quote, signed
+  line kinds, split allocations, actual transfers, spread, and NFT action
+  units. Confirm delegatecalled events come from the proxy. Include a
+  zero rounded share, a free split Listing, and grouped transfers.
 - Decode funding, routing, payout, spread, action, and baseline errors.
-  Check line zero when the stage is order-wide, first contributing line
-  for grouped payouts, and nested router or token reasons. Confirm the
-  builder repairs a failed basket and obtains a new signature when signed
-  terms change.
-- Test a stale SDK paired with new Cart or stale Lens paired with a new
-  implementation. Test old Orders, old Listing tuples including no splits,
-  missing mint result decoding, and consumers expecting obsolete resource
-  caps. Record the exact release order and fallback when client updates lag.
+  Check line zero for order-wide failures, first contributing line for
+  grouped payouts, and nested router or token reasons where present.
+- Compare current and prior selectors, tuples, events, and mint return
+  types. Check stale Lens behavior against the new implementation and
+  record the external compatibility consequences of changed signatures.
 
-Start with `CartLens.t.sol`, `CartSpreadRecipient.t.sol`, the SDK vectors,
-and the documented event schemas. Return a consumer inventory with versions,
-an example receipt and decoded allocations, and any missing integration access.
+Start with `CartLens.t.sol`, `CartSpreadRecipient.t.sol`, and the SDK
+vectors. Return a decoded receipt and any contract-level ABI differences.
 
-### 10. Measure gas and verify transaction admission
+### 10. Measure gas and assess on-chain griefing
 
-Measure the complete signed checkout. Cover SIZE-1,
-PAY-4, and ACT-2 with the builder, routing, and payout reviewers. Use the
+Own the evidence for CASE-17.
+
+Measure the complete signed checkout. Cover SIZE-1, PAY-4, and ACT-2
+with the routing and payout reviewers. Use the
 [resource policy](cart-resource-policy.md) and
-[split gas measurements](cart-split-verification.md#split-order-gas-measurements)
+[split gas fixtures](cart-split-verification.md#split-order-gas-measurements)
 to select workloads.
 
 | Workload | Vary independently | Inspect |
@@ -589,17 +641,21 @@ to select workloads.
 | Direct native and ERC-20 | Free, one line, repeated currency/recipient, distinct recipients and currencies | Funding and exact-transfer checks, currency deduplication, per-currency scans, payout grouping |
 | Seller authorization | Shared versus distinct roots, repeated Listings, proof depth and bytes, EOA versus ERC-1271 | Signature cache reuse, witness bytes, digest index collisions, allocation cost |
 | Listing Splits | 0, 1, or 16 recipients, zero rounded shares, shared versus distinct addresses, mixed currencies | Payout count, indexed probing, per-line events, temporary memory and calldata |
-| Routed orders | Command/input sizes, V2/V3/V4, exact input/output, partial spend, mixed native/WETH | Delegatecall encoding, router work, both approval layers, balance snapshots |
+| Routed orders | Command/input sizes, V2/V3/V4, router exact input/output, partial spend, mixed native/WETH, endpoint count, native sweep | Input decoding, asset-list return encoding, deduplication, router and Cart snapshots, approval layers, refund and spread transfers |
 | NFT fulfillment | ERC-721 versus ERC-1155 transfers, mint units, number of actions and distinct recipients | Per-action and per-unit calls, receiver work, mint return arrays and logs |
 | Rejection | Bad proof, stale approval, late NFT or payout failure, reverting recipient | Work before rejection, nested revert data, estimate failure and retry cost |
-| Integration | Exact production payload across payer types, fee-grouping shapes, and wallet or relayer envelopes | Submitted limit, cold accounts, calldata and envelope bytes, provider acceptance |
+| Full checkout | Payer types, fee-grouping shapes, and realistic combined workloads | Cold accounts, calldata bytes, and execution gas |
 
 1. Record the toolchain, EVM rules, fixture funding, cold and warm
    accounts, route state, and calldata. Measure execution, intrinsic
    calldata cost, simulated estimate, and receipt gas separately where
    available. Report a local call benchmark as a local call benchmark.
 2. Use `CartAdvancedGas.t.sol` and the current split stress cases as
-   regression points. Recheck the assumptions in `CartGasCapacity.t.sol`,
+   regression points. Include native V4 refund/spread benchmarks from
+   `CartUniversalRouterTemplatesEthereum.t.sol`, with a separate signed
+   platform spread recipient. Distinguish protection overhead on an unchanged
+   route from the cost of adding a native cleanup instruction. Simple native
+   and complex NFT checkout totals are not directly comparable. Recheck the assumptions in `CartGasCapacity.t.sol`,
    `CartQuoteCapacity.t.sol`, `CartListingGas.t.sol`,
    `CartERC721Gas.t.sol`, and `CartRareERC1155Gas.t.sol` before applying
    historical results to the current implementation.
@@ -611,32 +667,26 @@ to select workloads.
    size. Measure full execution, including the cost of producing admissible
    inputs. Distinguish ordinary expected probe growth from worst-case
    behavior and identify which actors control the keys.
-5. Exercise resource limits before expensive decode, hashing, signing,
-   or RPC. Count expanded ERC-721 mint operations, proof bytes, split
-   allocations, route bytes, and wallet signature bytes independently.
-   Verify an order above historical count caps can execute if admitted,
-   and a small order with expensive components can be declined.
-6. Confirm the current builder's policy and operator overrides. If it
-   uses the handoff's starting limits, verify the ceiling calculation
-   `(estimateGas * 125 + 99) / 100` against a 12,000,000 gas budget.
-   Check both sides of the gas and byte boundaries with the actual sender,
-   deployed proxy, funding, route, and seller witnesses.
-7. Check retry behavior when relevant state moves between signing and
-   inclusion. For a proposed split checkout, recompute fees, split
-   rounding, routes, and separate order IDs. Verify receipts and partial
-   completion when one of multiple checkouts fails.
-8. Keep optimizations subject to authorization, first-seen payout order,
+5. Vary expanded ERC-721 mint operations, proof bytes, split allocations,
+   route bytes, and wallet signature bytes independently. Check on-chain
+   structural limits and trace where execution cost grows.
+6. Separate one oversized or reverting purchase from persistent denial of
+   service. Check whether an adversarial call can leave state that increases
+   the cost or prevents execution of a separate valid checkout.
+7. Keep optimizations subject to authorization, first-seen payout order,
    error attribution, exact settlement, and final custody checks. Require
    before-and-after traces for any proposed change to these paths.
 
-Return gas and byte measurements by workload, practical chain and provider
-constraints, and a reproducer for any admission bypass or unbounded server work.
+Return gas and calldata measurements by workload and a reproducer for
+any persistent effect on unrelated checkouts.
 
 ### 11. Audit the test and proof claims
 
-Use the full baseline, [cleanup report](cart-cleanup-verification.md),
-[split report](cart-split-verification.md),
-[fork report](cart-mainnet-fork-verification.md), and
+Own the evidence for CASE-18, CASE-19.
+
+Use the full baseline, [refactor verification guide](cart-cleanup-verification.md),
+[split verification guide](cart-split-verification.md),
+[fork verification guide](cart-mainnet-fork-verification.md), and
 [Kontrol project](../verification/cart/README.md). Assign this workstream
 to a reviewer who can compare tests across the other workstreams.
 
@@ -647,13 +697,17 @@ to a reviewer who can compare tests across the other workstreams.
 - Distinguish an expected custom error from a generic revert. For
   rejection tests, prove the fixture would succeed without the targeted
   mutation. For late failures, seed and compare nonzero prior state.
-- Inspect invariant handler selectors, action distribution, amount and
-  caller bounds, and unexpected reverts. Add mixed split, routed, free,
-  revocation, and replay sequences if current handlers omit them. Check
-  that balances and allowances are sampled after both success and failure.
+- Complete CASE-18 with stateful sequences that include mixed split,
+  routed, free, revocation, replay, and failed purchases. Inspect handler
+  selectors, action distribution, amount and caller bounds, and unexpected
+  reverts. Sample balances, allowances, inventory, and replay state after
+  every step.
 - Compare Listing and payout index implementations with simple reference
   models using ordered outputs, collision cases, and signed inputs.
-  Compare payout amount and first-line attribution in addition to total gas.
+  Compute expected values without calling the production hashing,
+  allocation, or index helpers being tested. Compare payout amount and
+  first-line attribution in addition to total gas. Complete CASE-19 to
+  demonstrate that the critical assertions detect deliberately broken code.
 - Rebuild the real pre-split bytecode fixture if auditing migration.
   Compare the source and bytecode hash against its recorded revision.
   Keep modeled old storage, historical artifact upgrade, and live
@@ -671,6 +725,41 @@ to a reviewer who can compare tests across the other workstreams.
 
 Return the invariant coverage table, exact missing tests, and any claim
 that the currently available evidence cannot establish.
+
+### Require stateful sequences and effective test assertions
+
+CASE-18 must exercise this sequence with an independent inventory and currency
+ledger. Begin with nonzero custody baselines and more than one seller.
+
+1. Partially fill a split Listing, then authorize the same digest through
+   another root and fill it again.
+2. Attempt overfill and replay. Reject both without changing the ledger.
+3. Execute a routed purchase with NFT fulfillment and fail its final payout.
+   Check all participants' balances, NFT ownership, approvals, fills, and
+   replay state. Include the router's tracked balances and Cart's decoded
+   endpoint assets in the independent ledger. Remove the transient failure
+   and retry the original order.
+4. Cancel a root, cancel an exact Listing, and invalidate a seller nonce in
+   separate branches from the same prior state. Confirm each rejection and
+   the continued validity of unaffected sellers and authorizations.
+5. Rotate the platform signer with an unexecuted order outstanding. Check
+   old and replacement signatures, then rotate back and test the still-live
+   old authorization. A consumed order remains consumed.
+6. Execute a free Listing and an independent valid purchase after failures.
+   Compare model and contract state after each operation.
+
+Keep a deterministic sequence as a reproducible witness and add generated
+sequences with varied actors and operation ordering. Report successful and
+expected-rejection counts per operation. An unreached operation remains a gap.
+
+CASE-19 uses disposable source copies to introduce three faults independently.
+Remove root-cache seller binding, allocate splits after aggregating line amounts,
+and omit the final allowance check. For each fault, first run its positive
+baseline, then identify the failing assertion that detects the changed behavior.
+Use the allowance-restoring callback for the third case. Compilation failure,
+setup failure, or an unrelated revert does not count as detection. If the fault
+survives, strengthen the relevant test and repeat. Keep faulted code isolated
+from proposed production changes.
 
 ## Rehearse deployment, migration, and recovery
 
@@ -699,15 +788,15 @@ broadcast execution as a separate release operation. Cross-check the
 5. Generate bindings and fresh vectors against the new domain. Approve the
    new proxy from test buyers, NFT holders, and collection owners. Execute
    a direct purchase, a routed purchase with spread and splits, and a
-   free NFT purchase. Decode each receipt through the target client versions.
+   free NFT purchase. Decode each receipt with the release ABI.
 
 ### Rehearse the three release paths
 
 | Release path | Required compatibility evidence |
 | --- | --- |
-| Compatible implementation-only upgrade | Preserve the proxy, all storage, ordinary approvals, domain, pending compatible Orders, and seller witnesses. Check the configured executor and policy are still appropriate. Test a pre-upgrade order after upgrade. |
+| Compatible implementation-only upgrade | Preserve the proxy, all storage, ordinary approvals, domain, pending compatible Orders, and seller witnesses. Confirm the existing executor ABI and embedded policies are compatible. Rehearse the owner-authorized UUPS call on a fork. The checked-in implementation-only script always reverts. Test a pre-upgrade order after upgrade. |
 | Dependency rotation on the same proxy | Deploy compatible route policy, executor, implementation, and helpers. Check both embedded policy addresses. Router, Permit2, and WETH are stored configuration with no routine setter. Verify that stored dependencies remain unchanged unless the release explicitly includes a reviewed migration. |
-| Fresh proxy and client cutover | Verify the new domain, approvals, signer configuration, and off-chain version switch. Old proxy fills, replay state, and cancellations remain on the old proxy. Retire the old entry point under the migration runbook and explicitly reconcile outstanding seller capacity. |
+| Fresh proxy | Verify the new domain, approvals, signer configuration, and helper addresses. Old proxy fills, replay state, and cancellations remain on the old proxy. Retire the old entry point under the migration runbook and explicitly reconcile outstanding seller capacity. |
 
 1. Test a storage-compatible but signature-incompatible release separately.
    In the spread-only change, rebuild Purchase Orders and checkout calldata.
@@ -718,65 +807,85 @@ broadcast execution as a separate release operation. Cross-check the
    Seed a partially filled Listing before migration. Verify preserved
    historical storage and rejection of obsolete authorizations. Authorize
    only the seller-confirmed remaining quantity on the replacement digest.
-3. Rehearse `upgrade-with-dependency-rotation.sh` in simulation mode.
+3. For route-protection rotation, deploy matching policy, executor, and Cart
+   implementation artifacts. Verify both embedded policies and the new asset-list
+   return ABI. Test rejection of legacy mixtures. At the contract integration
+   boundary, execute a signed native exact-output route with its final ETH sweep;
+   require fixed buyer charge, fixed seller payouts, and signed platform spread.
+   Missing cleanup must revert. Confirm the required builder route format before
+   deployment; backend implementation review remains separate.
+   For a matching replacement bundle that retains the route policy, rehearse
+   `upgrade-cart-lens-and-hashes.sh`. For policy and executor rotation,
+   rehearse `upgrade-with-dependency-rotation.sh`. Use simulation mode.
    Inspect the actual owner, proxy override, chain, previous implementation,
    configured dependencies, new helper addresses, and encoded UUPS call.
    Compare the checkout guard with the candidate source. For the planned
    release, test clean, dirty, detached, and stale checkout cases.
 4. Rehearse the expected sequence of separate deployment and upgrade
    transactions on a fork. Stop after new helpers deploy, after the proxy
-   upgrade, and after an individual client cutover. At each stop, identify
-   the active contract bundle, whether checkout should be paused, how to
-   resume safely, and which signatures the builder may release.
+   upgrade. At each stop, identify the active contract bundle, whether
+   checkout should be paused, how to resume safely, and which signature
+   formats the proxy accepts.
 5. Test going back to the previous implementation as its own migration.
    Compare storage, live dependencies, signature schemas, inventory buckets,
    and reactivation of old pending orders. Confirm how already executed
    replacement Listings affect old inventory before allowing rollback.
 6. Record post-upgrade implementation and dependency fingerprints, proxy
-   reads, the before-and-after state comparison, sample checkout receipts,
-   and client revisions. Verify pause, signer rotation, and seller
+   reads, the before-and-after state comparison, and sample checkout receipts.
+   Verify pause, signer rotation, and seller
    invalidation again using the exact target bundle.
 
 ### Walk emergency and failure paths
 
 | Trigger | Rehearse |
 | --- | --- |
-| Wrong or unavailable platform signer | Pause if needed, rotate to the tested signer, rebuild outstanding quotes, simulate from the actual payer, and resume. Verify the consequences of rotating back. |
+| Wrong or unavailable platform signer | Pause if needed, rotate to a fixture signer, and check rejection of old signatures and acceptance of new ones. Verify the consequences of rotating back. |
 | Revoked seller authority | Recheck the exact cancellation, root, nonce, inventory, and token approvals. Rebuild only when the seller has issued fresh authorization where needed. |
 | Rejecting payout or receiver | Reproduce the exact index and stage, repair the basket with the appropriate authority, and prove the failed order did not consume inventory or funds. |
-| Unexpected route or stranded balance | Stop releasing affected quotes, reproduce with the actual route and dependency code, inspect asset custody, and document available recovery. Cart exposes no general rescue entry point. |
-| Stale helper or ABI | Stop quote release for the mismatched suite, verify all deployed addresses and generated bindings, and re-simulate end-to-end before resuming. |
-| Interrupted upgrade or ownership handoff | Read confirmed on-chain state before retrying. Check who can pause, upgrade, or rotate the signer, and reconcile current client configuration with confirmed transactions. |
+| Unexpected route or stranded balance | Reproduce with the actual route and dependency code, inspect asset custody, and document available recovery. Cart exposes no general rescue entry point. |
+| Stale helper or ABI | Verify deployed addresses and the compiled ABI. Simulate checkout with the matching contract bundle. |
+| Interrupted upgrade or ownership handoff | Read confirmed on-chain state before retrying. Check who can pause, upgrade, or rotate the signer, and verify the active contract bundle against confirmed transactions. |
 
 ## Use this reproduction matrix
 
 Start with the cited suite or record. Add a focused test when the current
-assertions leave a gap. The cases in this table are audit requirements.
+assertions leave a gap. This table is the required-case register. Track each
+case once by its stable ID, linking workstream evidence and findings to that
+record. A case can require several tests. Workstream bullets describe additional
+probes and do not create duplicate completion records.
 
-| Invariant | Setup and action | Assert | Starting evidence |
-| --- | --- | --- | --- |
-| AUTH-1 | Keep the signature and mutate each signed array or field. Repeat on a different chain and proxy. | Reject before funding and reservation. | `CartVerification`, `CartAdversarial`, `CartSpreadRecipient`, `CartHashingBuffer` |
-| AUTH-2 | Prove two valid leaves from different sellers in the same Merkle tree and reuse one root cache entry. | The first seller's signature cannot authorize the second. | `CartMerkle` |
-| AUTH-2, INV-1 | Partially fill a Listing, switch its root, cancel the exact digest, and attempt both roots. | Alternate root shares the fill bucket. Exact cancellation blocks both. | `CartMerkle`, `CartListingIndex` |
-| INV-1 | Two signed orders race for the last unit, with a late revert in one run. | Only a committed purchase consumes the unit and its order ID. | `CartVerification`, inventory proof model |
-| INV-2 | Valid platform signature overrides a seller term or signs an under-floor amount. Include an overflow input. | Reject before payment. | `CartAdversarial`, `CartSplits` |
-| ACT-1, ACT-2 | Several actions target different recipients, with a failing last mint unit. | Exact coverage, correct return order on success, full rollback on failure. | `CartExternalBoundaries`, `CartFree` |
-| ACT-2, EVENT-1 | Seller supplies a collection that returns success and fake delivery data. | Determine what Cart records and whether the target builder admits the collection. | `CartAdversarial` and builder policy |
-| PAY-1 | Use a processor as payer, a different NFT recipient, and a third spread recipient. | Exact debit, signed delivery, and signed spread. | `CartSpreadRecipient`, `CartOutcome` |
-| PAY-1, PAY-4 | Two 1-unit split lines, a shared collaborator across currencies, and colliding payout buckets. | Per-line rounding, exact-currency grouping, and stable transfer order. | `CartSplits` and mixed-currency fork case |
-| PAY-2 | Fund one output correctly and underfund another with nonzero Cart baselines. Repeat with ETH/WETH. | Reject cross-currency subsidy and preserve individual baselines. | `CartOutcome`, fork shortfall case |
-| PAY-3 | Partially spend the quote, then restore one allowance layer in a callback. | Immediate revocation and final failure if an allowance remains. | `CartOutcome`, `CartExternalBoundaries`, approval proof model |
-| PAY-4 | Route with unused input and excess output. Revert in the final recipient callback. | Spread belongs to the signed account. Failure rolls back earlier transfers and reservations. | `CartSpreadRecipient`, `CartExternalBoundaries` |
-| ATOM-1 | Reject the last ETH payment after real swaps and earlier split payouts. | Compare all participants' balances and allowance amounts. No fills, replay state, or logs survive. | Mixed-currency fork rollback case |
-| ATOM-1, ADMIN-1 | Attempt a second funded purchase and seller invalidation from a receiver. Invalidate separately while paused. | Guard nested calls and allow legitimate seller invalidation while paused. | `CartAdversarial`, `CartSplits`, `CartVerification` |
-| ADMIN-1, OPS-1 | Upgrade a seeded proxy from actual historical bytecode and test stale and fresh signatures. | Stable storage and approval target, with signature validity matching the migration. | `CartStorageLayout`, pre-split case in `CartSplits` |
-| EVENT-1 | Feed committed, duplicate, and reorged receipts with mixed line kinds to consumers. | Correct payer, allocation, spread, and mint attribution. External fulfillment only for applicable lines. | Fork receipt, SDK bindings, fulfillment worker |
-| SIZE-1 | Change witnesses, payer, value, or route between estimation and release. Stress independent resource dimensions. | Admission matches the actual payload and releases no usable signature after a failed check. | Builder tests, Cart gas fixtures |
+| Case | Invariant | Setup and action | Assert | Starting evidence |
+| --- | --- | --- | --- | --- |
+| CASE-01 | AUTH-1 | Keep the signature and mutate each signed array or field. Repeat on a different chain and proxy. | Reject before funding and reservation. | `CartVerification`, `CartAdversarial`, `CartSpreadRecipient`, `CartHashingBuffer` |
+| CASE-02 | AUTH-2 | Prove two valid leaves from different sellers in the same Merkle tree and reuse one root cache entry. | The first seller's signature cannot authorize the second. | `CartMerkle` |
+| CASE-03 | AUTH-2, INV-1 | Partially fill a Listing, switch its root, cancel the exact digest, and attempt both roots. | Alternate root shares the fill bucket. Exact cancellation blocks both. | `CartMerkle`, `CartListingIndex` |
+| CASE-04 | INV-1 | Two signed orders race for the last unit, with a late revert in one run. | Only a committed purchase consumes the unit and its order ID. | `CartVerification`, inventory proof model |
+| CASE-05 | INV-2 | Valid platform signature overrides a seller term or signs an under-floor amount. Include an overflow input. | Reject before payment. | `CartAdversarial`, `CartSplits` |
+| CASE-06 | ACT-1, ACT-2 | Several actions target different recipients, with a failing last mint unit. | Exact coverage, correct return order on success, full rollback on failure. | `CartExternalBoundaries`, `CartFree` |
+| CASE-07 | ACT-2, EVENT-1 | Seller supplies a collection that returns success and fake delivery data. | Compare the committed receipt and token state to establish the collection trust assumption. | `CartAdversarial` |
+| CASE-08 | PAY-1 | Use a processor as payer, a different NFT recipient, and a third spread recipient. | Exact debit, signed delivery, and signed spread. | `CartSpreadRecipient`, `CartOutcome` |
+| CASE-09 | PAY-1, PAY-4 | Two 1-unit split lines, a shared collaborator across currencies, and colliding payout buckets. | Per-line rounding, exact-currency grouping, and stable transfer order. | `CartSplits` and mixed-currency fork case |
+| CASE-10 | PAY-2 | Fund one output correctly and underfund another with nonzero Cart baselines. Repeat with ETH/WETH. | Reject cross-currency subsidy and preserve individual baselines. | `CartOutcome`, fork shortfall case |
+| CASE-11 | PAY-3 | Partially spend the quote, then restore one allowance layer in a callback. | Immediate revocation and final failure if an allowance remains. | `CartOutcome`, `CartExternalBoundaries`, approval proof model |
+| CASE-12 | PAY-4 | Route with unused input and excess output. Revert in the final recipient callback. | Spread belongs to the signed account. Failure rolls back earlier transfers and reservations. | `CartSpreadRecipient`, `CartExternalBoundaries` |
+| CASE-13 | ATOM-1 | Reject the last ETH payment after real swaps and earlier split payouts. | Compare all participants' balances and allowance amounts. No fills, replay state, or logs survive. | Mixed-currency fork rollback case |
+| CASE-14 | ATOM-1, ADMIN-1 | Attempt a second funded purchase and seller invalidation from a receiver. Invalidate separately while paused. | Guard nested calls and allow legitimate seller invalidation while paused. | `CartAdversarial`, `CartSplits`, `CartVerification` |
+| CASE-15 | ADMIN-1, OPS-1 | Upgrade a seeded proxy from actual historical bytecode and test stale and fresh signatures. | Stable storage and approval target, with signature validity matching the migration. | `CartStorageLayout`, pre-split case in `CartSplits` |
+| CASE-16 | EVENT-1 | Decode a receipt with mixed line kinds and delegatecalled settlement events. | Correct proxy, payer, line kind, allocation, spread, and mint attribution. | Fork receipt and compiled ABI |
+| CASE-17 | SIZE-1 | Stress independent calldata and execution dimensions. Follow an oversized or reverted purchase with a valid independent checkout. | Structural limits hold and a failed call leaves no persistent effect. | Cart gas fixtures and rollback suites |
+| CASE-18 | AUTH-1, AUTH-2, INV-1, PAY-1 through PAY-5, ATOM-1 | Execute the required stateful sequence and varied generated histories. | Independent ledgers match after every successful and rejected operation. | Stateful-sequence requirements in workstream 11 |
+| CASE-19 | AUTH-2, PAY-1, PAY-3 | Introduce each specified fault in an isolated copy. | A targeted assertion detects each fault after its unchanged baseline succeeds. | Test-assertion requirements in workstream 11 |
+| CASE-20 | OPS-1 | Run the broadcast branches of the Cart wrappers against a disposable RPC node. | Deployment and upgrade transactions use node gas estimates with the configured multiplier and confirm sequentially. Required preflight checks still run. | Cart shell wrappers, Python sender, RPC request and receipt logs |
+| CASE-21 | PAY-1, PAY-5, ATOM-1 | Sign a wrong output or sweep recipient while leaving enough quote to pay all sellers. | Reject before router execution. Restore payer funds, fills, and replay state. | `CartRoutePolicy`, `CartRouteProtection`, fork third-party recipient cases |
+| CASE-22 | PAY-4, PAY-5, ATOM-1 | Omit native cleanup from an exact-output V4 route, then repeat with a sweep and distinct platform spread recipient. | Missing cleanup reverts despite sufficient seller output. With cleanup, the buyer pays the fixed quote, sellers receive signed amounts, and unused ETH becomes platform spread. | `CartRouteProtection`, native V4 refund/spread fork cases |
+| CASE-23 | PAY-2, PAY-5 | Leave additional tracked tokens in a preloaded router; include a decoded endpoint absent from settlement lines. | Compare against existing router balances, reject increases, and include endpoint assets in Cart custody and spread accounting. | `CartRouteProtection`, `CartRoutePolicy`, custody and fork fixtures |
+| CASE-24 | OPS-1 | Pair the new executor with a legacy policy or mismatched embedded policies. | Detect the incompatible asset-list return ABI and bundle configuration before deployment. Verify matching bundles preserve checkout hashing and storage. | Artifact verification, deployment rehearsal, Lens and routing fixtures |
 
-### Build one checkout for cross-workstream review
+### Combine the required cases in one checkout
 
-Use a caller funded in a supported ERC-20, a different NFT recipient, and a
-third signed spread recipient. Start with nonzero Cart ETH, WETH, payment
+Combine CASE-08 through CASE-13. Use a caller funded in a supported ERC-20,
+a different NFT recipient, and a third signed spread recipient. Start with
+nonzero Cart ETH, WETH, payment
 token, and output token balances. Include a seller-signed split Listing with
 two lines referencing one digest, a direct fee line, a routed ERC-20 output,
 and a final native ETH payout funded by the route. Deliver one NFT action
@@ -796,6 +905,44 @@ returns unused input to Cart.
    on a pinned fork. Record any controlled test substitution, including
    collection or receiver behavior.
 
+## Apply completion criteria
+
+Maintain one coverage record per invariant with these fields.
+
+| Field | Required evidence |
+| --- | --- |
+| Scope | Audited source SHA, artifact fingerprint, configuration, assumptions, and attacker-controlled inputs |
+| Review | Owner, code paths and external-call boundaries reviewed, independent reviewer, and resolved disagreements |
+| Execution | Required case IDs, test names, commands, result locations, and independent expected values |
+| Limits | Unsupported dependency behavior, unexecuted paths, environment blockers, and open questions |
+| Disposition | Confirmed findings, fix and retest evidence, or the reason the claim holds within its stated assumptions |
+
+Mark an invariant complete only when its applicable cases and review requirements
+are satisfied. An excluded case needs a concrete applicability reason. A blocked
+case stays open. For each unresolved finding, record severity, impact, owner,
+and either remediation evidence or explicit acceptance by the release owner.
+A passing suite alone does not close a finding.
+
+Source-review completion requires coverage records for every invariant, completion
+of CASE-18 and CASE-19, the required independent reviews, and dispositions for
+all candidates. If any requirement is missing, report the review as partial.
+
+Release-artifact verification additionally requires a reproducible candidate
+build, verified dependencies and immutables, and execution against the exact
+candidate bundle on the target chain's recorded state. For an existing proxy,
+require the applicable seeded-state upgrade and rollback rehearsal. For a fresh
+proxy, require initialization, domain, approval, and configuration checks.
+Complete CASE-20 on a disposable node with the candidate toolchain. Capture
+RPC estimation requests, configured gas margins, transaction order, and receipt
+confirmation for each changed broadcast path. Dry-run simulation covers a
+different script branch.
+
+Record source-review completion and release-artifact verification separately.
+Identify which evidence a new source change, compiler setting, dependency, or
+configuration invalidates and rerun those checks before updating either status.
+Backend transaction construction and signing-service review remain outside both
+completion criteria.
+
 ## Triage findings and close the audit
 
 1. Log each candidate once. Record the workstream, invariant, affected SHA
@@ -806,8 +953,8 @@ returns unused input to Cart.
    documentation mismatches, and coverage blockers. Keep modeled dependency
    failures distinct from confirmed production behavior.
 3. Require a deterministic test or exact transaction sequence and a second
-   review for every proposed high or medium finding. If a case depends on a
-   target client or route, establish that the actual release can reach it.
+   review for every proposed high or medium finding. If a case depends on a particular route or dependency, establish which
+   signed input and deployment make it reachable.
    Mark incomplete cases as needing reproduction or missing access.
 4. Assign severity by reachability and impact. Use the release's audit
    rubric when one exists. At minimum distinguish unauthorized loss,

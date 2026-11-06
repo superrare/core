@@ -204,6 +204,11 @@ interface ICart {
     error ExtraListing(uint256 listingIndex);
     error InvalidArrayLength();
     error InvalidFulfillmentAction(uint256 actionIndex);
+    /// @notice Fulfillment Actions must cover the line's required quantity exactly.
+    /// @param lineIndex Index of the line with incomplete or excessive coverage.
+    /// @param expected Required action quantity for this line.
+    /// @param actual Sum of the supplied action quantities for this line.
+    error InvalidFulfillmentCoverage(uint256 lineIndex, uint256 expected, uint256 actual);
     error InvalidFulfillmentResult(uint256 lineIndex, uint256 actionIndex, bytes result);
     error InvalidFulfillmentActionsHash();
     error InvalidListing();
@@ -214,6 +219,8 @@ interface ICart {
     error CancelledListing(bytes32 listingDigest);
     error InvalidMerkleProof(bytes32 root, bytes32 leaf);
     error InvalidRootIndex(uint256 index);
+    /// @notice Initialization requires a nonzero proxy owner.
+    error InvalidOwner();
     error InvalidOrderId();
     error InvalidSpreadRecipient();
     error InvalidOrderLinesHash();
@@ -233,6 +240,13 @@ interface ICart {
     error OrderLineFailed(uint256 lineIndex, FailureStage stage, bytes reason);
     error FulfillmentActionFailed(uint256 lineIndex, uint256 actionIndex, bytes reason);
 
+    /// @notice Initializes the proxy's administrative and settlement configuration once.
+    /// @dev Dependency addresses are validated by deployment tooling.
+    /// @param owner_ Nonzero account authorized to pause, rotate the signer, and upgrade.
+    /// @param platformSigner_ Account that validates platform Purchase Orders.
+    /// @param universalRouter_ Router used for the signed settlement program.
+    /// @param permit2_ Permit2 deployment used for temporary router allowances.
+    /// @param weth_ Wrapped native token used for ETH/WETH settlement.
     function initialize(
         address owner_,
         address platformSigner_,
@@ -252,7 +266,10 @@ interface ICart {
     ///      its inventory bucket. Listing witnesses are independently seller-authorized.
     ///      Validation precedes inventory reservation and settlement. A later failure reverts all
     ///      transfers, fills, replay writes, and logs. Indexed errors identify the failing line or
-    ///      action where available; nested external-call failures retain their revert data.
+    ///      action where available. Native payout and spread failures retain at most the first
+    ///      2048 revert bytes. ERC-20 failures bubble directly from SafeERC20; Cart wraps
+    ///      recipient balance mismatches with the payout or spread stage.
+    ///      Router and fulfillment failures retain nested revert data.
     /// @param order Fixed quote, spread recipient, deadline, replay identifier, and payload hashes.
     /// @param lines Ordered charges. Their nonzero listingDigest resolves to one supplied Listing.
     /// @param listings Deduplicated seller Listings. Every supplied Listing must be used by a line.

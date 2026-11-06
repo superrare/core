@@ -122,6 +122,20 @@ contract CartTestRouter {
         revertExecution = value;
     }
 
+    bool public retainNative;
+
+    function configureRetainNative(bool value) external {
+        retainNative = value;
+    }
+
+    function _spendNativeInput() private {
+        if (!retainNative && msg.value != 0) {
+            uint256 amount = address(this).balance < msg.value ? address(this).balance : msg.value;
+            (bool ok,) = address(0xdead).call{value: amount}("");
+            require(ok, "mock input spend failed");
+        }
+    }
+
     function execute(bytes calldata commands, bytes[] calldata inputs, uint256) external payable {
         executeCalls++;
         lastRouterValue = msg.value;
@@ -144,6 +158,7 @@ contract CartTestRouter {
                     ICartTestMintableToken(multiOutputTokens[i]).mint(recipient, multiOutputAmounts[i]);
                 }
             }
+            _spendNativeInput();
             return;
         }
         if (settlementMode) {
@@ -174,6 +189,7 @@ contract CartTestRouter {
             outputToken.mint(msg.sender, outputAmount);
         }
         if (retainedAmount != 0) outputToken.mint(address(this), retainedAmount);
+        _spendNativeInput();
     }
 
     receive() external payable {}

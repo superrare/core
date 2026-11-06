@@ -127,7 +127,7 @@ contract CartSpreadRecipientTest is CartFixture {
             ICart.PayoutRoute memory route;
             route.commands = hex"08";
             route.inputs = new bytes[](1);
-            route.inputs[0] = bytes("opaque");
+            route.inputs[0] = _mockRouteInput(0x08);
             router.configure(address(output), 1.25 ether, 0, false);
             ICart.PurchaseOrder memory order =
                 _orderSingle(i == 0 ? "token-first" : "token-second", input, lines, route, 2 ether);
@@ -165,7 +165,7 @@ contract CartSpreadRecipientTest is CartFixture {
         ICart.ListingPurchaseAuthorization memory authorization = _rootAuthorization(listings, SELLER_PK);
         bytes memory signature = _sign(PLATFORM_PK, _orderDigest(order));
         vm.deal(payer, order.paymentAmount);
-        vm.expectRevert(abi.encodeWithSelector(ICart.OrderLineFailed.selector, 0, ICart.FailureStage.SPREAD, bytes("")));
+        vm.expectRevert(abi.encodeWithSelector(ICart.OrderLineFailed.selector, 0, ICart.FailureStage.SPREAD, abi.encodeWithSignature("Error(string)", "payout rejected")));
         vm.prank(payer);
         cart.executePurchase{value: order.paymentAmount}(
             order, lines, listings, authorization, route, actions, signature

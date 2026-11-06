@@ -39,7 +39,7 @@ The transaction builder, SDK, CLI, and settlement consumers are maintained outsi
 
 [NetworkConfig](../script/NetworkConfig.s.sol) records the fresh Sepolia suite deployed on November 1, 2026. The [deployment record](cart-sepolia-fresh-2026-11-01.md) and [receipt ledger](data/cart-sepolia-fresh-2026-11-01.json) document the new proxy, implementation, route policy, payments executor, Lens, and Hashes helper. This deployment includes signed spread recipients, per-listing splits, and indexed payout aggregation.
 
-The previous proxy is paused. The [October 27](cart-sepolia-free-listings-2026-10-27.md) and [October 26](cart-sepolia-upgrade-2026-10-26.md) records retain deployment history. SDK and application rollout to the new suite remains pending. Old proxy signatures cannot authorize the new proxy, and clients need the current ABI, fresh signatures, and approvals for the new address.
+The previous proxy is paused. The [October 27](cart-sepolia-free-listings-2026-10-27.md) and [October 26](cart-sepolia-upgrade-2026-10-26.md) records retain deployment history. SDK and application rollout were pending at the deployment checkpoint. Confirm current consumer configuration separately. Old proxy signatures cannot authorize the new proxy, and clients need the current ABI, fresh signatures, and approvals for the new address.
 
 These records establish Sepolia deployment only. Other chains require separate deployment evidence. Existing scripts in [script/cart](../script/cart) cover fresh deployment and scoped upgrades; the checkout guard rejects detached, dirty, or stale deployment sources.
 
@@ -51,11 +51,11 @@ Run the Cart unit, fuzz, invariant, and storage-upgrade tests from the repositor
 FOUNDRY_PROFILE=cart forge test --offline
 ```
 
-The profile selects [src/test/cart](../src/test/cart). Shared setup and builders live in abstract fixtures, and token/router mocks live in `CartMocks.sol`; executable suites inherit fixtures without inheriting other suites' tests. Live-dependency fork tests in [src/test/forks/ethereum/cart](../src/test/forks/ethereum/cart) require a separate RPC-backed run. The [November 2 fork report](cart-mainnet-fork-verification.md) records 17 passing tests against mainnet block 25,800,000, including mixed-currency seller-signed splits and payout-failure rollback. Historical gas reports use their recorded environments and do not replace current RPC estimates.
+The profile selects [src/test/cart](../src/test/cart). Shared setup and builders live in abstract fixtures, and token/router mocks live in `CartMocks.sol`; executable suites inherit fixtures without inheriting other suites' tests. Live-dependency fork tests in [src/test/forks/ethereum/cart](../src/test/forks/ethereum/cart) require a separate RPC-backed run. The [mainnet fork guide](cart-mainnet-fork-verification.md) covers the pinned dependency fixtures, including mixed-currency seller-signed splits and payout-failure rollback.
 
 The [formal-verification project](../verification/cart/README.md) documents its modeled properties and limitations. Its saved results are separate evidence from the native test suite and must be checked against the source used for any new proof claim.
 
-The [cleanup verification](cart-cleanup-verification.md) records preserved test scenarios, ABI and storage checks, runtime sizes, and checkout-gas comparisons for the internal refactor.
+The [refactor verification guide](cart-cleanup-verification.md) covers ABI and storage comparisons, runtime sizes, and checkout gas.
 
 The [signed spread-recipient verification](cart-signed-spread-verification.md) records tests, gas, runtime sizes, ABI changes, and reserved-slot checks for the checkout interface change.
 

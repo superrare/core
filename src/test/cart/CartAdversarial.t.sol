@@ -270,7 +270,7 @@ contract CartAdversarialTest is CartFixture {
         p.actions = new ICart.FulfillmentAction[](0);
         _signPurchase(p);
         _assertPreflight(p);
-        _assertReverts(p, abi.encodeWithSelector(ICart.InvalidFulfillmentAction.selector, 0));
+        _assertReverts(p, abi.encodeWithSelector(ICart.InvalidFulfillmentCoverage.selector, 0, 1, 0));
         assertEq(token.ownerOf(1), seller);
     }
 
@@ -432,6 +432,7 @@ contract CartAdversarialTest is CartFixture {
         Purchase memory p = _purchase(listing, false);
         p.lines[0].settlementCurrency = address(token);
         p.route = ICart.PayoutRoute(hex"08", new bytes[](1), 1 ether);
+        p.route.inputs[0] = _mockRouteInput(0x08);
         router.configure(address(token), 1 ether, 0, false);
         _signPurchase(p);
         _assertReverts(
@@ -455,6 +456,7 @@ contract CartAdversarialTest is CartFixture {
         p.authorization = _rootAuthorization(p.listings, SELLER_PK);
         p.actions[0].recipient = address(receiver);
         p.route = ICart.PayoutRoute(hex"08", new bytes[](1), 1 ether);
+        p.route.inputs[0] = _mockRouteInput(0x08);
         router.configure(address(token), 1 ether, 0, false);
         _signPurchase(p);
         // The payout is exact, but consuming one wei of the baseline must roll everything back.

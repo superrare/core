@@ -19,7 +19,7 @@ A fresh Cart suite was deployed from commit `593f13bf465b43c2ace4f37fe246b704c16
 
 Deployment used the fresh constructor and initialization sequence in `script/cart/CartDeploy.s.sol`, plus new Lens and Hashes contracts. A local orchestration adapter reused `Upgrade.deploy` and `Upgrade.send` from `tools/upgradeCartFreeListings.py` for live RPC estimation, a 25 percent gas margin, nonce checks, sequential receipt confirmation, and runtime comparison. It did not call an upgrade function. The checkout guard verified the remote PR head before broadcast. Compiled artifact metadata source hashes were checked against the checkout before deployment.
 
-All six deployed runtimes match the compiled Solidity 0.8.18, via IR, optimizer 100 artifacts after checking immutable addresses. The proxy implementation slot points to the new Cart implementation. Owner, platform signer, Universal Router, Permit2, and WETH match the previous deployment. The new proxy is unpaused. Its reserved former treasury slot is zero.
+All six deployed runtimes match the compiled Solidity 0.8.18, via IR, optimizer 100 artifacts after checking immutable addresses. To reproduce the build, recover the original compiler input, including EVM target, and the pinned dependency revisions. This record captures the artifact hashes and runtime comparison but does not capture the full compiler input. The proxy implementation slot points to the new Cart implementation. Owner, platform signer, Universal Router, Permit2, and WETH match the previous deployment. The new proxy is unpaused. Its reserved former treasury slot is zero.
 
 Owner: `0xba68422a154e459f7b4992a95ad358d412b6bd1d`.
 
@@ -27,7 +27,7 @@ Platform signer: `0xf7885c18e2757fbaea2dcfff3ac0df94520f4eae`.
 
 New domain separator: `0x84247b6ba9142a2eb9368b858cabe552cc1a10d72da904192da2e1271379ccb2`. The new proxy address changes the EIP-712 domain, so signatures for the old proxy cannot authorize this deployment.
 
-The current source includes signed order spread recipients, seller-signed per-listing splits, and indexed payout aggregation. The split suite passed 26 tests before deployment. Runtime and configuration verification were performed on Sepolia; no signed end-to-end checkout against the new deployment was submitted during this rollout.
+The current source includes signed order spread recipients, seller-signed per-listing splits, and indexed payout aggregation. Runtime and configuration verification were performed on Sepolia; no signed end-to-end checkout against the new deployment was submitted during this rollout.
 
 ## Transactions
 
@@ -47,4 +47,4 @@ The old proxy, `0x1ebf35b3a76caef60a009d2786a66a91d42a38bc`, is confirmed paused
 
 The new proxy starts with empty listing fill, cancellation, seller nonce, and order replay state. No old inventory or cancellation history was migrated. Recreated test listings must use intended remaining quantities and fresh seller authorizations.
 
-SDK, frontend, backend, and indexer configuration updates have not been performed. Stop at this deployment checkpoint before beginning that integration work. Consumers will need the new addresses, current ABI, regenerated listing roots and order signatures, and approvals for the new proxy. The SDK rollout and representative live checkouts remain pending.
+SDK, frontend, backend, and indexer cutover were pending at this deployment checkpoint. Confirm current consumer configuration separately. The new proxy requires its own approvals and signatures, current ABI bindings, and regenerated Listing Roots.

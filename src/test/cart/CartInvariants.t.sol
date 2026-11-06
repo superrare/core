@@ -176,10 +176,13 @@ contract CartInvariantsTest is Test {
         }
     }
 
-    function _route(uint256 routerValue) private pure returns (ICart.PayoutRoute memory route) {
+    function _route(uint256 routerValue) private view returns (ICart.PayoutRoute memory route) {
         route.commands = hex"08";
         route.inputs = new bytes[](1);
-        route.inputs[0] = bytes("opaque");
+        address[] memory path = new address[](2);
+        path[0] = address(paymentToken);
+        path[1] = address(outputToken);
+        route.inputs[0] = abi.encode(address(1), uint256(0), uint256(0), path, true);
         route.routerValue = routerValue;
     }
 

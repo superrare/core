@@ -9,6 +9,7 @@ import {CartHashes} from "../../../../cart/CartHashes.sol";
 import {CartPayments} from "../../../../cart/CartPayments.sol";
 import {CartRoutePolicy} from "../../../../cart/CartRoutePolicy.sol";
 import {ICart} from "../../../../cart/ICart.sol";
+import {ICartRoutePolicy} from "../../../../cart/ICartRoutePolicy.sol";
 
 interface IERC20Template {
     function approve(address spender, uint256 amount) external returns (bool);
@@ -247,9 +248,8 @@ contract CartUniversalRouterTemplatesEthereumTest is Test {
         assertGt(V3_WETH_DAI_3000.code.length, 0, "Pinned V3 WETH/DAI pool has no code");
         assertGt(V4_POOL_MANAGER.code.length, 0, "Pinned V4 PoolManager has no code");
 
-        PoolKey memory poolKey = PoolKey({
-            currency0: address(0), currency1: USDC, fee: 500, tickSpacing: 10, hooks: address(0)
-        });
+        PoolKey memory poolKey =
+            PoolKey({currency0: address(0), currency1: USDC, fee: 500, tickSpacing: 10, hooks: address(0)});
         assertEq(keccak256(abi.encode(poolKey)), V4_ETH_USDC_POOL_ID, "Unexpected V4 ETH/USDC pool id");
     }
 
@@ -384,9 +384,8 @@ contract CartUniversalRouterCartEthereumTest is Test {
         CartRoutePolicy routePolicy = new CartRoutePolicy();
         CartPayments paymentExecutor = new CartPayments(address(routePolicy));
         Cart implementation = new Cart(address(routePolicy), address(paymentExecutor));
-        bytes memory initData = abi.encodeCall(
-            Cart.initialize, (address(this), vm.addr(PLATFORM_PK), UNIVERSAL_ROUTER, PERMIT2, WETH)
-        );
+        bytes memory initData =
+            abi.encodeCall(Cart.initialize, (address(this), vm.addr(PLATFORM_PK), UNIVERSAL_ROUTER, PERMIT2, WETH));
         cart = Cart(payable(address(new ERC1967Proxy(address(implementation), initData))));
         hashes = new CartHashes();
     }
@@ -461,8 +460,12 @@ contract CartUniversalRouterCartEthereumTest is Test {
             auth.listingRootSignatures[i] = _sign(hashes.hashListingRoot(cart.DOMAIN_SEPARATOR(), auth.listingRoots[i]));
             auth.listingRootIndexes[i] = i;
             auth.listingProofs[i] = new bytes32[](0);
-            lines[i] = ICart.OrderLine(listings[i].sku, digest, ICart.FulfillmentKind.OFF_CHAIN, 1,
-                listings[i].settlementCurrency, i == 0 ? 1 ether + 3 : i == 1 ? 1_000_001 : 0.1 ether, primary);
+            lines[i] = ICart.OrderLine(
+                listings[i].sku,
+                digest, ICart.FulfillmentKind.OFF_CHAIN, 1,
+                listings[i].settlementCurrency, i == 0 ? 1 ether + 3 : i == 1 ? 1_000_001 : 0.1 ether,
+                primary
+            );
         }
         lines[3] = _directLine(address(0), 0.001 ether, fee, "fee");
         ICart.PayoutRoute memory route = _nativeV3V4Route(0.001 ether, 0.001 ether);
@@ -482,16 +485,24 @@ contract CartUniversalRouterCartEthereumTest is Test {
         vm.deal(address(cart), 17);
         beforeBalances[7] = address(this).balance;
         bytes memory signature = _sign(_orderDigest(order));
-        if (rejectFee) vm.expectRevert(abi.encodeWithSelector(ICart.OrderLineFailed.selector, 3, ICart.FailureStage.PAYOUT, bytes("")));
-        cart.executePurchase{value: order.paymentAmount}(order, lines, listings, auth, route,
-            new ICart.FulfillmentAction[](0), signature);
+        if (rejectFee) {
+            vm.expectRevert(
+                abi.encodeWithSelector(ICart.OrderLineFailed.selector, 3, ICart.FailureStage.PAYOUT, abi.encodeWithSignature("Error(string)", "reject"))
+            );
+        }
+        cart.executePurchase{value: order.paymentAmount}(
+            order, lines, listings, auth, route,
+            new ICart.FulfillmentAction[](0), signature
+        );
         assertEq(IERC20Template(DAI).balanceOf(primary), beforeBalances[0] + (rejectFee ? 0 : 0.9 ether + 3));
         assertEq(IERC20Template(DAI).balanceOf(secondary), beforeBalances[1] + (rejectFee ? 0 : 0.2 ether));
         assertEq(IERC20Template(USDC).balanceOf(primary), beforeBalances[2] + (rejectFee ? 0 : 500_001));
         assertEq(IERC20Template(USDC).balanceOf(secondary), beforeBalances[3] + (rejectFee ? 0 : 500_000));
         assertEq(primary.balance, beforeBalances[4] + (rejectFee ? 0 : 0.001 ether));
         assertEq(cart.executedOrderIds(order.orderId), !rejectFee);
-        for (uint256 i; i < 3; ++i) assertEq(cart.filledQuantity(lines[i].listingDigest), rejectFee ? 0 : 1);
+        for (uint256 i; i < 3; ++i) {
+            assertEq(cart.filledQuantity(lines[i].listingDigest), rejectFee ? 0 : 1);
+        }
         if (rejectFee) {
             assertEq(address(this).balance, beforeBalances[7]);
             assertEq(IERC20Template(DAI).balanceOf(address(this)), beforeBalances[5]);
@@ -509,9 +520,7 @@ contract CartUniversalRouterCartEthereumTest is Test {
         ICart.PayoutRoute memory quoteRoute = _nativeV3DaiToRecipientRoute(amountIn, address(1));
         uint256 beforeOutput = IERC20Template(DAI).balanceOf(address(this));
         vm.deal(address(this), amountIn);
-        router.execute{value: amountIn}(
-            quoteRoute.commands, quoteRoute.inputs, block.timestamp + 1 days
-        );
+        router.execute{value: amountIn}(quoteRoute.commands, quoteRoute.inputs, block.timestamp + 1 days);
         uint256 actualOutput = IERC20Template(DAI).balanceOf(address(this)) - beforeOutput;
         assertGt(actualOutput, 0, "Pinned V3 quote returned no DAI");
         assertTrue(vm.revertTo(snapshotId));
@@ -564,7 +573,8 @@ contract CartUniversalRouterCartEthereumTest is Test {
         vm.deal(address(this), quote);
         vm.expectRevert(
             abi.encodeWithSelector(
-                ICart.OrderLineFailed.selector, 0, ICart.FailureStage.ROUTING, abi.encode(uint256(0), uint256(1))
+                ICart.OrderLineFailed.selector, 0, ICart.FailureStage.ROUTING,
+                abi.encodeWithSelector(ICartRoutePolicy.InvalidRouteRecipient.selector, 1, attacker)
             )
         );
         cart.executePurchase{value: quote}(
@@ -602,10 +612,15 @@ contract CartUniversalRouterCartEthereumTest is Test {
         ICart.OrderLine[] memory lines = new ICart.OrderLine[](1);
         lines[0] = _currencyLine(USDC, 1, address(0x1402), "unnamed-token-sweep");
         vm.deal(address(this), quote);
-        _executeNative("unnamed-token-sweep", quote, lines, route);
-        assertEq(IERC20Template(DAI).balanceOf(attacker), attackerBefore + 7 ether);
-        assertEq(IERC20Template(DAI).balanceOf(UNIVERSAL_ROUTER), 0);
-        assertEq(IERC20Template(USDC).balanceOf(address(0x1402)), 1);
+        ICart.PurchaseOrder memory order = _order("unnamed-token-sweep", address(0), quote, lines, route);
+        bytes memory signature = _sign(_orderDigest(order));
+        vm.expectRevert(abi.encodeWithSelector(ICart.OrderLineFailed.selector, 0, ICart.FailureStage.ROUTING,
+            abi.encodeWithSelector(ICartRoutePolicy.InvalidRouteRecipient.selector, 2, attacker)));
+        cart.executePurchase{value: quote}(order, lines, new ICart.Listing[](0), _emptyAuthorization(),
+            route, new ICart.FulfillmentAction[](0), signature);
+        assertEq(IERC20Template(DAI).balanceOf(attacker), attackerBefore);
+        assertEq(IERC20Template(DAI).balanceOf(UNIVERSAL_ROUTER), 7 ether);
+        assertEq(IERC20Template(USDC).balanceOf(address(0x1402)), 0);
         assertEq(IERC20Template(DAI).allowance(address(cart), PERMIT2), 0);
         (uint160 amount,,) = IPermit2Template(PERMIT2).allowance(address(cart), DAI, UNIVERSAL_ROUTER);
         assertEq(amount, 0);
@@ -637,6 +652,7 @@ contract CartUniversalRouterCartEthereumTest is Test {
     }
 
     function testCartWethTransferUnwrapAndNativeV4Route() public {
+        setUp();
         uint256 amount = 0.001 ether;
         ICart.PayoutRoute memory route = _wethToNativeV4Route(amount);
         ICart.OrderLine[] memory lines = new ICart.OrderLine[](1);
@@ -659,6 +675,7 @@ contract CartUniversalRouterCartEthereumTest is Test {
     }
 
     function testCartV3ExactOutputRefundBecomesProtocolSpread() public {
+        setUp();
         uint256 maxInput = 0.01 ether;
         uint256 outputAmount = 1_000_000;
         ICart.PayoutRoute memory route = _wethV3ExactOutputRoute(maxInput, outputAmount);
@@ -678,6 +695,97 @@ contract CartUniversalRouterCartEthereumTest is Test {
         assertEq(IERC20Template(WETH).allowance(address(cart), PERMIT2), 0);
         (uint160 amountAfter,,) = IPermit2Template(PERMIT2).allowance(address(cart), WETH, UNIVERSAL_ROUTER);
         assertEq(amountAfter, 0);
+    }
+
+    struct V4ExactOutputParams {
+        PoolKey poolKey;
+        bool zeroForOne;
+        uint128 amountOut;
+        uint128 amountInMaximum;
+        bytes hookData;
+    }
+
+    /// @notice Exact-output native surplus must return to Cart or the whole checkout reverts.
+    function testCartV4ExactOutputRequiresNativeRefund() public {
+        _nativeRefundBenchmark(true);
+    }
+
+    function testCartV4ExactInputNativeRefundAndSpreadGas() public {
+        _nativeRefundBenchmark(false);
+    }
+
+    /// @dev Both modes return unused native input to Cart, which pays the signed spread recipient.
+    function _nativeRefundBenchmark(bool exactOutput) private {
+        // Activate the fork in this test call as well as setUp, so Cancun opcodes remain active.
+        setUp();
+        uint256 maxInput = 0.01 ether;
+        V4ExactOutputParams memory swap = V4ExactOutputParams({
+            poolKey: PoolKey(address(0), USDC, 500, 10, address(0)),
+            zeroForOne: true,
+            amountOut: exactOutput ? 1_000_000 : uint128(0.001 ether),
+            amountInMaximum: exactOutput ? uint128(maxInput) : uint128(1_000_000),
+            hookData: hex""
+        });
+        bytes[] memory params = new bytes[](3);
+        params[0] = abi.encode(swap);
+        params[1] = abi.encode(address(0), maxInput);
+        params[2] = abi.encode(USDC, uint256(1_000_000));
+        ICart.PayoutRoute memory route;
+        route.commands = hex"10";
+        route.inputs = new bytes[](1);
+        route.inputs[0] = abi.encode(exactOutput ? hex"080c0f" : hex"060c0f", params);
+        route.routerValue = maxInput;
+        ICart.OrderLine[] memory lines = new ICart.OrderLine[](1);
+        lines[0] = _currencyLine(USDC, 1_000_000, address(0x1301), "v4-refund");
+        vm.deal(address(this), maxInput);
+        uint256 routerBefore = UNIVERSAL_ROUTER.balance;
+        ICart.PurchaseOrder memory rejected = _order("missing-v4-refund", address(0), maxInput, lines, route);
+        bytes memory rejectedSignature = _sign(_orderDigest(rejected));
+        bytes memory payload = abi.encodeCall(ICart.executePurchase, (rejected, lines, new ICart.Listing[](0),
+            _emptyAuthorization(), route, new ICart.FulfillmentAction[](0), rejectedSignature));
+        (bool ok, bytes memory reason) = address(cart).call{value: maxInput}(payload);
+        assertFalse(ok);
+        assertEq(bytes4(reason), ICart.OrderLineFailed.selector);
+        bytes4 nested;
+        assembly ("memory-safe") { nested := mload(add(reason, 164)) }
+        assertEq(nested, ICartRoutePolicy.RouterBalanceIncreased.selector);
+        assertEq(UNIVERSAL_ROUTER.balance, routerBefore);
+        assertFalse(cart.executedOrderIds(keccak256("missing-v4-refund")));
+        assertEq(IERC20Template(USDC).balanceOf(address(0x1301)), 0);
+
+        bytes[] memory refunded = new bytes[](2);
+        refunded[0] = route.inputs[0];
+        refunded[1] = abi.encode(address(0), address(1), uint256(0));
+        route.commands = hex"1004";
+        route.inputs = refunded;
+        // The buyer pays the full signed quote. Favorable execution goes to the platform.
+        address platform = address(0x5150);
+        ICart.PurchaseOrder memory order = _order("refunded-v4", address(0), maxInput, lines, route);
+        order.spreadRecipient = platform;
+        bytes memory signature = _sign(_orderDigest(order));
+        bytes memory callData = abi.encodeCall(ICart.executePurchase, (order, lines, new ICart.Listing[](0),
+            _emptyAuthorization(), route, new ICart.FulfillmentAction[](0), signature));
+        uint256 intrinsic = 21000;
+        for (uint256 i; i < callData.length; ++i) intrinsic += callData[i] == 0 ? 4 : 16;
+        uint256 buyerBefore = address(this).balance;
+        uint256 platformBefore = platform.balance;
+        uint256 start = gasleft();
+        (bool success, bytes memory result) = address(cart).call{value: maxInput}(callData);
+        uint256 used = start - gasleft();
+        if (!success) assembly ("memory-safe") { revert(add(result, 32), mload(result)) }
+        emit log_named_uint(exactOutput ? "native exact-output checkout call gas" : "native exact-input checkout call gas", used);
+        emit log_named_uint("native checkout intrinsic gas", intrinsic);
+        emit log_named_uint("native checkout calldata bytes", callData.length);
+        assertEq(IERC20Template(USDC).balanceOf(address(0x1301)), 1_000_000);
+        assertEq(address(this).balance, buyerBefore - maxInput);
+        assertGt(platform.balance, platformBefore);
+        if (!exactOutput) {
+            assertEq(platform.balance - platformBefore, maxInput - 0.001 ether);
+            assertGt(IERC20Template(USDC).balanceOf(platform), 0);
+        }
+        assertEq(address(cart).balance, 0);
+        assertEq(IERC20Template(USDC).balanceOf(address(cart)), 0);
+        assertLe(UNIVERSAL_ROUTER.balance, routerBefore);
     }
 
     function _executeNative(
@@ -790,9 +898,7 @@ contract CartUniversalRouterCartEthereumTest is Test {
         route.commands = hex"0b00";
         route.inputs = new bytes[](2);
         route.inputs[0] = abi.encode(address(2), amount);
-        route.inputs[1] = abi.encode(
-            recipient, amount, 1, abi.encodePacked(WETH, uint24(3000), DAI), false
-        );
+        route.inputs[1] = abi.encode(recipient, amount, 1, abi.encodePacked(WETH, uint24(3000), DAI), false);
         route.routerValue = amount;
     }
 
@@ -826,9 +932,8 @@ contract CartUniversalRouterCartEthereumTest is Test {
         route.commands = hex"020104";
         route.inputs = new bytes[](3);
         route.inputs[0] = abi.encode(WETH, address(2), uint160(maxInput));
-        route.inputs[1] = abi.encode(
-            address(1), outputAmount, maxInput, abi.encodePacked(USDC, uint24(500), WETH), false
-        );
+        route.inputs[1] =
+            abi.encode(address(1), outputAmount, maxInput, abi.encodePacked(USDC, uint24(500), WETH), false);
         route.inputs[2] = abi.encode(WETH, address(1), 0);
     }
 
@@ -861,9 +966,8 @@ contract CartUniversalRouterCartEthereumTest is Test {
         assertGt(V3_WETH_DAI_3000.code.length, 0, "Pinned V3 WETH/DAI pool has no code");
         assertGt(V4_POOL_MANAGER.code.length, 0, "Pinned V4 PoolManager has no code");
 
-        PoolKey memory poolKey = PoolKey({
-            currency0: address(0), currency1: USDC, fee: 500, tickSpacing: 10, hooks: address(0)
-        });
+        PoolKey memory poolKey =
+            PoolKey({currency0: address(0), currency1: USDC, fee: 500, tickSpacing: 10, hooks: address(0)});
         assertEq(keccak256(abi.encode(poolKey)), V4_ETH_USDC_POOL_ID, "Unexpected V4 ETH/USDC pool id");
     }
 

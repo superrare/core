@@ -39,6 +39,8 @@ contract CartPayments is CartStorage, ICartPayments {
         bytes32 indexed orderId, address indexed currency, address indexed recipient, uint256 amount
     );
 
+    // Bound failure diagnostics without copying arbitrary receiver return data.
+    uint256 private constant MAX_NATIVE_REVERT_BYTES = 2048;
     uint256 private constant NO_GROUP = type(uint256).max;
 
     ICartRoutePolicy private immutable ROUTE_POLICY;
@@ -68,8 +70,8 @@ contract CartPayments is CartStorage, ICartPayments {
         ICart.PayoutRoute calldata route
     ) external payable onlyDelegateCall returns (PaymentState memory state) {
         // Validate the route before collecting the currencies whose balances must be preserved.
-        _validateRoute(route);
-        address[] memory settlementTokens = _settlementTokens(order.paymentCurrency, lines);
+        address[] memory routeAssets = _validateRoute(route);
+        address[] memory settlementTokens = _settlementTokens(order.paymentCurrency, lines, routeAssets);
 
         // Snapshot preexisting custody before collecting the caller's payment.
         state.nativeBaseline = address(this).balance - msg.value;
@@ -80,7 +82,7 @@ contract CartPayments is CartStorage, ICartPayments {
         }
         // Collect the fixed quote, run its signed route, then require enough incremental assets.
         _fundPayment(order, route);
-        _executeRoute(order, route);
+        _executeRoute(order, route, settlementTokens);
         _verifySolvency(lines, state.assetSnapshots, state.nativeBaseline);
     }
 
@@ -105,7 +107,7 @@ contract CartPayments is CartStorage, ICartPayments {
         }
     }
 
-    function _validateRoute(ICart.PayoutRoute calldata route) private view {
+    function _validateRoute(ICart.PayoutRoute calldata route) private view returns (address[] memory assets) {
         if (route.commands.length == 0) {
             if (route.inputs.length != 0) {
                 revert ICart.OrderLineFailed(
@@ -118,27 +120,32 @@ contract CartPayments is CartStorage, ICartPayments {
             }
             if (route.routerValue != 0) revert ICart.RouteValueWithoutCommands();
         } else {
-            try ROUTE_POLICY.validate(route.commands, route.inputs) {}
+            try ROUTE_POLICY.validate(route.commands, route.inputs) returns (address[] memory tokens) {
+                assets = tokens;
+            }
             catch (bytes memory reason) {
                 revert ICart.OrderLineFailed(0, ICart.FailureStage.ROUTING, reason);
             }
         }
     }
 
-    function _settlementTokens(address paymentCurrency, ICart.OrderLine[] calldata lines)
+    function _settlementTokens(address paymentCurrency, ICart.OrderLine[] calldata lines, address[] memory routeAssets)
         private
         view
         returns (address[] memory tokens)
     {
-        // The order defines the complete supported settlement universe. WETH is always tracked
+        // Track settlement and route endpoint assets. WETH is always tracked
         // because native ETH and WETH share solvency while retaining distinct payout forms.
-        tokens = new address[](lines.length + 2);
+        tokens = new address[](lines.length + 2 + routeAssets.length);
         uint256 count = _recordToken(tokens, 0, _cartConfig().weth);
         if (paymentCurrency != address(0)) count = _recordToken(tokens, count, paymentCurrency);
         for (uint256 i = 0; i < lines.length; ++i) {
             if (lines[i].settlementCurrency != address(0)) {
                 count = _recordToken(tokens, count, lines[i].settlementCurrency);
             }
+        }
+        for (uint256 i; i < routeAssets.length; ++i) {
+            if (routeAssets[i] != address(0)) count = _recordToken(tokens, count, routeAssets[i]);
         }
         assembly {
             mstore(tokens, count)
@@ -164,7 +171,11 @@ contract CartPayments is CartStorage, ICartPayments {
         }
     }
 
-    function _executeRoute(ICart.PurchaseOrder calldata order, ICart.PayoutRoute calldata route) private {
+    function _executeRoute(
+        ICart.PurchaseOrder calldata order,
+        ICart.PayoutRoute calldata route,
+        address[] memory tokens
+    ) private {
         if (route.commands.length == 0) return;
 
         CartStorage.Config storage config = _cartConfig();
@@ -182,12 +193,43 @@ contract CartPayments is CartStorage, ICartPayments {
                 );
         }
 
+        // A shared router may already hold funds. This purchase must not add to those balances.
+        uint256 nativeBefore = config.universalRouter.balance;
+        uint256[] memory balances = new uint256[](tokens.length);
+        for (uint256 i; i < tokens.length; ++i) {
+            balances[i] = IERC20(tokens[i]).balanceOf(config.universalRouter);
+        }
         bytes memory data =
             abi.encodeWithSignature("execute(bytes,bytes[],uint256)", route.commands, route.inputs, order.deadline);
         (bool success, bytes memory reason) = config.universalRouter.call{value: route.routerValue}(data);
         if (!success) revert ICart.OrderLineFailed(0, ICart.FailureStage.ROUTING, reason);
 
-        // Revoke both approval layers immediately after the opaque router call returns.
+        if (config.universalRouter.balance > nativeBefore) {
+            revert ICart.OrderLineFailed(
+                0,
+                ICart.FailureStage.ROUTING,
+                abi.encodeWithSelector(
+                    ICartRoutePolicy.RouterBalanceIncreased.selector,
+                    address(0),
+                    nativeBefore,
+                    config.universalRouter.balance
+                )
+            );
+        }
+        for (uint256 i; i < tokens.length; ++i) {
+            uint256 afterBalance = IERC20(tokens[i]).balanceOf(config.universalRouter);
+            if (afterBalance > balances[i]) {
+                revert ICart.OrderLineFailed(
+                    0,
+                    ICart.FailureStage.ROUTING,
+                    abi.encodeWithSelector(
+                        ICartRoutePolicy.RouterBalanceIncreased.selector, tokens[i], balances[i], afterBalance
+                    )
+                );
+            }
+        }
+
+        // Revoke both approval layers before fulfillment.
         if (order.paymentCurrency != address(0)) {
             IERC20(order.paymentCurrency).forceApprove(config.permit2, 0);
             IPermit2Cart(config.permit2).approve(order.paymentCurrency, config.universalRouter, 0, 0);
@@ -303,10 +345,9 @@ contract CartPayments is CartStorage, ICartPayments {
         for (uint256 i = 0; i < count; ++i) {
             Payout memory payout = payouts[i];
             if (payout.currency == address(0)) {
-                (bool success,) = payout.recipient.call{value: payout.amount}("");
-                if (!success) revert ICart.OrderLineFailed(payout.lineIndex, ICart.FailureStage.PAYOUT, "");
+                _transferNative(payout.recipient, payout.amount, payout.lineIndex, ICart.FailureStage.PAYOUT);
             } else {
-                _transferExact(payout.currency, payout.recipient, payout.amount, payout.lineIndex);
+                _transferExact(payout.currency, payout.recipient, payout.amount, payout.lineIndex, ICart.FailureStage.PAYOUT);
             }
         }
     }
@@ -372,7 +413,7 @@ contract CartPayments is CartStorage, ICartPayments {
             }
             uint256 spread = current - snapshot.cartBalance;
             if (spread != 0) {
-                _transferExact(snapshot.token, recipient, spread, 0);
+                _transferExact(snapshot.token, recipient, spread, 0, ICart.FailureStage.SPREAD);
                 emit ProtocolSpreadCaptured(orderId, snapshot.token, recipient, spread);
             }
         }
@@ -383,8 +424,7 @@ contract CartPayments is CartStorage, ICartPayments {
         }
         uint256 nativeSpread = nativeCurrent - state.nativeBaseline;
         if (nativeSpread != 0) {
-            (bool success,) = recipient.call{value: nativeSpread}("");
-            if (!success) revert ICart.OrderLineFailed(0, ICart.FailureStage.SPREAD, "");
+            _transferNative(recipient, nativeSpread, 0, ICart.FailureStage.SPREAD);
             emit ProtocolSpreadCaptured(orderId, address(0), recipient, nativeSpread);
         }
     }
@@ -467,12 +507,35 @@ contract CartPayments is CartStorage, ICartPayments {
         return count + 1;
     }
 
-    function _transferExact(address token, address recipient, uint256 amount, uint256 lineIndex) private {
+    /// @dev Copy receiver revert data only on failure, bounded to protect diagnostic memory use.
+    function _transferNative(address recipient, uint256 amount, uint256 lineIndex, ICart.FailureStage stage) private {
+        bool success;
+        assembly ("memory-safe") {
+            success := call(gas(), recipient, amount, 0, 0, 0, 0)
+        }
+        if (!success) {
+            uint256 length;
+            assembly ("memory-safe") {
+                length := returndatasize()
+            }
+            if (length > MAX_NATIVE_REVERT_BYTES) length = MAX_NATIVE_REVERT_BYTES;
+            bytes memory reason = new bytes(length);
+            assembly ("memory-safe") {
+                returndatacopy(add(reason, 32), 0, length)
+            }
+            revert ICart.OrderLineFailed(lineIndex, stage, reason);
+        }
+    }
+
+    /// @dev SafeERC20 failures bubble directly. Balance mismatches identify the settlement stage.
+    function _transferExact(
+        address token, address recipient, uint256 amount, uint256 lineIndex, ICart.FailureStage stage
+    ) private {
         uint256 beforeBalance = IERC20(token).balanceOf(recipient);
         IERC20(token).safeTransfer(recipient, amount);
         uint256 received = IERC20(token).balanceOf(recipient) - beforeBalance;
         if (received != amount) {
-            revert ICart.OrderLineFailed(lineIndex, ICart.FailureStage.PAYOUT, abi.encode(amount, received));
+            revert ICart.OrderLineFailed(lineIndex, stage, abi.encode(amount, received));
         }
     }
 }

@@ -1,105 +1,77 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.18;
-
 import {CartRoutePolicyFixture} from "./CartRoutePolicyFixture.sol";
-
-import {CartRoutePolicy} from "../../cart/CartRoutePolicy.sol";
 import {ICartRoutePolicy} from "../../cart/ICartRoutePolicy.sol";
 
-/// @notice Tests for Cart's shallow Universal Router command-family boundary.
-/// @dev Inputs are intentionally opaque here. Universal Router owns their decoding and semantics.
 contract CartRoutePolicyTest is CartRoutePolicyFixture {
-    function testAcceptsEverySupportedCommandWithOpaqueInputs() public {
-        bytes memory commands = hex"0001020408090b0c10";
-        bytes[] memory inputs = new bytes[](commands.length);
-        for (uint256 i = 0; i < inputs.length; ++i) {
-            inputs[i] = abi.encodePacked(bytes32(uint256(i + 1)), hex"deadbeef");
-        }
-
-        policy.validate(commands, inputs);
+    function testRejectsWrongSwapRecipient() public {
+        bytes[] memory inputs = new bytes[](1);
+        address[] memory path = new address[](2);
+        path[0] = address(0x100);
+        path[1] = address(0x200);
+        inputs[0] = abi.encode(address(0xbad), 1, 2, path, true);
+        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.InvalidRouteRecipient.selector, 0, address(0xbad)));
+        policy.validate(hex"09", inputs);
     }
 
-    function testAcceptsMalformedOpaqueV3Input() public {
+    function testRejectsWrongRefundRecipient() public {
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = hex"01";
-
-        policy.validate(hex"00", inputs);
+        inputs[0] = abi.encode(address(0), address(0xbad), 0);
+        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.InvalidRouteRecipient.selector, 0, address(0xbad)));
+        policy.validate(hex"04", inputs);
     }
 
-    function testAcceptsMalformedOpaqueV4Input() public {
+    function testAcceptsCartRefund() public {
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encodePacked(bytes4(0xdeadbeef), hex"00");
+        inputs[0] = abi.encode(address(0), address(1), 0);
+        address[] memory assets = policy.validate(hex"04", inputs);
+        assertEq(assets[0], address(0));
+    }
 
+    function testRejectsArbitraryV4Take() public {
+        bytes[] memory inputs = new bytes[](1);
+        bytes[] memory params = new bytes[](3);
+        inputs[0] = abi.encode(hex"080c0e", params);
+        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.InvalidRouteInput.selector, 0));
         policy.validate(hex"10", inputs);
     }
 
-    function testAcceptsOpaqueRecipientAndPayerFields() public {
+    function testAcceptsCompilerV4ActionsAndReportsAssets() public {
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(address(0x9999), false, address(0x8888), uint256(7));
-
-        policy.validate(hex"08", inputs);
+        bytes[] memory params = new bytes[](3);
+        params[1] = abi.encode(address(0), 100);
+        params[2] = abi.encode(address(0x200), 50);
+        inputs[0] = abi.encode(hex"080c0f", params);
+        address[] memory assets = policy.validate(hex"10", inputs);
+        assertEq(assets.length, 2);
+        assertEq(assets[0], address(0));
+        assertEq(assets[1], address(0x200));
     }
 
-    function testRejectsEmptyRoute() public {
+    function testRejectsMalformedInput() public {
+        bytes[] memory inputs = new bytes[](1);
+        inputs[0] = hex"01";
+        vm.expectRevert();
+        policy.validate(hex"00", inputs);
+    }
+
+    function testRejectsPrefundingWrongRecipient() public {
+        bytes[] memory inputs = new bytes[](1);
+        inputs[0] = abi.encode(address(0x200), address(0xbad), uint160(1));
+        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.InvalidRouteRecipient.selector, 0, address(0xbad)));
+        policy.validate(hex"02", inputs);
+    }
+
+    function testRejectsFlags() public {
+        bytes[] memory inputs = new bytes[](1);
+        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.CommandFlagsNotAllowed.selector, 0, bytes1(0x90)));
+        policy.validate(hex"90", inputs);
+    }
+
+    function testRejectsEmptyAndMismatchedRoutes() public {
         vm.expectRevert(ICartRoutePolicy.EmptyRoute.selector);
-        policy.validate(bytes(""), new bytes[](0));
-    }
-
-    function testRejectsCommandInputLengthMismatch() public {
+        policy.validate(hex"", new bytes[](0));
         vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.CommandInputLengthMismatch.selector, 1, 0));
-        policy.validate(hex"08", new bytes[](0));
-    }
-
-    function testAcceptsMoreThan32Commands() public {
-        bytes memory commands = new bytes(33);
-        bytes[] memory inputs = new bytes[](commands.length);
-        for (uint256 i = 0; i < inputs.length; ++i) {
-            inputs[i] = bytes("");
-        }
-
-        policy.validate(commands, inputs);
-    }
-
-    function testRejectsLargeMismatchedInputArray() public {
-        bytes[] memory inputs = new bytes[](33);
-        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.CommandInputLengthMismatch.selector, 1, 33));
-        policy.validate(hex"08", inputs);
-    }
-
-    function testStillRejectsUnsupportedCommandAfterFormerLimit() public {
-        bytes memory commands = new bytes(34);
-        bytes[] memory inputs = new bytes[](34);
-        commands[33] = bytes1(0x03);
-        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.CommandNotAllowed.selector, 33, bytes1(0x03)));
-        policy.validate(commands, inputs);
-    }
-
-    function testRejectsUnsupportedCommand() public {
-        bytes[] memory inputs = new bytes[](1);
-        inputs[0] = bytes("");
-
-        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.CommandNotAllowed.selector, 0, bytes1(0x03)));
-        policy.validate(hex"03", inputs);
-    }
-
-    function testRejectsCommandFlags() public {
-        bytes[] memory inputs = new bytes[](1);
-        inputs[0] = bytes("");
-
-        vm.expectRevert(abi.encodeWithSelector(ICartRoutePolicy.CommandFlagsNotAllowed.selector, 0, bytes1(0x80)));
-        policy.validate(hex"80", inputs);
-    }
-
-    function testRejectsFundMovingCommandsAndFlags() public {
-        bytes memory commands = hex"05060a0d4084";
-        bytes[] memory inputs = new bytes[](1);
-        for (uint256 i; i < commands.length; ++i) {
-            bytes1 command = commands[i];
-            bytes4 selector = uint8(command) & 0xc0 != 0
-                ? ICartRoutePolicy.CommandFlagsNotAllowed.selector
-                : ICartRoutePolicy.CommandNotAllowed.selector;
-            vm.expectRevert(abi.encodeWithSelector(selector, 0, command));
-            policy.validate(abi.encodePacked(command), inputs);
-        }
+        policy.validate(hex"10", new bytes[](0));
     }
 }

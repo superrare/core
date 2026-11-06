@@ -441,7 +441,7 @@ contract CartOutcomeTest is CartFixture {
         assertEq(sellerPayout.balance, 0.6 ether);
     }
 
-    function testMalformedOpaqueInputReachesRouterBoundary() public {
+    function testMalformedInputRejectedBeforeRouterCall() public {
         ICart.Listing memory listing =
             _listing(keccak256("malformed-router-input"), ICart.FulfillmentKind.NONE, address(0), 0, sellerPayout);
         ICart.OrderLine[] memory lines = _lineForListing(listing, 1, 1 ether);
@@ -455,7 +455,7 @@ contract CartOutcomeTest is CartFixture {
         bytes memory signature = _sign(PLATFORM_PK, _orderDigest(order));
 
         vm.deal(payer, 1 ether);
-        bytes memory routerReason = abi.encodeWithSignature("Error(string)", "router reverted");
+        bytes memory routerReason = bytes("");
         vm.expectRevert(
             abi.encodeWithSelector(ICart.OrderLineFailed.selector, 0, ICart.FailureStage.ROUTING, routerReason)
         );
@@ -692,11 +692,14 @@ contract CartOutcomeTest is CartFixture {
 
     function _opaqueRoute(bytes memory command, uint256 routerValue)
         internal
-        pure
+        view
         returns (ICart.PayoutRoute memory route)
     {
         route.commands = command;
         route.inputs = new bytes[](command.length);
+        for (uint256 i; i < command.length; ++i) {
+            route.inputs[i] = _mockRouteInput(command[i]);
+        }
         route.routerValue = routerValue;
     }
 

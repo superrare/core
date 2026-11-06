@@ -231,7 +231,7 @@ contract CartSplitsTest is CartFixture {
             _lineForListing(listing, 1, 150),
             actions,
             address(0),
-            abi.encodeWithSelector(ICart.OrderLineFailed.selector, 0, ICart.FailureStage.PAYOUT, bytes(""))
+            abi.encodeWithSelector(ICart.OrderLineFailed.selector, 0, ICart.FailureStage.PAYOUT, abi.encodeWithSignature("Error(string)", "payout rejected"))
         );
         assertEq(nft.ownerOf(7), seller);
         assertEq(cart.filledQuantity(_listingDigest(listing)), 0);
@@ -572,7 +572,7 @@ contract CartSplitsTest is CartFixture {
         _pay(
             listing,
             150,
-            abi.encodeWithSelector(ICart.OrderLineFailed.selector, 0, ICart.FailureStage.PAYOUT, bytes(""))
+            abi.encodeWithSelector(ICart.OrderLineFailed.selector, 0, ICart.FailureStage.PAYOUT, abi.encodeWithSignature("Error(string)", "payout rejected"))
         );
         assertFalse(receiver.attempted());
         assertEq(address(receiver).balance, 0);
@@ -615,7 +615,7 @@ contract CartSplitsTest is CartFixture {
             lines,
             new ICart.FulfillmentAction[](0),
             address(0),
-            abi.encodeWithSelector(ICart.OrderLineFailed.selector, 0, ICart.FailureStage.PAYOUT, bytes(""))
+            abi.encodeWithSelector(ICart.OrderLineFailed.selector, 0, ICart.FailureStage.PAYOUT, abi.encodeWithSignature("Error(string)", "payout rejected"))
         );
         assertEq(recipients[1].balance, 40);
     }
