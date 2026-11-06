@@ -1,0 +1,682 @@
+{
+  "chainId": 11155111,
+  "sourceCommit": "5ef61a2dbf8f81c635d04b9734a635a269929bf9",
+  "contracts": {
+    "CartRoutePolicy": "0xd1eb11d80d76eb8ad42e034436c6122f1576599a",
+    "CartPayments": "0x18060529f82e468d39c0ed67e8194c8fb214e435",
+    "Cart": "0x9285b46be6674a307dec6d7c4beb7714d770166f",
+    "ERC1967Proxy": "0xacff2622f53f360274df3014dc135efdc058786b",
+    "CartLens": "0x6eed643d5016575952e7f424dfc708bf8dcc29ab",
+    "CartHashes": "0x0377835fbd6050d6ca17cfd154b93e8307205803"
+  },
+  "transactions": [
+    {
+      "label": "CartRoutePolicy",
+      "hash": "0xd2d5e7dd1b26742f32281d0a2dc0f1b81a9a96b94ff0135d67c0f478b69954fb",
+      "nonce": 2032,
+      "gasLimit": 6883501,
+      "receipt": {
+        "status": "0x1",
+        "cumulativeGasUsed": "0x2cfc14d",
+        "logs": [],
+        "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "type": "0x2",
+        "transactionHash": "0xd2d5e7dd1b26742f32281d0a2dc0f1b81a9a96b94ff0135d67c0f478b69954fb",
+        "transactionIndex": "0x60",
+        "blockHash": "0x26f7bb4cf5cdaf51b762a7be29e4666095d4782aa2f51aa821675edc075eaa6b",
+        "blockNumber": "0xb8499d",
+        "gasUsed": "0x45741d",
+        "effectiveGasPrice": "0x6dac2cf",
+        "from": "0xba68422a154e459f7b4992a95ad358d412b6bd1d",
+        "to": null,
+        "contractAddress": "0xd1eb11d80d76eb8ad42e034436c6122f1576599a"
+      }
+    },
+    {
+      "label": "CartPayments",
+      "hash": "0x52e6d53627e04ab1b2da57e029c3f5db43caf965e18a2b07eb017849150d412b",
+      "nonce": 2033,
+      "gasLimit": 28281504,
+      "receipt": {
+        "status": "0x1",
+        "cumulativeGasUsed": "0x3f63263",
+        "logs": [],
+        "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "type": "0x2",
+        "transactionHash": "0x52e6d53627e04ab1b2da57e029c3f5db43caf965e18a2b07eb017849150d412b",
+        "transactionIndex": "0x14",
+        "blockHash": "0xfdcc0a68667ec445c1dd3423bf43d5626ebe63a8bf5973ca2a832eb48cbd2863",
+        "blockNumber": "0xb8499e",
+        "gasUsed": "0x11d694f",
+        "effectiveGasPrice": "0x6dac2cf",
+        "from": "0xba68422a154e459f7b4992a95ad358d412b6bd1d",
+        "to": null,
+        "contractAddress": "0x18060529f82e468d39c0ed67e8194c8fb214e435"
+      }
+    },
+    {
+      "label": "Cart",
+      "hash": "0xab7f74d84cabdf560a244f83242725b086212333b5e878655480f10c74560d2e",
+      "nonce": 2034,
+      "gasLimit": 44761617,
+      "receipt": {
+        "status": "0x1",
+        "cumulativeGasUsed": "0x841ba27",
+        "logs": [
+          {
+            "address": "0x9285b46be6674a307dec6d7c4beb7714d770166f",
+            "topics": [
+              "0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498"
+            ],
+            "data": "0x00000000000000000000000000000000000000000000000000000000000000ff",
+            "blockHash": "0xa084a64cc91603502c84a008c02e811c8cfd13882f3330983c26fa61dcb89cbf",
+            "blockNumber": "0xb8499f",
+            "blockTimestamp": "0x6aedf344",
+            "transactionHash": "0xab7f74d84cabdf560a244f83242725b086212333b5e878655480f10c74560d2e",
+            "transactionIndex": "0x432",
+            "logIndex": "0x433",
+            "removed": false
+          }
+        ],
+        "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000080010000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "type": "0x2",
+        "transactionHash": "0xab7f74d84cabdf560a244f83242725b086212333b5e878655480f10c74560d2e",
+        "transactionIndex": "0x432",
+        "blockHash": "0xa084a64cc91603502c84a008c02e811c8cfd13882f3330983c26fa61dcb89cbf",
+        "blockNumber": "0xb8499f",
+        "gasUsed": "0x1c3bc57",
+        "effectiveGasPrice": "0x6dac2d0",
+        "from": "0xba68422a154e459f7b4992a95ad358d412b6bd1d",
+        "to": null,
+        "contractAddress": "0x9285b46be6674a307dec6d7c4beb7714d770166f"
+      }
+    },
+    {
+      "label": "ERC1967Proxy",
+      "hash": "0xf98470c5d3b56511a8b1cbbe6880e53f3b146580f57473507d6834ca411d1dee",
+      "nonce": 2035,
+      "gasLimit": 2519620,
+      "receipt": {
+        "status": "0x1",
+        "cumulativeGasUsed": "0x362b0eb",
+        "logs": [
+          {
+            "address": "0xacff2622f53f360274df3014dc135efdc058786b",
+            "topics": [
+              "0xbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b",
+              "0x0000000000000000000000009285b46be6674a307dec6d7c4beb7714d770166f"
+            ],
+            "data": "0x",
+            "blockHash": "0x9054d41e1e49c5a6fff26790c39a2524dd5e3d80bd2e4d19eda31ea4671d766d",
+            "blockNumber": "0xb849a0",
+            "blockTimestamp": "0x6aedf350",
+            "transactionHash": "0xf98470c5d3b56511a8b1cbbe6880e53f3b146580f57473507d6834ca411d1dee",
+            "transactionIndex": "0x1b",
+            "logIndex": "0x22",
+            "removed": false
+          },
+          {
+            "address": "0xacff2622f53f360274df3014dc135efdc058786b",
+            "topics": [
+              "0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0",
+              "0x0000000000000000000000000000000000000000000000000000000000000000",
+              "0x000000000000000000000000ba68422a154e459f7b4992a95ad358d412b6bd1d"
+            ],
+            "data": "0x",
+            "blockHash": "0x9054d41e1e49c5a6fff26790c39a2524dd5e3d80bd2e4d19eda31ea4671d766d",
+            "blockNumber": "0xb849a0",
+            "blockTimestamp": "0x6aedf350",
+            "transactionHash": "0xf98470c5d3b56511a8b1cbbe6880e53f3b146580f57473507d6834ca411d1dee",
+            "transactionIndex": "0x1b",
+            "logIndex": "0x23",
+            "removed": false
+          },
+          {
+            "address": "0xacff2622f53f360274df3014dc135efdc058786b",
+            "topics": [
+              "0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0",
+              "0x000000000000000000000000ba68422a154e459f7b4992a95ad358d412b6bd1d",
+              "0x000000000000000000000000ba68422a154e459f7b4992a95ad358d412b6bd1d"
+            ],
+            "data": "0x",
+            "blockHash": "0x9054d41e1e49c5a6fff26790c39a2524dd5e3d80bd2e4d19eda31ea4671d766d",
+            "blockNumber": "0xb849a0",
+            "blockTimestamp": "0x6aedf350",
+            "transactionHash": "0xf98470c5d3b56511a8b1cbbe6880e53f3b146580f57473507d6834ca411d1dee",
+            "transactionIndex": "0x1b",
+            "logIndex": "0x24",
+            "removed": false
+          },
+          {
+            "address": "0xacff2622f53f360274df3014dc135efdc058786b",
+            "topics": [
+              "0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498"
+            ],
+            "data": "0x0000000000000000000000000000000000000000000000000000000000000001",
+            "blockHash": "0x9054d41e1e49c5a6fff26790c39a2524dd5e3d80bd2e4d19eda31ea4671d766d",
+            "blockNumber": "0xb849a0",
+            "blockTimestamp": "0x6aedf350",
+            "transactionHash": "0xf98470c5d3b56511a8b1cbbe6880e53f3b146580f57473507d6834ca411d1dee",
+            "transactionIndex": "0x1b",
+            "logIndex": "0x25",
+            "removed": false
+          }
+        ],
+        "logsBloom": "0x00000000000000000000080000000000400020000000000000800000000000000000004000000010000000000000000000000000000000000000000000000000000000000000000000000000000002000011000000000000000000000000000000000000020000000000000000000800000000000000000000000000000000400000000000000000000000000000001000000000000080000000000000000000000000000000000000000000000400000000010000400000000000000400000000000020000000000000000000040000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000",
+        "type": "0x2",
+        "transactionHash": "0xf98470c5d3b56511a8b1cbbe6880e53f3b146580f57473507d6834ca411d1dee",
+        "transactionIndex": "0x1b",
+        "blockHash": "0x9054d41e1e49c5a6fff26790c39a2524dd5e3d80bd2e4d19eda31ea4671d766d",
+        "blockNumber": "0xb849a0",
+        "gasUsed": "0x196953",
+        "effectiveGasPrice": "0x6dac2d1",
+        "from": "0xba68422a154e459f7b4992a95ad358d412b6bd1d",
+        "to": null,
+        "contractAddress": "0xacff2622f53f360274df3014dc135efdc058786b"
+      }
+    },
+    {
+      "label": "CartLens",
+      "hash": "0x06aa867f12dc6cc05dd31e6570012522df276cef9f6654338cdca5d094dc17c4",
+      "nonce": 2036,
+      "gasLimit": 24317475,
+      "receipt": {
+        "status": "0x1",
+        "cumulativeGasUsed": "0x810dadb",
+        "logs": [],
+        "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "type": "0x2",
+        "transactionHash": "0x06aa867f12dc6cc05dd31e6570012522df276cef9f6654338cdca5d094dc17c4",
+        "transactionIndex": "0x47b",
+        "blockHash": "0x23a51128f984b8e0dae67e53b4dce5197dc5de20fe2b5bc0e3619c52c0545375",
+        "blockNumber": "0xb849a4",
+        "gasUsed": "0xf56799",
+        "effectiveGasPrice": "0x6dac2d5",
+        "from": "0xba68422a154e459f7b4992a95ad358d412b6bd1d",
+        "to": null,
+        "contractAddress": "0x6eed643d5016575952e7f424dfc708bf8dcc29ab"
+      }
+    },
+    {
+      "label": "CartHashes",
+      "nonce": 2037,
+      "estimateGas": 4249149,
+      "gasLimit": 6373724,
+      "status": "confirmed",
+      "hash": "0x90489768ab519966b1549f204c68182d1d64feec8f0051e6450ac94f87237506",
+      "receipt": {
+        "status": "0x1",
+        "cumulativeGasUsed": "0x55987e0",
+        "logs": [],
+        "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "type": "0x2",
+        "transactionHash": "0x90489768ab519966b1549f204c68182d1d64feec8f0051e6450ac94f87237506",
+        "transactionIndex": "0x63",
+        "blockHash": "0x2cf9b1276f7fc3806c29f68bc8c1bf7b0f23145a06c5f79d6d05fc8b641fffc9",
+        "blockNumber": "0xb849a8",
+        "gasUsed": "0x404f05",
+        "effectiveGasPrice": "0x3b9ac9ff",
+        "from": "0xba68422a154e459f7b4992a95ad358d412b6bd1d",
+        "to": null,
+        "contractAddress": "0x0377835fbd6050d6ca17cfd154b93e8307205803"
+      }
+    }
+  ],
+  "runtimeVerification": {
+    "CartRoutePolicy": {
+      "matches": true,
+      "runtimeBytes": 2809,
+      "immutableAddresses": []
+    },
+    "CartPayments": {
+      "matches": true,
+      "runtimeBytes": 11961,
+      "immutableAddresses": [
+        "0x18060529f82e468d39c0ed67e8194c8fb214e435",
+        "0xd1eb11d80d76eb8ad42e034436c6122f1576599a"
+      ]
+    },
+    "Cart": {
+      "matches": true,
+      "runtimeBytes": 18936,
+      "immutableAddresses": [
+        "0x18060529f82e468d39c0ed67e8194c8fb214e435",
+        "0x9285b46be6674a307dec6d7c4beb7714d770166f",
+        "0xd1eb11d80d76eb8ad42e034436c6122f1576599a"
+      ]
+    },
+    "ERC1967Proxy": {
+      "matches": true,
+      "runtimeBytes": 209,
+      "immutableAddresses": []
+    },
+    "CartLens": {
+      "matches": true,
+      "runtimeBytes": 10267,
+      "immutableAddresses": []
+    },
+    "CartHashes": {
+      "matches": true,
+      "runtimeBytes": 2591,
+      "immutableAddresses": []
+    }
+  },
+  "sourceSha256": {
+    "src/cart/CartRoutePolicy.sol": "49393da88890ff07dd7bc1da9eeb5e1a891f6617ac78200d2783a619da2ba6db",
+    "src/cart/ICartRoutePolicy.sol": "1619d6d1e4112ea160acdc2b90e1c5a7ca2ad5775122fdd1609a2b62da0aac69",
+    "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol": "9b3ddf6c1c9da600aa996789d63e71075ac93334bc79bb7684096bf6d460a1ae",
+    "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Permit.sol": "d8571c57ba4bf6fda46e2dc1e7a7ff39ae6800e9ff77b4a4b2f6ac42b7820ac6",
+    "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol": "1e22c5cdea794ca24115ad7d42651a8654adf492a5b7c2757ba4c16608b581c4",
+    "lib/openzeppelin-contracts/contracts/utils/Address.sol": "4c80ce54738d3c89b66823ba504828bffd520ea8ebca7a785aa3cc83cadee004",
+    "lib/openzeppelin-contracts/contracts/utils/math/Math.sol": "a18f7e086c9d05213620a4953bc3462881d97280cefb2505cb02f141c467d9a3",
+    "src/cart/CartPayments.sol": "f82309446974de9b826ad225d40c8da28b2032d870833ef797dd69e54eaf1fd2",
+    "src/cart/CartStorage.sol": "4fc3cfc97c86692189bb654baf0e988a3e89beb9f756701f49c72b66a8543da5",
+    "src/cart/ICart.sol": "c4674649d999397364c65558197b50588432c1abb21775a42b65dab87c778137",
+    "src/cart/ICartPayments.sol": "b364965d77392f9c9e19620d2e7aec907b40e3d24d3a146ee390b2a984a9e326",
+    "src/cart/IPermit2Cart.sol": "6aab677871af9293218e26854068f9391d83cf02fe5637d42c9c6a66ad8c53fd",
+    "lib/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol": "1fbf2a131b895514f0027866cc0deff151ea16424b4aed2b8c573d2275cfa9e8",
+    "lib/openzeppelin-contracts-upgradeable/contracts/interfaces/IERC1967Upgradeable.sol": "167828e6f725b1d47d82bc912fd0f1c6ed0fb67a4e5e06a4d62e72b4a53e95cf",
+    "lib/openzeppelin-contracts-upgradeable/contracts/interfaces/IERC5267Upgradeable.sol": "6a0d92d0222dd70cdc073029b6fe979e03e65d9c9ea4f2b8ffb774e144d2a51e",
+    "lib/openzeppelin-contracts-upgradeable/contracts/interfaces/draft-IERC1822Upgradeable.sol": "a94576fd98585c07b2a9725f7c89c910a3a1909a03f49ec2df465327c6a0ffc3",
+    "lib/openzeppelin-contracts-upgradeable/contracts/proxy/ERC1967/ERC1967UpgradeUpgradeable.sol": "40dd5b14a370eea51ba94eb1b66a89638c6c54d86cc9f406599075c273e5e4c6",
+    "lib/openzeppelin-contracts-upgradeable/contracts/proxy/beacon/IBeaconUpgradeable.sol": "e0ac7115916f0dce0a8e80769694736f3e674bdc5b2e5853964c82004b1e1cc5",
+    "lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol": "a2c4e5c274a586f145d278293ae33198cd8f412ab7e6d26f2394c8949b32b24b",
+    "lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol": "04338003a3be8f5f38595048b591d80fdc147bf95cc7c6285e1e1a5f1afa2b47",
+    "lib/openzeppelin-contracts-upgradeable/contracts/security/ReentrancyGuardUpgradeable.sol": "26219dd6b9b574cf3e225ee00466bdf1b74fbcc1b24bd93ae3628c812a76333e",
+    "lib/openzeppelin-contracts-upgradeable/contracts/utils/AddressUpgradeable.sol": "db92fc1b515decad3a783b1422190877d2d70b907c6e36fb0998d9465aee42db",
+    "lib/openzeppelin-contracts-upgradeable/contracts/utils/ContextUpgradeable.sol": "5fb301961e45cb482fe4e05646d2f529aa449fe0e90c6671475d6a32356fa2d4",
+    "lib/openzeppelin-contracts-upgradeable/contracts/utils/StorageSlotUpgradeable.sol": "5b478023a1200e1364308ca06cdefec7cb7ab990a1cb904cbbdbaa7ba85076be",
+    "lib/openzeppelin-contracts-upgradeable/contracts/utils/StringsUpgradeable.sol": "357c8d1a0fb673fa10a884d6e27b383171ecc3eaf8dee8211de75f88ff77843d",
+    "lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/ECDSAUpgradeable.sol": "aefb3039d0aae994ad64c397dfa0bcc1ab6e675e2fd97b2fdfc0e7739def0b5b",
+    "lib/openzeppelin-contracts-upgradeable/contracts/utils/cryptography/EIP712Upgradeable.sol": "ed30d96d25a360d320a807157db07b5bbb73392745ce8188b775787eb2d33fb9",
+    "lib/openzeppelin-contracts-upgradeable/contracts/utils/math/MathUpgradeable.sol": "fbf7ebc0f3c2cf5aef908ecce85e69af53db4e2c6652f61c8ac1e3f416c2fa99",
+    "lib/openzeppelin-contracts-upgradeable/contracts/utils/math/SignedMathUpgradeable.sol": "4f06981f993ea4a96e078c2036b5a42e1edade38996e5180171d5fe4be2f18fe",
+    "lib/openzeppelin-contracts/contracts/interfaces/IERC1271.sol": "c981ecaf1c2ec77e3e47f146306d7e99c669b5e733b0adcfd3436c7f6a7a46b6",
+    "lib/openzeppelin-contracts/contracts/utils/Strings.sol": "81adb93350f7ed381aa230f52f0e187259ac8b57175836f536821361dfc297b0",
+    "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol": "94d7ffe60620d14a2c4f4b77c8b9f6b0f30e347ae1e7e407d0773b91910c9a83",
+    "lib/openzeppelin-contracts/contracts/utils/cryptography/MerkleProof.sol": "8846f76c8a79da6b6bfc9afef468a0ca3667ff88525b24e242f761e2205425a2",
+    "lib/openzeppelin-contracts/contracts/utils/cryptography/SignatureChecker.sol": "5bf232e94679faafdabd16a45da480f737580113230fbae038031a1bccc92f9c",
+    "lib/openzeppelin-contracts/contracts/utils/math/SignedMath.sol": "420a5a5d8d94611a04b39d6cf5f02492552ed4257ea82aba3c765b1ad52f77f6",
+    "src/cart/Cart.sol": "94ab0adedcf450f2ae2deb5cf3ae7b8997e89a4be5f1c327156cc56448157524",
+    "src/cart/CartHashing.sol": "b1a78b5b7f412ce8d8d5d23769858dd7e6826627e342e508d4551c7983232e13",
+    "src/cart/CartValidation.sol": "c4fa4d0a2c4cb274bc3904f6748d003ac9bdfc1f368de1d171005f4d71bc46aa",
+    "lib/openzeppelin-contracts/contracts/interfaces/IERC1967.sol": "ff617535cec4c3ca835ca76d4d4e33866ee5480b9e0ca8a151fe622a5793c561",
+    "lib/openzeppelin-contracts/contracts/interfaces/draft-IERC1822.sol": "38728bce05e2b518d0ef66d514dbfcdee5555aeac2d57729480bf1409ee63630",
+    "lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol": "f64dc961f262436fc9fd3235f16a8495fd43c8f1d98d0a750a376ea8c8d5365d",
+    "lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Upgrade.sol": "3c130023e775ca857c3444172450118736d230467c356351de4233817a8b8677",
+    "lib/openzeppelin-contracts/contracts/proxy/Proxy.sol": "b3b79c95884570b4d01629e13985aea8a3c71bc37c257e1ea7fae9f23cffe8c4",
+    "lib/openzeppelin-contracts/contracts/proxy/beacon/IBeacon.sol": "6afea1d83856ed8e0495fe78109f674f925cfdc79fe2e24e854b1237e742f011",
+    "lib/openzeppelin-contracts/contracts/utils/StorageSlot.sol": "b9a9a7c1f34b65bd4fe0f4a4a89230766c126cb4544eba6319f827bbf5bca713",
+    "lib/openzeppelin-contracts/contracts/token/ERC1155/IERC1155.sol": "da64b0d9864646eaf7d73ae42f39b2dadd74b54871039ea75a318cffa79e3d47",
+    "lib/openzeppelin-contracts/contracts/token/ERC721/IERC721.sol": "32781c05799dd3e94d2e5fc8efcf1adc6199fab2dfd920428f044a81aae9791f",
+    "lib/openzeppelin-contracts/contracts/utils/introspection/IERC165.sol": "701e025d13ec6be09ae892eb029cd83b3064325801d73654847a5fb11c58b1e5",
+    "src/cart/CartLens.sol": "afe511837703e22ea3fb760ba46a86d973d91d68ac66a993b20896d4cd2feebb",
+    "src/cart/ICartLens.sol": "6a60116e49e97ffb02e8821544faab587f65387ec0c2ec144a0144a4e9fce985",
+    "src/cart/CartHashes.sol": "82f8151fc39b07c4761fb42cf5712618dced1ece8ecf6bcaeba0db638d72f83f"
+  },
+  "artifactSha256": {
+    "CartRoutePolicy": "ad54208b4afa660f02847d58e43db498aa40d06106ee50b633563ba5f40fbfcd",
+    "CartPayments": "a68d2ce4a99aa04709965950b8e3dacbcac5f354982bfecdea01d5438b61659b",
+    "Cart": "28e7561b15119fae0904c05f4d725722a8b7b0f68d5efbdc3a3afa6bfd37aae4",
+    "ERC1967Proxy": "50f0d164604506c12d8eb4c1a948c72fac12f9c810eca7ec25c15b8afcaa38bf",
+    "CartLens": "2e767b21bd421113c3d6df7f7287efde95a5a25fd17848bdf2d04a6a6b7aa009",
+    "CartHashes": "25dc441eed3d0272111f61397bb1da53d54526a775d9690fdfd5ca95bf814a40"
+  },
+  "compilerSettings": {
+    "CartRoutePolicy": {
+      "compiler": {
+        "version": "0.8.18+commit.87f61d96"
+      },
+      "settings": {
+        "remappings": [
+          "@ensdomains/buffer/=lib/buffer/",
+          "@ensdomains/ens-contracts/=lib/ens-contracts/contracts/",
+          "@ensdomains/governance/=lib/governance-contracts/contracts/",
+          "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+          "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+          "@uniswap/v3-core/contracts/=lib/v3-core/contracts/",
+          "@uniswap/v3-periphery/=lib/v3-periphery/contracts/",
+          "arachnid/solidity-stringutils/=lib/solidity-stringutils/",
+          "ds-test/=lib/ds-test/src/",
+          "ensdomains/ens-contracts/=lib/ensdomains/ens-contracts/contracts/",
+          "ensdomains/governance/=lib/governance-contracts/contracts/",
+          "forge-std/=lib/forge-std/src/",
+          "murky/=lib/murky/src/",
+          "openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+          "openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/",
+          "rareprotocol/assets/=lib/assets/src/",
+          "rareprotocol/aux/=src/",
+          "royalty-guard/=lib/royalty-guard/src/royalty-guard/",
+          "royalty-registry-solidity/=lib/royalty-registry-solidity/contracts/",
+          "royalty-registry/=lib/royalty-registry-solidity/contracts/",
+          "solmate/=lib/solmate/src/"
+        ],
+        "optimizer": {
+          "enabled": true,
+          "runs": 100
+        },
+        "metadata": {
+          "bytecodeHash": "ipfs"
+        },
+        "compilationTarget": {
+          "src/cart/CartRoutePolicy.sol": "CartRoutePolicy"
+        },
+        "evmVersion": "paris",
+        "libraries": {},
+        "viaIR": true
+      }
+    },
+    "CartPayments": {
+      "compiler": {
+        "version": "0.8.18+commit.87f61d96"
+      },
+      "settings": {
+        "remappings": [
+          "@ensdomains/buffer/=lib/buffer/",
+          "@ensdomains/ens-contracts/=lib/ens-contracts/contracts/",
+          "@ensdomains/governance/=lib/governance-contracts/contracts/",
+          "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+          "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+          "@uniswap/v3-core/contracts/=lib/v3-core/contracts/",
+          "@uniswap/v3-periphery/=lib/v3-periphery/contracts/",
+          "arachnid/solidity-stringutils/=lib/solidity-stringutils/",
+          "ds-test/=lib/ds-test/src/",
+          "ensdomains/ens-contracts/=lib/ensdomains/ens-contracts/contracts/",
+          "ensdomains/governance/=lib/governance-contracts/contracts/",
+          "forge-std/=lib/forge-std/src/",
+          "murky/=lib/murky/src/",
+          "openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+          "openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/",
+          "rareprotocol/assets/=lib/assets/src/",
+          "rareprotocol/aux/=src/",
+          "royalty-guard/=lib/royalty-guard/src/royalty-guard/",
+          "royalty-registry-solidity/=lib/royalty-registry-solidity/contracts/",
+          "royalty-registry/=lib/royalty-registry-solidity/contracts/",
+          "solmate/=lib/solmate/src/"
+        ],
+        "optimizer": {
+          "enabled": true,
+          "runs": 100
+        },
+        "metadata": {
+          "bytecodeHash": "ipfs"
+        },
+        "compilationTarget": {
+          "src/cart/CartPayments.sol": "CartPayments"
+        },
+        "evmVersion": "paris",
+        "libraries": {},
+        "viaIR": true
+      }
+    },
+    "Cart": {
+      "compiler": {
+        "version": "0.8.18+commit.87f61d96"
+      },
+      "settings": {
+        "remappings": [
+          "@ensdomains/buffer/=lib/buffer/",
+          "@ensdomains/ens-contracts/=lib/ens-contracts/contracts/",
+          "@ensdomains/governance/=lib/governance-contracts/contracts/",
+          "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+          "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+          "@uniswap/v3-core/contracts/=lib/v3-core/contracts/",
+          "@uniswap/v3-periphery/=lib/v3-periphery/contracts/",
+          "arachnid/solidity-stringutils/=lib/solidity-stringutils/",
+          "ds-test/=lib/ds-test/src/",
+          "ensdomains/ens-contracts/=lib/ensdomains/ens-contracts/contracts/",
+          "ensdomains/governance/=lib/governance-contracts/contracts/",
+          "forge-std/=lib/forge-std/src/",
+          "murky/=lib/murky/src/",
+          "openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+          "openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/",
+          "rareprotocol/assets/=lib/assets/src/",
+          "rareprotocol/aux/=src/",
+          "royalty-guard/=lib/royalty-guard/src/royalty-guard/",
+          "royalty-registry-solidity/=lib/royalty-registry-solidity/contracts/",
+          "royalty-registry/=lib/royalty-registry-solidity/contracts/",
+          "solmate/=lib/solmate/src/"
+        ],
+        "optimizer": {
+          "enabled": true,
+          "runs": 100
+        },
+        "metadata": {
+          "bytecodeHash": "ipfs"
+        },
+        "compilationTarget": {
+          "src/cart/Cart.sol": "Cart"
+        },
+        "evmVersion": "paris",
+        "libraries": {},
+        "viaIR": true
+      }
+    },
+    "ERC1967Proxy": {
+      "compiler": {
+        "version": "0.8.18+commit.87f61d96"
+      },
+      "settings": {
+        "remappings": [
+          "@ensdomains/buffer/=lib/buffer/",
+          "@ensdomains/ens-contracts/=lib/ens-contracts/contracts/",
+          "@ensdomains/governance/=lib/governance-contracts/contracts/",
+          "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+          "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+          "@uniswap/v3-core/contracts/=lib/v3-core/contracts/",
+          "@uniswap/v3-periphery/=lib/v3-periphery/contracts/",
+          "arachnid/solidity-stringutils/=lib/solidity-stringutils/",
+          "ds-test/=lib/ds-test/src/",
+          "ensdomains/ens-contracts/=lib/ensdomains/ens-contracts/contracts/",
+          "ensdomains/governance/=lib/governance-contracts/contracts/",
+          "forge-std/=lib/forge-std/src/",
+          "murky/=lib/murky/src/",
+          "openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+          "openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/",
+          "rareprotocol/assets/=lib/assets/src/",
+          "rareprotocol/aux/=src/",
+          "royalty-guard/=lib/royalty-guard/src/royalty-guard/",
+          "royalty-registry-solidity/=lib/royalty-registry-solidity/contracts/",
+          "royalty-registry/=lib/royalty-registry-solidity/contracts/",
+          "solmate/=lib/solmate/src/"
+        ],
+        "optimizer": {
+          "enabled": true,
+          "runs": 100
+        },
+        "metadata": {
+          "bytecodeHash": "ipfs"
+        },
+        "compilationTarget": {
+          "lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol": "ERC1967Proxy"
+        },
+        "evmVersion": "paris",
+        "libraries": {},
+        "viaIR": true
+      }
+    },
+    "CartLens": {
+      "compiler": {
+        "version": "0.8.18+commit.87f61d96"
+      },
+      "settings": {
+        "remappings": [
+          "@ensdomains/buffer/=lib/buffer/",
+          "@ensdomains/ens-contracts/=lib/ens-contracts/contracts/",
+          "@ensdomains/governance/=lib/governance-contracts/contracts/",
+          "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+          "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+          "@uniswap/v3-core/contracts/=lib/v3-core/contracts/",
+          "@uniswap/v3-periphery/=lib/v3-periphery/contracts/",
+          "arachnid/solidity-stringutils/=lib/solidity-stringutils/",
+          "ds-test/=lib/ds-test/src/",
+          "ensdomains/ens-contracts/=lib/ensdomains/ens-contracts/contracts/",
+          "ensdomains/governance/=lib/governance-contracts/contracts/",
+          "forge-std/=lib/forge-std/src/",
+          "murky/=lib/murky/src/",
+          "openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+          "openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/",
+          "rareprotocol/assets/=lib/assets/src/",
+          "rareprotocol/aux/=src/",
+          "royalty-guard/=lib/royalty-guard/src/royalty-guard/",
+          "royalty-registry-solidity/=lib/royalty-registry-solidity/contracts/",
+          "royalty-registry/=lib/royalty-registry-solidity/contracts/",
+          "solmate/=lib/solmate/src/"
+        ],
+        "optimizer": {
+          "enabled": true,
+          "runs": 100
+        },
+        "metadata": {
+          "bytecodeHash": "ipfs"
+        },
+        "compilationTarget": {
+          "src/cart/CartLens.sol": "CartLens"
+        },
+        "evmVersion": "paris",
+        "libraries": {},
+        "viaIR": true
+      }
+    },
+    "CartHashes": {
+      "compiler": {
+        "version": "0.8.18+commit.87f61d96"
+      },
+      "settings": {
+        "remappings": [
+          "@ensdomains/buffer/=lib/buffer/",
+          "@ensdomains/ens-contracts/=lib/ens-contracts/contracts/",
+          "@ensdomains/governance/=lib/governance-contracts/contracts/",
+          "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+          "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+          "@uniswap/v3-core/contracts/=lib/v3-core/contracts/",
+          "@uniswap/v3-periphery/=lib/v3-periphery/contracts/",
+          "arachnid/solidity-stringutils/=lib/solidity-stringutils/",
+          "ds-test/=lib/ds-test/src/",
+          "ensdomains/ens-contracts/=lib/ensdomains/ens-contracts/contracts/",
+          "ensdomains/governance/=lib/governance-contracts/contracts/",
+          "forge-std/=lib/forge-std/src/",
+          "murky/=lib/murky/src/",
+          "openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+          "openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/",
+          "rareprotocol/assets/=lib/assets/src/",
+          "rareprotocol/aux/=src/",
+          "royalty-guard/=lib/royalty-guard/src/royalty-guard/",
+          "royalty-registry-solidity/=lib/royalty-registry-solidity/contracts/",
+          "royalty-registry/=lib/royalty-registry-solidity/contracts/",
+          "solmate/=lib/solmate/src/"
+        ],
+        "optimizer": {
+          "enabled": true,
+          "runs": 100
+        },
+        "metadata": {
+          "bytecodeHash": "ipfs"
+        },
+        "compilationTarget": {
+          "src/cart/CartHashes.sol": "CartHashes"
+        },
+        "evmVersion": "paris",
+        "libraries": {},
+        "viaIR": true
+      }
+    }
+  },
+  "externalDependencies": {
+    "universalRouter": {
+      "address": "0x3a9d48ab9751398bbfa63ad67599bb04e4bdf98b",
+      "codeHash": "0x14f7c9253a5406bafa90cb512f4a2db2a10513886603e7a9b4a2e72329e944f4"
+    },
+    "permit2": {
+      "address": "0x000000000022d473030f116ddee9f6b43ac78ba3",
+      "codeHash": "0x96d9f5c3f0fb0423426b7f970186235b7347027f4e5c19c40c412b7d97fc3751"
+    },
+    "weth": {
+      "address": "0xfff9976782d46cc05630d1f6ebab18b2324d6b14",
+      "codeHash": "0xc864e10689f2da18833652a3b075d43106e87f0f90d95ee64f6f0b33bc026083"
+    }
+  },
+  "routePolicyProbe": "[]",
+  "proxyState": {
+    "owner": "0xba68422a154e459f7b4992a95ad358d412b6bd1d",
+    "platformSigner": "0xf7885c18e2757fbaea2dcfff3ac0df94520f4eae",
+    "universalRouter": "0x3a9d48ab9751398bbfa63ad67599bb04e4bdf98b",
+    "permit2": "0x000000000022d473030f116ddee9f6b43ac78ba3",
+    "weth": "0xfff9976782d46cc05630d1f6ebab18b2324d6b14",
+    "paused": "false",
+    "routePolicy": "0xd1eb11d80d76eb8ad42e034436c6122f1576599a",
+    "DOMAIN_SEPARATOR": "0x1e7887329a023bdf8be1222d4ffb0c7f5fcc113d90adf75067552e288eb05c44",
+    "implementation": "0x9285b46be6674a307dec6d7c4beb7714d770166f",
+    "reservedProtocolRecipient": "0x0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "previousProxy": {
+    "address": "0xb08876f9c661667af22e85859357bb31c4e11741",
+    "paused": "false",
+    "modified": false
+  },
+  "status": "deployed-and-runtime-verified",
+  "limitations": [
+    "No signed end-to-end checkout was broadcast as part of this deployment."
+  ],
+  "explorerVerification": {
+    "CartRoutePolicy": {
+      "verified": true,
+      "url": "https://sepolia.etherscan.io/address/0xd1eb11d80d76eb8ad42e034436c6122f1576599a#code"
+    },
+    "CartPayments": {
+      "verified": true,
+      "url": "https://sepolia.etherscan.io/address/0x18060529f82e468d39c0ed67e8194c8fb214e435#code"
+    },
+    "Cart": {
+      "verified": true,
+      "url": "https://sepolia.etherscan.io/address/0x9285b46be6674a307dec6d7c4beb7714d770166f#code"
+    },
+    "ERC1967Proxy": {
+      "verified": true,
+      "url": "https://sepolia.etherscan.io/address/0xacff2622f53f360274df3014dc135efdc058786b#code"
+    },
+    "CartLens": {
+      "verified": true,
+      "url": "https://sepolia.etherscan.io/address/0x6eed643d5016575952e7f424dfc708bf8dcc29ab#code"
+    },
+    "CartHashes": {
+      "verified": true,
+      "url": "https://sepolia.etherscan.io/address/0x0377835fbd6050d6ca17cfd154b93e8307205803#code"
+    }
+  },
+  "sdkVerification": {
+    "liveSmoke": {
+      "chainId": 11155111,
+      "cart": "0xACfF2622f53f360274df3014DC135EfDC058786B",
+      "lens": "0x6eED643D5016575952e7F424Dfc708bf8DcC29ab",
+      "hashes": "0x0377835fbD6050d6CA17cfD154b93E8307205803",
+      "owner": "0xBa68422A154e459f7b4992a95Ad358d412b6bd1d",
+      "signer": "0xF7885c18e2757fbaEa2dCfFF3aC0DF94520f4EAE",
+      "domain": "0x1e7887329a023bdf8be1222d4ffb0c7f5fcc113d90adf75067552e288eb05c44",
+      "domainRecomputed": true,
+      "paused": false,
+      "hashesMatchLocalViem": true,
+      "supportedRoutePreviewValid": true,
+      "status": "passed"
+    },
+    "typecheck": "passed",
+    "lint": {
+      "status": "passed",
+      "warnings": 45,
+      "errors": 0
+    },
+    "tests": {
+      "passed": 565,
+      "skipped": 14,
+      "filesPassed": 79,
+      "filesSkipped": 1
+    },
+    "pr": "https://github.com/superrare/rare-sdk/pull/13"
+  },
+  "deploymentIssues": [
+    "Core RPC endpoint rejected authentication with HTTP 401, used validated SDK Sepolia endpoint.",
+    "Foundry build attempted unrelated submodule installs and created empty Git pointers, backed up and restored original state.",
+    "Fresh wrappers omit CartHashes, deployed it separately with existing live-estimation Python helper.",
+    "Nonfatal Foundry parser, cache and Etherscan configuration warnings, performed explorer verification separately."
+  ]
+}
