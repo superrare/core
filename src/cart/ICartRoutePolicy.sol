@@ -16,8 +16,23 @@ interface ICartRoutePolicy {
     /// @notice A path or V4 action sequence does not match a supported route form.
     error InvalidRouteInput(uint256 commandIndex);
 
-    /// @notice Validates command inputs and restricts output and refund destinations to Cart.
-    /// @dev Uses the router's MSG_SENDER alias for Cart. V4 accepts swap/SETTLE_ALL/TAKE_ALL only.
+    /// @notice Validates command inputs for the calling Cart and returns tracked endpoint assets.
+    /// @dev Final destinations are the caller or MSG_SENDER. Swaps may use temporary router
+    ///      custody. V4 accepts one swap, SETTLE or SETTLE_ALL, and TAKE or TAKE_ALL.
+    /// @param commands Universal Router command bytes.
+    /// @param inputs Command arguments, one element per command.
     /// @return assets Input and output assets whose custody must be checked, possibly with duplicates.
     function validate(bytes calldata commands, bytes[] calldata inputs) external view returns (address[] memory assets);
+
+    /// @notice Previews a route for an explicitly identified Cart.
+    /// @dev Advisory validation only. Execution uses validate so the Cart context is its caller.
+    /// @param cart Target Cart proxy, including when the caller is a Lens.
+    /// @param commands Universal Router command bytes.
+    /// @param inputs Command arguments, one element per command.
+    /// @return assets Input and output assets whose custody must be checked.
+    function validateFor(
+        address cart,
+        bytes calldata commands,
+        bytes[] calldata inputs
+    ) external view returns (address[] memory assets);
 }

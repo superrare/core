@@ -117,7 +117,11 @@ interface ICartLens {
         uint256 requestedQuantity
     ) external view returns (ValidationResult memory result);
 
-    /// @notice Checks only the shallow command-family structure of an order-wide route.
+    /// @notice Checks supported commands, recipients, and settlement forms for the target Cart.
+    /// @dev Advisory validation does not execute swaps or verify post-execution custody.
+    /// @param cart Target Cart proxy whose policy and recipient context are used.
+    /// @param route Order-wide Universal Router commands, inputs, and native funding.
+    /// @return preview Validation status and the policy's rejection reason when available.
     function previewRoute(address cart, ICart.PayoutRoute calldata route)
         external
         view

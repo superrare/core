@@ -1,6 +1,6 @@
 # Route cart payments through validated intermediate custody
 
-The global protocol-recipient aspect of this decision is superseded by [ADR 0003](0003-signed-cart-spread-recipient.md). The opaque route boundary and custody requirements remain in force.
+The global protocol-recipient aspect of this decision is superseded by [ADR 0003](0003-signed-cart-spread-recipient.md). The route boundary and custody requirements remain in force. Recipient and endpoint validation now follows the [route protection rules](../cart-route-protection.md), which supersede the shallow-policy details below. Temporary router custody is permitted; final outputs and refunds return to Cart, and tracked router balances cannot increase after the route.
 
 The cart accepts platform-signed, order-wide Universal Router command plans and forwards them as opaque programs, including the signed `routerValue`. A dedicated `CartRoutePolicy` performs only shallow default-deny checks for the permitted command families: Permit2 transfer-from, sweep, wrap/unwrap, V2/V3 swaps, and V4 swap. Universal Router remains responsible for decoding command inputs and validating paths, recipients, payer flags, V4 actions, slippage, refunds, and exact-input/output semantics. Swap outputs return to Cart for aggregate balance-delta validation before payout. Both unused input and output above signed line obligations are favorable execution variance belonging to the configured protocol recipient under the signed fixed quote.
 

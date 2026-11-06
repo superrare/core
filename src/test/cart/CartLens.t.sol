@@ -13,6 +13,10 @@ contract CartLensTestPolicy is ICartRoutePolicy {
     function validate(bytes calldata, bytes[] calldata) external pure override returns (address[] memory) {
         return new address[](0);
     }
+
+    function validateFor(address, bytes calldata, bytes[] calldata) external pure override returns (address[] memory) {
+        return new address[](0);
+    }
 }
 
 contract CartLensTestSigner {

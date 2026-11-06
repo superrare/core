@@ -188,6 +188,7 @@ contract CartLens is ICartLens {
         return _success();
     }
 
+    /// @inheritdoc ICartLens
     function previewRoute(address cart, ICart.PayoutRoute calldata route)
         external
         view
@@ -213,7 +214,8 @@ contract CartLens is ICartLens {
             }
             return preview;
         }
-        try ICartRoutePolicy(config.routePolicy()).validate(route.commands, route.inputs) {
+        // Explicit recipients are checked against the target proxy, not the Lens address.
+        try ICartRoutePolicy(config.routePolicy()).validateFor(cart, route.commands, route.inputs) {
             preview.valid = true;
             preview.code = ValidationCode.OK;
         } catch (bytes memory reason) {

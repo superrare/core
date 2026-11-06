@@ -3,6 +3,7 @@ pragma solidity 0.8.18;
 
 import {ICartRoutePolicy} from "./ICartRoutePolicy.sol";
 
+/// @title Cart Route Policy
 /// @notice Default-deny validation for the Universal Router command families used by Cart.
 /// @dev Cart deliberately does not reimplement Universal Router planning. This policy restricts recipients and V4 settlement actions. Pool selection and
 ///      swap pricing remain the transaction builder's responsibility.
@@ -20,12 +21,28 @@ contract CartRoutePolicy is ICartRoutePolicy {
     uint8 private constant COMMAND_FLAGS_MASK = 0xc0;
 
     /// @inheritdoc ICartRoutePolicy
-    function validate(bytes calldata commands, bytes[] calldata inputs)
-        external
-        pure
-        override
-        returns (address[] memory assets)
-    {
+    function validate(
+        bytes calldata commands,
+        bytes[] calldata inputs
+    ) external view override returns (address[] memory assets) {
+        return _validate(msg.sender, commands, inputs);
+    }
+
+    /// @inheritdoc ICartRoutePolicy
+    function validateFor(
+        address cart,
+        bytes calldata commands,
+        bytes[] calldata inputs
+    ) external pure override returns (address[] memory assets) {
+        return _validate(cart, commands, inputs);
+    }
+
+    /// @dev Execution supplies its caller; advisory Lens calls supply their target Cart explicitly.
+    function _validate(
+        address cart,
+        bytes calldata commands,
+        bytes[] calldata inputs
+    ) private pure returns (address[] memory assets) {
         if (commands.length != inputs.length) {
             revert CommandInputLengthMismatch(commands.length, inputs.length);
         }
@@ -36,16 +53,17 @@ contract CartRoutePolicy is ICartRoutePolicy {
             uint8 command = uint8(commands[i]);
             if ((command & COMMAND_FLAGS_MASK) != 0) revert CommandFlagsNotAllowed(i, commands[i]);
             if (command == V2_SWAP_EXACT_IN || command == V2_SWAP_EXACT_OUT) {
-                (address recipient,,, address[] memory path,) =
-                    abi.decode(inputs[i], (address, uint256, uint256, address[], bool));
-                _recipient(i, recipient, false);
+                (address recipient, , , address[] memory path, ) = abi.decode(
+                    inputs[i],
+                    (address, uint256, uint256, address[], bool)
+                );
+                _recipient(i, recipient, cart, true);
                 if (path.length < 2) revert InvalidRouteInput(i);
                 assets[count++] = path[0];
                 assets[count++] = path[path.length - 1];
             } else if (command == V3_SWAP_EXACT_IN || command == V3_SWAP_EXACT_OUT) {
-                (address recipient,,, bytes memory path,) =
-                    abi.decode(inputs[i], (address, uint256, uint256, bytes, bool));
-                _recipient(i, recipient, false);
+                (address recipient, , , bytes memory path, ) = abi.decode(inputs[i], (address, uint256, uint256, bytes, bool));
+                _recipient(i, recipient, cart, true);
                 if (path.length < 43 || (path.length - 20) % 23 != 0) revert InvalidRouteInput(i);
                 address first;
                 address last;
@@ -56,40 +74,60 @@ contract CartRoutePolicy is ICartRoutePolicy {
                 assets[count++] = first;
                 assets[count++] = last;
             } else if (command == PERMIT2_TRANSFER_FROM) {
-                (address token, address recipient,) = abi.decode(inputs[i], (address, address, uint160));
+                (address token, address recipient, ) = abi.decode(inputs[i], (address, address, uint160));
                 if (recipient != address(2)) revert InvalidRouteRecipient(i, recipient);
                 assets[count++] = token;
             } else if (command == SWEEP) {
-                (address token, address recipient,) = abi.decode(inputs[i], (address, address, uint256));
-                _recipient(i, recipient, false);
+                (address token, address recipient, ) = abi.decode(inputs[i], (address, address, uint256));
+                _recipient(i, recipient, cart, false);
                 assets[count++] = token;
             } else if (command == WRAP_ETH || command == UNWRAP_WETH) {
-                (address recipient,) = abi.decode(inputs[i], (address, uint256));
-                _recipient(i, recipient, true);
+                (address recipient, ) = abi.decode(inputs[i], (address, uint256));
+                _recipient(i, recipient, cart, true);
             } else if (command == V4_SWAP) {
                 (bytes memory actions, bytes[] memory params) = abi.decode(inputs[i], (bytes, bytes[]));
-                // SETTLE_ALL pays only actual debt. TAKE_ALL delivers all output to the caller.
-                // Excluding other actions prevents arbitrary recipients and partial withdrawals.
-                if (
-                    actions.length != 3 || params.length != 3 || uint8(actions[0]) < 6 || uint8(actions[0]) > 9
-                        || actions[1] != 0x0c || actions[2] != 0x0f
-                ) {
+                // Keep one supported swap followed by settlement and withdrawal. Decode each
+                // settlement form independently so every endpoint joins the custody checks.
+                if (actions.length != 3 || params.length != 3 || uint8(actions[0]) < 6 || uint8(actions[0]) > 9) {
                     revert InvalidRouteInput(i);
                 }
-                (address input,) = abi.decode(params[1], (address, uint256));
-                (address output,) = abi.decode(params[2], (address, uint256));
+                address input;
+                address output;
+                if (actions[1] == 0x0c) {
+                    (input, ) = abi.decode(params[1], (address, uint256));
+                } else if (actions[1] == 0x0b) {
+                    (input, , ) = abi.decode(params[1], (address, uint256, bool));
+                } else {
+                    revert InvalidRouteInput(i);
+                }
+                if (actions[2] == 0x0f) {
+                    (output, ) = abi.decode(params[2], (address, uint256));
+                } else if (actions[2] == 0x0e) {
+                    address recipient;
+                    (output, recipient, ) = abi.decode(params[2], (address, address, uint256));
+                    _recipient(i, recipient, cart, false);
+                } else {
+                    revert InvalidRouteInput(i);
+                }
                 assets[count++] = input;
                 assets[count++] = output;
             } else {
                 revert CommandNotAllowed(i, commands[i]);
             }
         }
-        assembly ("memory-safe") { mstore(assets, count) }
+        assembly ("memory-safe") {
+            mstore(assets, count)
+        }
     }
 
-    /// @dev Universal Router's MSG_SENDER alias resolves to Cart, including through delegatecall.
-    function _recipient(uint256 index, address recipient, bool allowRouter) private pure {
-        if (recipient != address(1) && !(allowRouter && recipient == address(2))) {
+    /// @dev Final transfers return to Cart. Swap and wrap/unwrap commands may use temporary
+    ///      router custody; CartPayments still rejects any increase in final router balances.
+    function _recipient(uint256 index, address recipient, address cart, bool allowRouter) private pure {
+        if (
+            recipient != address(1) &&
+            !(recipient != address(0) && recipient == cart) &&
+            !(allowRouter && recipient == address(2))
+        ) {
             revert InvalidRouteRecipient(index, recipient);
         }
     }

@@ -6,17 +6,20 @@ fails the post-execution custody checks and rolls back the purchase.
 
 ## Supported instructions
 
-- V2 and V3 swaps must use Universal Router's `MSG_SENDER` recipient, address `1`.
-  The router resolves that alias to the calling Cart proxy. Explicit wallet addresses,
-  including a seller address, are rejected.
-- `SWEEP` must return funds to `MSG_SENDER`.
-- Wrap and unwrap may deliver to `MSG_SENDER` or the router alias, address `2`.
-  The router alias supports intermediate funding before another swap.
-- `PERMIT2_TRANSFER_FROM` may only prefund the router alias. Cart's existing temporary
-  allowances constrain the token and amount that the router can pull.
-- V4 accepts exactly one swap action, `0x06` through `0x09`, followed by `SETTLE_ALL`
-  and `TAKE_ALL`. `TAKE_ALL` returns output to the caller. Arbitrary take recipients,
-  other settlement forms, extra actions, and partial-failure command flags are rejected.
+- V2 and V3 swaps may deliver to the calling Cart, Universal Router's `MSG_SENDER`
+  alias, address `1`, or the router alias, address `2`, for temporary custody.
+- `SWEEP` returns funds to Cart or `MSG_SENDER`. It cannot pay an order recipient
+  directly, even when that address appears in a signed line.
+- Wrap and unwrap may deliver to Cart, `MSG_SENDER`, or the router alias.
+  Intermediate router custody must be cleared before the complete route returns.
+- `PERMIT2_TRANSFER_FROM` may only prefund the router alias. Cart's temporary
+  allowances constrain the token and amount the router can pull.
+- V4 accepts exactly one swap action, `0x06` through `0x09`, followed by either
+  `SETTLE` or `SETTLE_ALL`, then either `TAKE` or `TAKE_ALL`. `TAKE` must return
+  output to Cart or `MSG_SENDER`; `TAKE_ALL` returns output to the caller.
+  Other action families, extra actions, arbitrary recipients, and partial-failure
+  command flags remain rejected. Amount sentinels and payer flags retain their
+  router-defined meaning.
 
 Pool paths, price bounds, and V4 swap payload execution remain the router's responsibility.
 The policy decodes V2/V3 paths and V4 settlement endpoints to identify assets for custody
@@ -36,8 +39,7 @@ These checks cover supported asset flows, not arbitrary tokens transferred by ma
 hooks or unusual token side effects. A pre/post balance comparison cannot distinguish
 individual coins in a shared balance.
 
-A native exact-output V4 route must return its unused ETH. The local SDK compiler inspected
-during this change emits only `V4_SWAP`, which can retain that surplus. Append a native
+A native exact-output V4 route must return its unused ETH. A compiler that emits only `V4_SWAP` can retain that surplus. Append a native
 `SWEEP` to `MSG_SENDER`, or the new executor will reject purchases that leave surplus.
 The contract does not rewrite the signed route automatically.
 
@@ -50,14 +52,21 @@ mode controls execution inside the router and does not change spread ownership.
 
 ## Deployment and client compatibility
 
-`validate(bytes,bytes[])` now returns the decoded asset list. Its selector is unchanged,
-but the return ABI has changed. Deploy the policy and payment executor together with a
-compatible Cart implementation that embeds the same policy. A legacy policy does not
-provide the return data required by the new executor. Regenerate policy ABI consumers.
-Checkout order hashing and proxy storage layouts are unchanged.
+`validate(bytes,bytes[])` returns the decoded asset list and binds explicit Cart
+recipients to `msg.sender`. CartPayments calls this entry point from the proxy's
+execution context. Lens calls `validateFor(cart,commands,inputs)` to preview that
+same recipient context without making Lens an allowed payout destination. The
+preview entry point is advisory; it cannot change execution's caller context.
 
-Provider-generated routes can now fail validation because they use explicit recipient
-addresses or unsupported V4 action sequences. Update and simulate backend routes against
+The existing execution selector and return ABI are unchanged by this expansion.
+The context-aware preview entry point is new. Deploy a matching Lens with the
+replacement policy, executor, and Cart implementation. The new Lens cannot use a
+legacy policy that lacks `validateFor`. A legacy policy that returns no asset
+array remains incompatible with the current executor. Checkout argument tuples,
+hashing, events, and proxy storage layouts are unchanged.
+
+Provider routes still fail validation when they use unrelated recipients or
+unsupported V4 action sequences. Update and simulate backend routes against
 the replacement contracts before deployment. The CLI live Cart swap cases use deployed
 contracts; they do not validate this local implementation until their deployment changes.
 
@@ -74,6 +83,20 @@ archive RPC; public endpoints refused those archive reads. The disposable copy c
 only the fork block. These three tests reactivate the fork within the test call so the
 deployed router's Cancun instructions remain available with the older Solidity target.
 
+The pinned Sepolia provider regressions execute the two captured routes through
+signed checkout, including seller authorization, exact payouts, spread, protected
+Cart balances, allowance cleanup, fills, and replay state. They also reject a V3
+route that leaves WETH in the router and a V4 route paying a signed line recipient
+directly. Run them locally with an archive-capable Sepolia RPC:
+
+```sh
+ETH_SEPOLIA_RPC_URL=<endpoint> FOUNDRY_PROFILE=cart FOUNDRY_TEST=src/test/forks/sepolia/cart forge test --offline -vv
+```
+
+The fixture pins block 12,078,702 and stores public provider calldata in
+`src/test/fixtures/cart-provider-sepolia.json`. Upgrades and signer changes happen
+only in fork state. The tests do not broadcast transactions.
+
 Use `CartAdvancedGasTest.testAdvancedCheckoutGas` for the existing complex checkout
 benchmark. It contains six NFT purchases, two fee lines, grouped splits, and a routed
 ERC-20 payment. Its deterministic router models settlement; it is not a live exchange
@@ -84,11 +107,11 @@ pricing benchmark. Compare its logged checkout call gas with the same compiler s
 With the Cart profile, Solidity 0.8.18, via IR, and optimizer runs 100, the existing
 advanced checkout fixture logs the following call gas:
 
-| Version | Checkout call gas |
-| --- | ---: |
-| Before route protection | 1,138,982 |
-| With route protection | 1,152,392 |
-| Increase | 13,410, or 1.18% |
+| Version                 | Checkout call gas |
+| ----------------------- | ----------------: |
+| Before route protection |         1,138,982 |
+| With route protection   |         1,152,392 |
+| Increase                |  13,410, or 1.18% |
 
 Calldata remains 8,676 bytes and intrinsic gas remains 83,292. This compares the same
 checkout and signed route. Fixture setup warms accounts and storage, so the percentage
@@ -105,10 +128,10 @@ The native V4 fork benchmarks include the final ETH sweep, Cart settlement, and 
 to a separate signed platform `spreadRecipient`. Both modes reject a missing sweep and
 succeed with it. At mainnet block 26,355,410, the measured cases are:
 
-| Router mode | Checkout call gas | Intrinsic gas | Calldata bytes |
-| --- | ---: | ---: | ---: |
-| Exact input | 308,683 | 35,200 | 2,404 |
-| Exact output | 273,795 | 35,188 | 2,404 |
+| Router mode  | Checkout call gas | Intrinsic gas | Calldata bytes |
+| ------------ | ----------------: | ------------: | -------------: |
+| Exact input  |           308,683 |        35,200 |          2,404 |
+| Exact output |           273,795 |        35,188 |          2,404 |
 
 These are complete simple checkouts with one 1-USDC payout, not increases over the
 complex ERC-20 benchmark above. The fixtures warm state during setup and the rejected
