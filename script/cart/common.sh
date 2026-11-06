@@ -85,7 +85,8 @@ cart_run_script() {
     forge_args+=(--broadcast --slow --skip-simulation --gas-estimate-multiplier "${multiplier}")
   fi
   if [[ "${verify}" == true ]]; then forge_args+=(--verify); fi
-  if [[ "${resume}" == true ]]; then forge_args+=(--resume); fi
+  # Resume skips run(), including its vm.startBroadcast wallet registration.
+  if [[ "${resume}" == true ]]; then forge_args+=(--resume --private-key "${PRIVATE_KEY}"); fi
   # forge script compiles its inputs directly. Do not precede it with forge build,
   # which tries to install every missing submodule, including unrelated protocols.
   FOUNDRY_PROFILE=cart RUST_LOG="${RUST_LOG:-warn,foundry_evm_traces::debug::sources=error}" forge "${forge_args[@]}"

@@ -37,7 +37,7 @@ The transaction builder, SDK, CLI, and settlement consumers are maintained outsi
 
 ## Deployment records
 
-[NetworkConfig](../script/NetworkConfig.s.sol) records the fresh Sepolia suite deployed on November 6, 2026. The [deployment record](cart-sepolia-fresh-2026-11-06.md) and [receipt ledger](data/cart-sepolia-fresh-2026-11-06.json) document all six contracts and their verification. The SDK Cart PR contains the matching addresses and ABIs.
+[NetworkConfig](../script/NetworkConfig.s.sol) records the current Sepolia bundle. The [November 6 policy upgrade](cart-sepolia-policy-upgrade-2026-11-06.md) replaces the policy, executor, implementation, Lens, and Hashes while preserving the proxy and domain. The earlier [fresh deployment record](cart-sepolia-fresh-2026-11-06.md) and [receipt ledger](data/cart-sepolia-fresh-2026-11-06.json) remain the proxy's deployment and indexing anchor. The SDK Cart and routing PRs contain the matching helper addresses, bindings, and validation.
 
 The November 1 proxy was not modified and remained unpaused at the November 6 checkpoint. The [November 1](cart-sepolia-fresh-2026-11-01.md), [October 27](cart-sepolia-free-listings-2026-10-27.md), and [October 26](cart-sepolia-upgrade-2026-10-26.md) records retain deployment history. Confirm application consumer configuration separately. Old proxy signatures cannot authorize the new proxy, and clients need the current ABI, fresh signatures, and approvals for the new address.
 

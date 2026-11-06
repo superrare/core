@@ -193,6 +193,13 @@ class DeploymentTests(unittest.TestCase):
                 if call["params"][0] == pending:
                     pending = None
         self.assertIsNone(pending)
+        # A completed broadcast can resume without rerunning run() or resending transactions.
+        nonce = self.rpc("eth_getTransactionCount", OWNER, "latest")
+        resume_start = len(self.records)
+        resumed = self.wrapper("--broadcast", "--resume")
+        self.assertEqual(resumed.returncode, 0, resumed.stdout)
+        self.assertEqual(self.rpc("eth_getTransactionCount", OWNER, "latest"), nonce)
+        self.assertFalse(any(call["method"] == "eth_sendRawTransaction" for call, _ in self.records[resume_start:]))
         addresses = {t["contractName"]: t["contractAddress"].lower() for t in transactions}
         proxy = addresses["ERC1967Proxy"]
         self.assertEqual("0x" + self.rpc("eth_getStorageAt", proxy, IMPLEMENTATION_SLOT, "latest")[-40:], addresses["Cart"])
