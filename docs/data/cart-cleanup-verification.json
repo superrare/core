@@ -1,0 +1,301 @@
+{
+  "baselineRevision": "2e396e125e993b4a00527a6d53e2abea766b6cf2",
+  "compiler": {
+    "version": "0.8.18",
+    "viaIR": true,
+    "optimizerRuns": 100
+  },
+  "testInventory": {
+    "declaredBefore": 210,
+    "declaredAfter": 210,
+    "distinctMethodNames": 208
+  },
+  "compatibility": {
+    "abis": "identical",
+    "methodSelectors": "identical",
+    "canonicalHashingSource": "unchanged",
+    "paymentStateTypes": "unchanged",
+    "storageDeclarationsAndBaseline": "unchanged",
+    "externalLibraryLinking": false
+  },
+  "runtimeBytecode": [
+    {
+      "contract": "Cart",
+      "before": 17725,
+      "after": 18041,
+      "delta": 316,
+      "abi": "identical",
+      "selectors": "identical"
+    },
+    {
+      "contract": "CartPayments",
+      "before": 9977,
+      "after": 9821,
+      "delta": -156,
+      "abi": "identical",
+      "selectors": "identical"
+    },
+    {
+      "contract": "CartLens",
+      "before": 9593,
+      "after": 9593,
+      "delta": 0,
+      "abi": "identical",
+      "selectors": "identical"
+    },
+    {
+      "contract": "CartRoutePolicy",
+      "before": 697,
+      "after": 697,
+      "delta": 0,
+      "abi": "identical",
+      "selectors": "identical"
+    },
+    {
+      "contract": "CartHashes",
+      "before": 2247,
+      "after": 2247,
+      "delta": 0,
+      "abi": "identical",
+      "selectors": "identical"
+    },
+    {
+      "contract": "CartHashing",
+      "before": 58,
+      "after": 58,
+      "delta": 0,
+      "abi": "identical",
+      "selectors": "identical"
+    },
+    {
+      "contract": "CartStorage",
+      "before": 0,
+      "after": 0,
+      "delta": 0,
+      "abi": "identical",
+      "selectors": "identical"
+    },
+    {
+      "contract": "ICart",
+      "before": 0,
+      "after": 0,
+      "delta": 0,
+      "abi": "identical",
+      "selectors": "identical"
+    }
+  ],
+  "checkoutGas": [
+    {
+      "case": "ERC721Gas:minting=true,sales=18,lines=20",
+      "before": 2549034,
+      "after": 2541854,
+      "delta": -7180,
+      "percent": -0.28167533269466
+    },
+    {
+      "case": "ERC721Gas:minting=true,sales=32,lines=34",
+      "before": 4388153,
+      "after": 4371898,
+      "delta": -16255,
+      "percent": -0.3704291987995861
+    },
+    {
+      "case": "ERC721Gas:minting=true,sales=62,lines=64",
+      "before": 8353720,
+      "after": 8328450,
+      "delta": -25270,
+      "percent": -0.30249996408785546
+    },
+    {
+      "case": "ERC721Gas:minting=true,sales=64,lines=66",
+      "before": 8622511,
+      "after": 8600031,
+      "delta": -22480,
+      "percent": -0.2607129176176174
+    },
+    {
+      "case": "ERC721Gas:minting=true,sales=9,lines=11",
+      "before": 1370708,
+      "after": 1365643,
+      "delta": -5065,
+      "percent": -0.36951706709233473
+    },
+    {
+      "case": "ERC721Gas:minting=false,sales=18,lines=20",
+      "before": 1334621,
+      "after": 1325351,
+      "delta": -9270,
+      "percent": -0.6945792101278191
+    },
+    {
+      "case": "ERC721Gas:minting=false,sales=32,lines=34",
+      "before": 2248999,
+      "after": 2234287,
+      "delta": -14712,
+      "percent": -0.654157694156378
+    },
+    {
+      "case": "ERC721Gas:minting=false,sales=62,lines=64",
+      "before": 4229350,
+      "after": 4184217,
+      "delta": -45133,
+      "percent": -1.067137976284772
+    },
+    {
+      "case": "ERC721Gas:minting=false,sales=64,lines=66",
+      "before": 4366612,
+      "after": 4315731,
+      "delta": -50881,
+      "percent": -1.1652283280492977
+    },
+    {
+      "case": "ERC721Gas:minting=false,sales=9,lines=11",
+      "before": 749492,
+      "after": 744534,
+      "delta": -4958,
+      "percent": -0.6615147326455786
+    },
+    {
+      "case": "ListingGas:lines=18,listings=18",
+      "before": 967736,
+      "after": 957943,
+      "delta": -9793,
+      "percent": -1.0119495399571785
+    },
+    {
+      "case": "ListingGas:lines=32,listings=32",
+      "before": 1640870,
+      "after": 1623333,
+      "delta": -17537,
+      "percent": -1.068762302924668
+    },
+    {
+      "case": "ListingGas:lines=64,listings=64",
+      "before": 3195239,
+      "after": 3159969,
+      "delta": -35270,
+      "percent": -1.103829791762056
+    },
+    {
+      "case": "ListingGas:lines=9,listings=9",
+      "before": 537739,
+      "after": 532920,
+      "delta": -4819,
+      "percent": -0.8961596610995296
+    },
+    {
+      "case": "ListingGas:lines=18,listings=1",
+      "before": 383856,
+      "after": 374607,
+      "delta": -9249,
+      "percent": -2.4094973114918092
+    },
+    {
+      "case": "ListingGas:lines=32,listings=1",
+      "before": 571847,
+      "after": 555302,
+      "delta": -16545,
+      "percent": -2.893256412991587
+    },
+    {
+      "case": "ListingGas:lines=64,listings=1",
+      "before": 1002618,
+      "after": 969364,
+      "delta": -33254,
+      "percent": -3.316716835325119
+    },
+    {
+      "case": "ListingGas:lines=9,listings=1",
+      "before": 263157,
+      "after": 258594,
+      "delta": -4563,
+      "percent": -1.7339458954160443
+    },
+    {
+      "case": "ListingGas:lines=65,listings=65",
+      "before": 3257265,
+      "after": 3221440,
+      "delta": -35825,
+      "percent": -1.099849106535698
+    },
+    {
+      "case": "RareERC1155Gas:minting=true,sales=18,lines=20",
+      "before": 2586472,
+      "after": 2577382,
+      "delta": -9090,
+      "percent": -0.35144397464963856
+    },
+    {
+      "case": "RareERC1155Gas:minting=true,sales=32,lines=34",
+      "before": 4492985,
+      "after": 4479041,
+      "delta": -13944,
+      "percent": -0.3103504685637722
+    },
+    {
+      "case": "RareERC1155Gas:minting=true,sales=62,lines=64",
+      "before": 8607576,
+      "after": 8559281,
+      "delta": -48295,
+      "percent": -0.5610754990719803
+    },
+    {
+      "case": "RareERC1155Gas:minting=true,sales=64,lines=66",
+      "before": 8885040,
+      "after": 8831088,
+      "delta": -53952,
+      "percent": -0.6072229275276194
+    },
+    {
+      "case": "RareERC1155Gas:minting=true,sales=9,lines=11",
+      "before": 1365473,
+      "after": 1361178,
+      "delta": -4295,
+      "percent": -0.3145430191589288
+    },
+    {
+      "case": "RareERC1155Gas:minting=false,sales=18,lines=20",
+      "before": 1685025,
+      "after": 1669821,
+      "delta": -15204,
+      "percent": -0.9023011528018873
+    },
+    {
+      "case": "RareERC1155Gas:minting=false,sales=32,lines=34",
+      "before": 2885120,
+      "after": 2858887,
+      "delta": -26233,
+      "percent": -0.9092516082519965
+    },
+    {
+      "case": "RareERC1155Gas:minting=false,sales=62,lines=64",
+      "before": 5479825,
+      "after": 5445414,
+      "delta": -34411,
+      "percent": -0.6279580096079711
+    },
+    {
+      "case": "RareERC1155Gas:minting=false,sales=64,lines=66",
+      "before": 5657727,
+      "after": 5616830,
+      "delta": -40897,
+      "percent": -0.7228521277184282
+    },
+    {
+      "case": "RareERC1155Gas:minting=false,sales=9,lines=11",
+      "before": 912126,
+      "after": 905407,
+      "delta": -6719,
+      "percent": -0.736630684795741
+    }
+  ],
+  "testResult": {
+    "passed": 210,
+    "failed": 0,
+    "skipped": 0,
+    "suites": 19,
+    "invariantRunsEach": 256,
+    "invariantCallsEach": 128000,
+    "invariantReverts": 0
+  }
+}

@@ -1,0 +1,42 @@
+--- a/src/cart/CartPayments.sol
++++ b/src/cart/CartPayments.sol
+@@ -246,24 +246,31 @@
+     function _payLines(ICart.OrderLine[] calldata lines) private {
+         address wrappedNative = _cartConfig().weth;
+         Payout[] memory payouts = new Payout[](lines.length);
++        uint256 tableSize = 1;
++        while (tableSize < lines.length * 2) tableSize <<= 1;
++        uint256[] memory slots = new uint256[](tableSize);
++        uint256 mask = tableSize - 1;
+         uint256 count;
+-        for (uint256 i = 0; i < lines.length; ++i) {
++        for (uint256 i; i < lines.length; ++i) {
+             bool native = lines[i].settlementCurrency == address(0);
+             address token = native ? wrappedNative : lines[i].settlementCurrency;
++            address recipient = lines[i].paymentRecipient;
++            uint256 slot = uint256(keccak256(abi.encode(token, recipient, native))) & mask;
+             uint256 payoutIndex = NO_GROUP;
+-            for (uint256 j = 0; j < count; ++j) {
+-                if (
+-                    payouts[j].token == token && payouts[j].recipient == lines[i].paymentRecipient
+-                        && payouts[j].native == native
+-                ) {
+-                    payoutIndex = j;
++            while (slots[slot] != 0) {
++                uint256 candidate = slots[slot] - 1;
++                if (payouts[candidate].token == token && payouts[candidate].recipient == recipient
++                    && payouts[candidate].native == native) {
++                    payoutIndex = candidate;
+                     break;
+                 }
++                slot = (slot + 1) & mask;
+             }
+             if (payoutIndex == NO_GROUP) {
+                 payoutIndex = count++;
++                slots[slot] = payoutIndex + 1;
+                 payouts[payoutIndex] = Payout({
+-                    token: token, recipient: lines[i].paymentRecipient, amount: 0, lineIndex: i, native: native
++                    token: token, recipient: recipient, amount: 0, lineIndex: i, native: native
+                 });
+             }
+             payouts[payoutIndex].amount += lines[i].amount;

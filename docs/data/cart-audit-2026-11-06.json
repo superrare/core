@@ -1,0 +1,700 @@
+{
+  "head": "c0ad811919d14a8b81de3684705fd66abc510feb",
+  "workingTreeAudited": true,
+  "sourceFingerprintSha256": "63517931eacb7e1773b70caa6bc74fe1cdbb4e7a78a37024bbf189fd45aa2838",
+  "sourceManifest": {
+    "src/cart/Cart.sol": "94ab0adedcf450f2ae2deb5cf3ae7b8997e89a4be5f1c327156cc56448157524",
+    "src/cart/CartHashes.sol": "82f8151fc39b07c4761fb42cf5712618dced1ece8ecf6bcaeba0db638d72f83f",
+    "src/cart/CartHashing.sol": "b1a78b5b7f412ce8d8d5d23769858dd7e6826627e342e508d4551c7983232e13",
+    "src/cart/CartLens.sol": "afe511837703e22ea3fb760ba46a86d973d91d68ac66a993b20896d4cd2feebb",
+    "src/cart/CartPayments.sol": "f82309446974de9b826ad225d40c8da28b2032d870833ef797dd69e54eaf1fd2",
+    "src/cart/CartRoutePolicy.sol": "49393da88890ff07dd7bc1da9eeb5e1a891f6617ac78200d2783a619da2ba6db",
+    "src/cart/CartStorage.sol": "4fc3cfc97c86692189bb654baf0e988a3e89beb9f756701f49c72b66a8543da5",
+    "src/cart/CartValidation.sol": "c4fa4d0a2c4cb274bc3904f6748d003ac9bdfc1f368de1d171005f4d71bc46aa",
+    "src/cart/ICart.sol": "c4674649d999397364c65558197b50588432c1abb21775a42b65dab87c778137",
+    "src/cart/ICartLens.sol": "6a60116e49e97ffb02e8821544faab587f65387ec0c2ec144a0144a4e9fce985",
+    "src/cart/ICartPayments.sol": "b364965d77392f9c9e19620d2e7aec907b40e3d24d3a146ee390b2a984a9e326",
+    "src/cart/ICartRoutePolicy.sol": "1619d6d1e4112ea160acdc2b90e1c5a7ca2ad5775122fdd1609a2b62da0aac69",
+    "src/cart/IPermit2Cart.sol": "6aab677871af9293218e26854068f9391d83cf02fe5637d42c9c6a66ad8c53fd",
+    "script/cart/CartDeploy.s.sol": "e0c12f680a26dbbca6817e617ece1265d539eddab5d2597bd4fe0166d4b09b9c",
+    "script/cart/CartFreeListingUpgrade.s.sol": "2e5abb688f9d306a8dbd0c4b8b5f358cc0e6a50b4c84adcbffcc3939cd5cf2ea",
+    "script/cart/CartImplementationLensAndHashesUpgrade.s.sol": "64d5a7b238c2ee7b5e6392a42af0af87fe98b3fa4c18fbdc2b7e83701ade3cdd",
+    "script/cart/CartImplementationUpgrade.s.sol": "f4c4d07327d1cca1d67859e7f5afd1af1bc777de2f1a21a6a8a2246483ea4e41",
+    "script/cart/CartLensDeploy.s.sol": "2a3bc617212310a3214c4d4796b3fd2d823a3c1703ba461cbe4aa94ffad108ec",
+    "script/cart/CartUpgrade.s.sol": "0297d33f843380531361e692992419adaeee0cbe3ee9a61595b9104f600eece4",
+    "script/cart/check-checkout.sh": "b0d06d711d4d8efe67210563e8b5d09d0a60dae2e9c5f0ad873c8a568e303890",
+    "script/cart/deploy-lens.sh": "b3b91ea65038c69cd5bf32d2d56eff56b9c10b5c1435539778c7482b7fa5fc16",
+    "script/cart/deploy.sh": "b059d2618ca33a0f0c1260c8dd022f671aa72f590b5d01e54e2f83950fa1f118",
+    "script/cart/upgrade-cart-implementation.sh": "9e77d11b280ff9ee0b1dd1ef3336a2d6030a769024cb10fb6f26751875b6b779",
+    "script/cart/upgrade-cart-lens-and-hashes.sh": "c763762a067949cc1ee78cf72257ad56309faa2362c429385e4b3f80770f44fa",
+    "script/cart/upgrade-free-listings.sh": "9098c6f73262e2f7feb670928ec8f3a2b2d3f774bc78c524eb70bcc7e7e455e0",
+    "script/cart/upgrade-with-dependency-rotation.sh": "8b10a7221ef89b7c53e191b75571a04e56884a72624c552ca69e9f679cf38247",
+    "script/NetworkConfig.s.sol": "929a44b7f3bb01e4d9fd3792a15a2542018ff52b1efec13d89212898d2a900d7",
+    "tools/upgradeCartFreeListings.py": "372b4e21bbca3ebdd319d02820572f42d749520ce5ed42aff05e9c771f56f145",
+    "foundry.toml": "e06e593ad7144155d16a93de8a1d8d6c715e1914ceddda413b8c1fe3ae208ab1",
+    "remappings.txt": "9e86d9a7a4fb8500548508dc0d81b2abb36cfa4e7a34a39a9d01b1a9e22aaecc"
+  },
+  "snapshotDirectory": "/private/tmp/cart-audit-20261106-5c01rzvk/baseline",
+  "runDirectory": "/private/tmp/cart-audit-20261106-5c01rzvk",
+  "buildOverrides": [
+    "isolated Foundry root",
+    "explicit ds-test remapping for native test invocation",
+    "read permission for frozen snapshot"
+  ],
+  "baselineTests": {
+    "passed": 293,
+    "failed": 0,
+    "skipped": 0
+  },
+  "nativeVerificationFixtures": {
+    "passed": 67,
+    "failed": 0
+  },
+  "targetedAuditChecks": {
+    "authorization": 19,
+    "settlement": 4,
+    "statefulAndMutationControls": 5,
+    "mixedReceipt": 1
+  },
+  "mutationChecks": {
+    "baselineControls": 3,
+    "executedFaultsDetected": 3,
+    "literalFinalCheckDeletion": "compiler exception excluded, executable conditional disable used"
+  },
+  "rpcFork": {
+    "status": "blocked",
+    "configuredArchiveRpc": false,
+    "publicReadOnlyProbes": [
+      {
+        "endpoint": "https://ethereum-rpc.publicnode.com",
+        "result": "HTTP403"
+      },
+      {
+        "endpoint": "https://eth.llamarpc.com",
+        "result": "HTTP403"
+      }
+    ]
+  },
+  "wrapperTrace": [
+    {
+      "script": "deploy.sh",
+      "nodeEstimatedAndSequential": true,
+      "transactions": [
+        {
+          "hash": "0x966ddbc076796d2e1948f1bce2ef89d69be1be27f619e45e22c196beb768c3e6",
+          "nonce": 0,
+          "nodeEstimate": 660611,
+          "gasLimit": 990916
+        },
+        {
+          "hash": "0x9ce0e65f4eb9281afadb1437cd68721cce338fd4d481d240ec37ceebbcf052ca",
+          "nonce": 1,
+          "nodeEstimate": 2639745,
+          "gasLimit": 3959617
+        },
+        {
+          "hash": "0xe395a78e13e33235709f0f7cb7af6b5e675080213e28cbbd512462928fe464ae",
+          "nonce": 2,
+          "nodeEstimate": 4173899,
+          "gasLimit": 6260848
+        },
+        {
+          "hash": "0xd78a2f4893714887659a8951edd575755ba90b03ea4476bfda32f8743978e6a2",
+          "nonce": 3,
+          "nodeEstimate": 352251,
+          "gasLimit": 528376
+        }
+      ]
+    },
+    {
+      "script": "deploy-lens.sh",
+      "nodeEstimatedAndSequential": true,
+      "transactions": [
+        {
+          "hash": "0xe5303be5320f7a0f740f1a0416da85b4f8e96653028a3fcf1cee19dcfb86050c",
+          "nonce": 4,
+          "nodeEstimate": 2271205,
+          "gasLimit": 3406807
+        }
+      ]
+    },
+    {
+      "script": "upgrade-cart-lens-and-hashes.sh",
+      "nodeEstimatedAndSequential": true,
+      "transactions": [
+        {
+          "hash": "0x8a148ffae2d4a20c92ba4289c34e08414b1eba5b972bced030b0d349d9d30e91",
+          "nonce": 5,
+          "nodeEstimate": 2639745,
+          "gasLimit": 3959617
+        },
+        {
+          "hash": "0xe46f5f2da1c60e95f114f6d51d3471f93ded43c24be959ff903083468edbb418",
+          "nonce": 6,
+          "nodeEstimate": 4173899,
+          "gasLimit": 6260848
+        },
+        {
+          "hash": "0xc0026de3f41cabc6b0e05eb04fd312ddd3b9a45aeac63e24a0140cf019d44206",
+          "nonce": 7,
+          "nodeEstimate": 2271205,
+          "gasLimit": 3406807
+        },
+        {
+          "hash": "0xe412622af615753451e645b394d26e006b806272273bc57a386d4c9f9b192ff8",
+          "nonce": 8,
+          "nodeEstimate": 613417,
+          "gasLimit": 920125
+        },
+        {
+          "hash": "0xb38113092cd7418902782f328c5656059c953969c6ed1bebd151678dd36689ed",
+          "nonce": 9,
+          "nodeEstimate": 40565,
+          "gasLimit": 60847
+        }
+      ]
+    },
+    {
+      "script": "upgrade-with-dependency-rotation.sh",
+      "nodeEstimatedAndSequential": true,
+      "transactions": [
+        {
+          "hash": "0x872003c567aacb0aecd4aeb33b47de974fbf38322e7d0a64d31408b759c6fb4f",
+          "nonce": 11,
+          "nodeEstimate": 660611,
+          "gasLimit": 990916
+        },
+        {
+          "hash": "0x3d9ae9690f2ddcd2816c3bea2a96ed5496f162941b1cda55bafa1aa5a122f0f7",
+          "nonce": 12,
+          "nodeEstimate": 2639745,
+          "gasLimit": 3959617
+        },
+        {
+          "hash": "0xb12c16ca9b8ddd36de7ecc9e63e7d173600ee00463d885d152082f9cfe5f82b5",
+          "nonce": 13,
+          "nodeEstimate": 4173899,
+          "gasLimit": 6260848
+        },
+        {
+          "hash": "0x5a5ace8ed249e26449a00153f7b30c9f2a77d06ed32b7198ed0d73ad0c16a25d",
+          "nonce": 14,
+          "nodeEstimate": 2271205,
+          "gasLimit": 3406807
+        },
+        {
+          "hash": "0x63f78d2ae4a0e410bf166e7f958ea69a1b6e300c618e8b1b12b71d0fe010e55d",
+          "nonce": 15,
+          "nodeEstimate": 613417,
+          "gasLimit": 920125
+        },
+        {
+          "hash": "0x014c4b957f53d849f9822eab05b57e8ebef1fe7b3361fcc1dd3a91a46f817f0d",
+          "nonce": 16,
+          "nodeEstimate": 40565,
+          "gasLimit": 60847
+        }
+      ]
+    }
+  ],
+  "localArtifacts": {
+    "Cart": {
+      "address": "0x0dcd1bf9a1b36ce34237eeafef220932846bcd82",
+      "runtimeBytes": 18936,
+      "maskedRuntimeMatches": true,
+      "immutables": [
+        "0x0dcd1bf9a1b36ce34237eeafef220932846bcd82",
+        "0xb7f8bc63bbcad18155201308c8f3540b07f84f5e",
+        "0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0"
+      ],
+      "namedImmutables": {
+        "__self": "0x0dcd1bf9a1b36ce34237eeafef220932846bcd82",
+        "routePolicy": "0xb7f8bc63bbcad18155201308c8f3540b07f84f5e",
+        "PAYMENT_EXECUTOR": "0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0"
+      },
+      "artifactSha256": "7a57010f73996f2b3a8194eb1a9b3ea0cc1063e8890deb5aa0a7e3ac0ad8804f",
+      "compiler": {
+        "version": "0.8.18+commit.87f61d96"
+      },
+      "settings": {
+        "evmVersion": "paris",
+        "optimizer": {
+          "enabled": true,
+          "runs": 100
+        },
+        "viaIR": true
+      }
+    },
+    "CartPayments": {
+      "address": "0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0",
+      "runtimeBytes": 11961,
+      "maskedRuntimeMatches": true,
+      "immutables": [
+        "0xb7f8bc63bbcad18155201308c8f3540b07f84f5e",
+        "0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0"
+      ],
+      "namedImmutables": {
+        "ROUTE_POLICY": "0xb7f8bc63bbcad18155201308c8f3540b07f84f5e",
+        "SELF": "0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0"
+      },
+      "artifactSha256": "5c0b375ba0d42e6a5af275ede5a2e1701b1213cbd2fb72ac321e52502ac65670",
+      "compiler": {
+        "version": "0.8.18+commit.87f61d96"
+      },
+      "settings": {
+        "evmVersion": "paris",
+        "optimizer": {
+          "enabled": true,
+          "runs": 100
+        },
+        "viaIR": true
+      }
+    },
+    "CartRoutePolicy": {
+      "address": "0xb7f8bc63bbcad18155201308c8f3540b07f84f5e",
+      "runtimeBytes": 2809,
+      "maskedRuntimeMatches": true,
+      "immutables": [],
+      "namedImmutables": {},
+      "artifactSha256": "73129ea8d8af4ffc2a826d15d6ee3b40ee8f00b0aa9030fd7dc2ebc34aa5c867",
+      "compiler": {
+        "version": "0.8.18+commit.87f61d96"
+      },
+      "settings": {
+        "evmVersion": "paris",
+        "optimizer": {
+          "enabled": true,
+          "runs": 100
+        },
+        "viaIR": true
+      }
+    },
+    "CartLens": {
+      "address": "0x9a676e781a523b5d0c0e43731313a708cb607508",
+      "runtimeBytes": 10267,
+      "maskedRuntimeMatches": true,
+      "immutables": [],
+      "namedImmutables": {},
+      "artifactSha256": "952cf9f49b315c2707c2308546565e0fb07f83d1472771ab124a9a29acaafe65",
+      "compiler": {
+        "version": "0.8.18+commit.87f61d96"
+      },
+      "settings": {
+        "evmVersion": "paris",
+        "optimizer": {
+          "enabled": true,
+          "runs": 100
+        },
+        "viaIR": true
+      }
+    },
+    "CartHashes": {
+      "address": "0x0b306bf915c4d645ff596e518faf3f9669b97016",
+      "runtimeBytes": 2591,
+      "maskedRuntimeMatches": true,
+      "immutables": [],
+      "namedImmutables": {},
+      "artifactSha256": "83bc2592eceeb6f494831d526a42c60c1c3d984fbd9ccd307a47606aeae5da29",
+      "compiler": {
+        "version": "0.8.18+commit.87f61d96"
+      },
+      "settings": {
+        "evmVersion": "paris",
+        "optimizer": {
+          "enabled": true,
+          "runs": 100
+        },
+        "viaIR": true
+      }
+    },
+    "ERC1967Proxy": {
+      "address": "0xcf7ed3acca5a467e9e704c703e8d87f634fb0fc9",
+      "runtimeBytes": 209,
+      "maskedRuntimeMatches": true,
+      "immutables": [],
+      "namedImmutables": {},
+      "artifactSha256": "dc3db729608168c7062f5959e9b8d8cfe9235cad7a0a71dd17f0f94b81348e3a",
+      "compiler": {
+        "version": "0.8.18+commit.87f61d96"
+      },
+      "settings": {
+        "evmVersion": "paris",
+        "optimizer": {
+          "enabled": true,
+          "runs": 100
+        },
+        "viaIR": true
+      }
+    }
+  },
+  "rollback": {
+    "before": {
+      "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "platformSigner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "paused": "true",
+      "DOMAIN_SEPARATOR": "0xca7d8159521cc8f13a4bfb9cd48b0606cfebf70e2590e6c6f655a3aa9c0c860f",
+      "universalRouter": "0x3A9D48AB9751398BbFa63ad67599Bb04e4BdF98b",
+      "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+      "weth": "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
+      "filled": "1",
+      "nonce": "1",
+      "rootCancelled": "true",
+      "listingCancelled": "true",
+      "executed": "true",
+      "oldCanary": "true"
+    },
+    "afterRollbackAndForwardMatches": true,
+    "rollbackTransaction": "0x37c7a74268ed2d9730e1c5c8f2c701debe333201e561de5758f6e5868d6f711c",
+    "forwardTransaction": "0xa7fea7bf81e1cea408482bb27a3e3d53503e43e4e3bd8a153a60e292e4993e80",
+    "listingDigest": "0x722a9db3ad9cd6d6dbc5259d260848fcf2ed79e7939db6ad1930328f06d02b10",
+    "rootDigest": "0xd470a4daaf1b404db4225d1858f751536e987e37b9a3fb311f4f7b004b5cee96",
+    "filledOrder": "0xd247e1540d48e0f4805405d28fddee407e2e62175430b3b9203ea83951b3c27c",
+    "scope": "Current compatible bundle rollback with seeded inventory, cancellations, nonce, replay, pause, domain and configuration"
+  },
+  "formal": {
+    "status": "canceled at user request",
+    "positiveSelection": 29,
+    "setupProofs": 5,
+    "strictAcceptanceComplete": false,
+    "arithmeticHelpers": "both SMT checks UNSAT",
+    "formalNegativeControl": "canceled before completion",
+    "nativeNegativeControlPassed": true,
+    "checkpointsRetained": true,
+    "savedCheckpointCount": 9
+  },
+  "supplementalHarnesses": {
+    "auth-harness/src/test/cart/AuditAuthorization.t.sol": "b3f9abd0b2d659685d5613ce45d344bde08374cd7e6f3f1a1a8199f2406b36e7",
+    "settlement/src/test/cart/SettlementAudit.t.sol": "ee39920b02f4b4f9d514e9f179fbd6c49cf4d0d7d5c5acc6a7bafdc69f1ac0c0",
+    "sequence-run/src/test/cart/CartSequenceAudit.t.sol": "aa70a8c7ff75daa3dc990bd31f9fcb3875c650247383ecc0f6a9393a64adefee",
+    "upgrade-review/src/test/cart/CartAuditReceipt.t.sol": "10160508a7f8e764cbca3ac09a5ec4119fcc508977cde867e3ab721015d695fc"
+  },
+  "sdkVectors": {
+    "command": "node generate.mjs --check",
+    "root": "/private/tmp/cart-audit-20261106-5c01rzvk/sdk-check/tools/cart-split-vectors",
+    "ethers": "6.15.0",
+    "passed": true,
+    "note": "Pinned packages installed in isolated audit directory because workspace dependency was incomplete"
+  },
+  "nativeNegativeControl": {
+    "passed": 2,
+    "scope": "Positive PAYEE18 witness and deliberate Panic(0x01) after successful settlement",
+    "trace": "/private/tmp/cart-audit-20261106-5c01rzvk/reports/negative-control-native.log"
+  },
+  "candidateRebuild": [
+    {
+      "name": "Cart",
+      "runtimeBytes": 18936,
+      "byteForByteMatch": true
+    },
+    {
+      "name": "CartPayments",
+      "runtimeBytes": 11961,
+      "byteForByteMatch": true
+    },
+    {
+      "name": "CartRoutePolicy",
+      "runtimeBytes": 2809,
+      "byteForByteMatch": true
+    },
+    {
+      "name": "CartLens",
+      "runtimeBytes": 10267,
+      "byteForByteMatch": true
+    },
+    {
+      "name": "CartHashes",
+      "runtimeBytes": 2591,
+      "byteForByteMatch": true
+    },
+    {
+      "name": "ERC1967Proxy",
+      "runtimeBytes": 209,
+      "byteForByteMatch": true
+    }
+  ],
+  "compilerInputSha256": "312bd6a802db9f222751dcccf1ad3961ba1ace562b9699895eec39c43645c70c",
+  "dependencySourceFingerprintSha256": "32cb947df1175b62a96589b8dea62f608680da5474ba33c83e84f1d6f07c75ce",
+  "auditPlanSha256": "84edabb91ca9896d2326d194890175d996b6189281359cb0139709f77701b008",
+  "fixtureSha256": {
+    "src/cart/Cart.storage-layout.json": "a20e6a2ed97fa724892562e130e2232fcb356d8ef30b77f1e3aabf59a6e16cc8",
+    "docs/data/cart-pre-split-bytecode.json": "fef51a2e220893cb00cd4d2ead1de50213ca91f377237c488ac8c392b39418d9",
+    "docs/data/cart-split-sdk-vectors.json": "ac7d9a172137511ea2d5727fe726451a139d1f5120b424bf4eeb91d78dad05fa"
+  },
+  "invariantCoverage": [
+    {
+      "invariant": "AUTH-1",
+      "owner": "authorization",
+      "independentReviewer": "settlement",
+      "paths": [
+        "Cart._validateOrderHashes",
+        "CartHashing",
+        "SignatureChecker"
+      ],
+      "cases": [
+        "CASE-01",
+        "CASE-18"
+      ],
+      "limits": "Exact frozen source and modeled dependency behavior where applicable",
+      "status": "reviewed with recorded coverage limits"
+    },
+    {
+      "invariant": "AUTH-2",
+      "owner": "authorization",
+      "independentReviewer": "settlement",
+      "paths": [
+        "Cart._resolveRootListings",
+        "MerkleProof"
+      ],
+      "cases": [
+        "CASE-02",
+        "CASE-03",
+        "CASE-19"
+      ],
+      "limits": "Exact frozen source and modeled dependency behavior where applicable",
+      "status": "reviewed with recorded coverage limits"
+    },
+    {
+      "invariant": "INV-1",
+      "owner": "authorization",
+      "independentReviewer": "settlement",
+      "paths": [
+        "Cart._validateLineTerms",
+        "Cart._reserveListings",
+        "CartStorage.Listings"
+      ],
+      "cases": [
+        "CASE-03",
+        "CASE-04",
+        "CASE-18"
+      ],
+      "limits": "Exact frozen source and modeled dependency behavior where applicable",
+      "status": "reviewed with recorded coverage limits"
+    },
+    {
+      "invariant": "INV-2",
+      "owner": "authorization",
+      "independentReviewer": "settlement",
+      "paths": [
+        "Cart._validateLineTerms",
+        "CartValidation.validSplits"
+      ],
+      "cases": [
+        "CASE-05",
+        "CASE-09"
+      ],
+      "limits": "Exact frozen source and modeled dependency behavior where applicable",
+      "status": "reviewed with recorded coverage limits"
+    },
+    {
+      "invariant": "ACT-1",
+      "owner": "authorization",
+      "independentReviewer": "upgrade and receipts",
+      "paths": [
+        "Cart._validateActions"
+      ],
+      "cases": [
+        "CASE-06",
+        "CASE-14"
+      ],
+      "limits": "Exact frozen source and modeled dependency behavior where applicable",
+      "status": "reviewed with recorded coverage limits"
+    },
+    {
+      "invariant": "ACT-2",
+      "owner": "authorization",
+      "independentReviewer": "settlement rollback and upgrade receipts",
+      "paths": [
+        "Cart._executeFulfillment"
+      ],
+      "cases": [
+        "CASE-06",
+        "CASE-07",
+        "CASE-18"
+      ],
+      "limits": "Conforming collections. Dishonest delivery accepted as explicit trust boundary.",
+      "status": "reviewed with recorded coverage limits"
+    },
+    {
+      "invariant": "PAY-1",
+      "owner": "settlement",
+      "independentReviewer": "authorization",
+      "paths": [
+        "CartPayments._fundPayment",
+        "CartPayments._allocateLine"
+      ],
+      "cases": [
+        "CASE-08",
+        "CASE-09",
+        "CASE-18",
+        "CASE-19"
+      ],
+      "limits": "Exact-transfer tokens. Real-router fork repetition open.",
+      "status": "reviewed with recorded coverage limits"
+    },
+    {
+      "invariant": "PAY-2",
+      "owner": "settlement",
+      "independentReviewer": "authorization",
+      "paths": [
+        "CartPayments._settlementTokens",
+        "CartPayments._verifySolvency",
+        "CartPayments._prepareNativeFamily",
+        "CartPayments._verifyFinalBaselines"
+      ],
+      "cases": [
+        "CASE-10",
+        "CASE-18",
+        "CASE-23"
+      ],
+      "limits": "Truthful token balances and conforming WETH. Real-router fork repetition open.",
+      "status": "reviewed with recorded coverage limits"
+    },
+    {
+      "invariant": "PAY-3",
+      "owner": "settlement",
+      "independentReviewer": "authorization",
+      "paths": [
+        "CartPayments._executeRoute",
+        "CartPayments._assertNoPreexistingApprovals",
+        "CartPayments._assertAllowancesCleared"
+      ],
+      "cases": [
+        "CASE-11",
+        "CASE-18",
+        "CASE-19"
+      ],
+      "limits": "Exact frozen source and modeled dependency behavior where applicable",
+      "status": "reviewed with recorded coverage limits"
+    },
+    {
+      "invariant": "PAY-4",
+      "owner": "settlement",
+      "independentReviewer": "authorization",
+      "paths": [
+        "CartPayments._payLines",
+        "CartPayments._addPayout",
+        "CartPayments._captureSupportedSpread"
+      ],
+      "cases": [
+        "CASE-09",
+        "CASE-12",
+        "CASE-18"
+      ],
+      "limits": "Exact frozen source and modeled dependency behavior where applicable",
+      "status": "reviewed with recorded coverage limits"
+    },
+    {
+      "invariant": "PAY-5",
+      "owner": "settlement",
+      "independentReviewer": "authorization",
+      "paths": [
+        "CartRoutePolicy.validate",
+        "CartPayments._executeRoute"
+      ],
+      "cases": [
+        "CASE-21",
+        "CASE-22",
+        "CASE-23"
+      ],
+      "limits": "Reviewed policy semantics and local mocks. Exact deployed router pairing and fork execution open.",
+      "status": "reviewed with recorded coverage limits"
+    },
+    {
+      "invariant": "ATOM-1",
+      "owner": "settlement",
+      "independentReviewer": "authorization",
+      "paths": [
+        "Cart.executePurchase",
+        "CartPayments.begin",
+        "CartPayments.finish",
+        "Cart seller invalidation"
+      ],
+      "cases": [
+        "CASE-13",
+        "CASE-14",
+        "CASE-18"
+      ],
+      "limits": "Real-swap rollback repetition open. Owner-authorized callback behavior retains trusted-owner assumption.",
+      "status": "reviewed with recorded coverage limits"
+    },
+    {
+      "invariant": "ADMIN-1",
+      "owner": "upgrade",
+      "independentReviewer": "authorization",
+      "paths": [
+        "Cart.initialize",
+        "Cart._authorizeUpgrade",
+        "CartStorage",
+        "Cart owner entry points"
+      ],
+      "cases": [
+        "CASE-14",
+        "CASE-15"
+      ],
+      "limits": "Exact frozen source and modeled dependency behavior where applicable",
+      "status": "reviewed with recorded coverage limits"
+    },
+    {
+      "invariant": "OPS-1",
+      "owner": "coordinator and upgrade",
+      "independentReviewer": "authorization",
+      "paths": [
+        "script/cart",
+        "NetworkConfig",
+        "tools/upgradeCartFreeListings.py",
+        "candidate runtime immutables"
+      ],
+      "cases": [
+        "CASE-15",
+        "CASE-20",
+        "CASE-24"
+      ],
+      "limits": "Open operational Low L-2 and intended live target verification.",
+      "status": "reviewed with recorded coverage limits"
+    },
+    {
+      "invariant": "EVENT-1",
+      "owner": "upgrade and receipts",
+      "independentReviewer": "authorization and settlement ledgers",
+      "paths": [
+        "Cart._emitLineEvents",
+        "Cart._executeFulfillment",
+        "CartPayments settlement events",
+        "CartLens"
+      ],
+      "cases": [
+        "CASE-07",
+        "CASE-16"
+      ],
+      "limits": "Exact frozen source and modeled dependency behavior where applicable",
+      "status": "reviewed with recorded coverage limits"
+    },
+    {
+      "invariant": "SIZE-1",
+      "owner": "settlement and coordinator",
+      "independentReviewer": "verification sequence reviewer",
+      "paths": [
+        "memory indexes",
+        "dynamic calldata",
+        "gas fixtures",
+        "rollback state"
+      ],
+      "cases": [
+        "CASE-17",
+        "CASE-18"
+      ],
+      "limits": "Measured workloads are local fixtures. Deliberate collisions can increase per-call work.",
+      "status": "reviewed with recorded coverage limits"
+    }
+  ],
+  "focusedGasReport": {
+    "passed": 30,
+    "failed": 0,
+    "scope": [
+      "CartAdvancedGasTest",
+      "CartSplitsTest",
+      "CartRouteProtectionTest"
+    ],
+    "log": "/private/tmp/cart-audit-20261106-5c01rzvk/gas-report.log"
+  }
+}

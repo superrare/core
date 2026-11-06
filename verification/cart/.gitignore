@@ -1,0 +1,9 @@
+.native-out/
+.native-cache/
+proofs/
+kompiled/
+digest
+tmp/
+__pycache__/
+build-info
+kontrol_prove_report.xml

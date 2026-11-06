@@ -89,6 +89,17 @@ library NetworkConfig {
     address liquidRegistry;
     address rareBurner;
     address networkBeneficiary;
+    // Immutable external settlement dependencies used by Cart. Universal Router is the
+    // V2 deployment because CartRoutePolicy admits V2, V3, and V4 swap commands.
+    address weth;
+    address permit2;
+    address universalRouter;
+    address cartProxy;
+    address cartImplementation;
+    address cartRoutePolicy;
+    address cartPaymentExecutor;
+    address cartLens;
+    address cartHashes;
   }
 
   function getCurrent() internal view returns (Addresses memory) {
@@ -114,6 +125,9 @@ library NetworkConfig {
   }
 
   function _ethereumMainnet() private pure returns (Addresses memory config) {
+    config.weth = _addr(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    config.permit2 = _addr(0x000000000022D473030F116dDEE9F6B43aC78BA3);
+    config.universalRouter = _addr(0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af);
     config.superRareV1 = _addr(0x41A322b28D0fF354040e2CbC676F0320d8c8850d);
     config.superRareV2 = _addr(0xb932a70A57673d89f4acfFBE830E8ed7f75Fb9e0);
     config.marketplace = _addr(0x65B49f7AEE40347f5A90b714be4eF086f3fe5E2C);
@@ -195,6 +209,15 @@ library NetworkConfig {
   }
 
   function _ethereumSepolia() private pure returns (Addresses memory config) {
+    config.weth = _addr(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
+    config.permit2 = _addr(0x000000000022D473030F116dDEE9F6B43aC78BA3);
+    config.universalRouter = _addr(0x3A9D48AB9751398BbFa63ad67599Bb04e4BdF98b);
+    config.cartProxy = _addr(0xACfF2622f53f360274df3014DC135EfDC058786B);
+    config.cartImplementation = _addr(0x3F440079Ac99D99d418F1355FdE4BA3110271cE0);
+    config.cartRoutePolicy = _addr(0x534055AF4D780b1776EE443D388B748abdF2da97);
+    config.cartPaymentExecutor = _addr(0x95984953917BE6b94CeeA5CF90b271D5B07eB4a2);
+    config.cartLens = _addr(0xD9f2ED84317D517fc8e393227D76c63227e3f823);
+    config.cartHashes = _addr(0xD0e7aeE76485Bb3D6af3aBa187014DC636afF12A);
     config.superRareV1 = _addr(0x4eb420094a17f243878896e274D67A04F916C214);
     config.superRareV2 = _addr(0x6C7C4879dd37Bdf2B57f128b344DeF62DA0Ca34e);
     config.creatorRegistry = _addr(0x38302C717F793dD7EA5C0a2F215494409EaD3ce0);
@@ -276,6 +299,9 @@ library NetworkConfig {
   }
 
   function _baseMainnet() private pure returns (Addresses memory config) {
+    config.weth = _addr(0x4200000000000000000000000000000000000006);
+    config.permit2 = _addr(0x000000000022D473030F116dDEE9F6B43aC78BA3);
+    config.universalRouter = _addr(0x6fF5693b99212Da76ad316178A184AB56D299b43);
     config.marketplaceSettingsV3 = _addr(0x1Ca04105730EF2bBE93040Feb20aCc668292F69D);
     config.marketplaceSettingsV2 = _addr(0xDDAB7C8a64eBb9E1736c2EFFA1399b43601527C0);
     config.marketplaceSettingsV1 = _addr(0xb8BEA146470829F5ad4029D27338BDE7124c6704);
@@ -356,6 +382,9 @@ library NetworkConfig {
   }
 
   function _baseSepolia() private pure returns (Addresses memory config) {
+    config.weth = _addr(0x4200000000000000000000000000000000000006);
+    config.permit2 = _addr(0x000000000022D473030F116dDEE9F6B43aC78BA3);
+    config.universalRouter = _addr(0x492E6456D9528771018DeB9E87ef7750EF184104);
     config.creatorRegistry = _addr(0x74797488D1000d08B1f364d0989c011a86165CC1);
     config.marketplaceSettingsV3 = _addr(0xC83551914aB8784B4D779794cD74d12Ac4dF26Bc);
     config.marketplaceSettingsV2 = _addr(0x560f1Bd4B1b704073eDcEe6C1f930AC4E3AE6811);
@@ -438,4 +467,13 @@ library NetworkConfig {
   function _addr(address raw) private pure returns (address) {
     return raw;
   }
+
+  function requireContract(address value, string memory name) internal view returns (address) {
+    if (value == address(0)) revert NetworkAddressNotConfigured(name, block.chainid);
+    if (value.code.length == 0) revert NetworkAddressNotDeployed(name, value, block.chainid);
+    return value;
+  }
+
+  error NetworkAddressNotConfigured(string name, uint256 chainId);
+  error NetworkAddressNotDeployed(string name, address value, uint256 chainId);
 }

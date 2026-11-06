@@ -1,0 +1,50 @@
+{
+  "expanded_caps": false,
+  "line_cap": 64,
+  "operation_cap": 20,
+  "tests_passed": 10,
+  "large_cases_expected_to_revert": 6,
+  "method": "Factory-cloned RareERC1155; distinct token IDs; one EOA collector; two fee lines; native payment. Local approximation excluding fixture creation and refunds, not chain receipts. Isolated copy uses trimmed unrelated inherited test methods as earlier benchmarks.",
+  "results": [
+    {
+      "sales": 18,
+      "lines": 20,
+      "calldataBytes": 17892,
+      "grossCallGas": 2599487,
+      "intrinsicGas": 174636,
+      "calldataFloorGas": 405090,
+      "mode": "mint",
+      "approximateTransactionGas": 2774123
+    },
+    {
+      "sales": 9,
+      "lines": 11,
+      "calldataBytes": 9540,
+      "grossCallGas": 1372026,
+      "intrinsicGas": 99072,
+      "calldataFloorGas": 216180,
+      "mode": "mint",
+      "approximateTransactionGas": 1471098
+    },
+    {
+      "sales": 18,
+      "lines": 20,
+      "calldataBytes": 17892,
+      "grossCallGas": 1698040,
+      "intrinsicGas": 174624,
+      "calldataFloorGas": 405060,
+      "mode": "transfer",
+      "approximateTransactionGas": 1872664
+    },
+    {
+      "sales": 9,
+      "lines": 11,
+      "calldataBytes": 9540,
+      "grossCallGas": 918679,
+      "intrinsicGas": 99072,
+      "calldataFloorGas": 216180,
+      "mode": "transfer",
+      "approximateTransactionGas": 1017751
+    }
+  ]
+}
