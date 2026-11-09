@@ -13,6 +13,7 @@ This repository contains the Solidity contracts that power Rare Protocol's marke
   - [`RareMinter` — blind & sequential lazy minting](#rareminter--blind--sequential-lazy-minting)
 - [Token Contracts](#token-contracts)
   - [`LazySovereignNFT` — token contract for `RareMinter` drops](#lazysovereignnft--token-contract-for-rareminter-drops)
+  - [`LazySovereignNFTV5` — optional creator-token transfer validation](#lazysovereignnftv5--optional-creator-token-transfer-validation)
   - [`SovereignBatchMint` — standard creator collections](#sovereignbatchmint--standard-creator-collections)
   - [`LazySovereignBatchMint` — lazy batch drops](#lazysovereignbatchmint--lazy-batch-drops)
   - [Choosing between `SovereignBatchMint` and `LazySovereignBatchMint`](#choosing-between-sovereignbatchmint-and-lazysovereignbatchmint)
@@ -110,7 +111,7 @@ Use `BatchOffer` when you want to make a **blanket offer over a curated list of 
 
 `RareMinter` is the marketplace contract for **blind mints and sequential token lazy minting** — fixed-price public drops where buyers pay and receive a newly-minted token in one transaction. Token IDs are assigned sequentially as each buyer comes in (1, 2, 3, ...), and tokens are minted on-demand at sale settlement rather than pre-minted upfront. The contract supports optional Merkle allow-lists, per-address and per-tx mint caps, payment currency selection, and revenue splits.
 
-**Pairs with:** [`LazySovereignNFT`](#lazysovereignnft--token-contract-for-rareminter-drops). `RareMinter` mints by calling `IERC721Mint.mintTo(address) returns (uint256)`, and `LazySovereignNFT` is the only active token contract that implements that signature. The other active token contracts (`SovereignBatchMint`, `LazySovereignBatchMint`) have richer `mintTo` signatures and aren't callable by `RareMinter`.
+**Pairs with:** [`LazySovereignNFT`](#lazysovereignnft--token-contract-for-rareminter-drops) and its [`LazySovereignNFTV5`](#lazysovereignnftv5--optional-creator-token-transfer-validation) variant. `RareMinter` calls `IERC721Mint.mintTo(address) returns (uint256)`. The other active token contracts (`SovereignBatchMint`, `LazySovereignBatchMint`) have richer `mintTo` signatures and aren't callable by `RareMinter`.
 
 **Setup:**
 1. Deploy `LazySovereignNFT` via `LazySovereignNFTFactory` (see [Token Contracts](#token-contracts)).
@@ -134,6 +135,49 @@ This contract supports two common drop styles when paired with `RareMinter`:
 - **Blind mints** — sequential token IDs, but the `baseURI` initially points at placeholder metadata. After the sale completes, the creator calls `updateBaseURI(...)` to swap in the real metadata, "revealing" the collection.
 
 There is no on-chain randomization or shuffle mechanism — "blind" here is an off-chain UX pattern enabled by `updateBaseURI`. If you need randomized assignment, that has to be implemented at a layer above this contract.
+
+### `LazySovereignNFTV5` — optional creator-token transfer validation
+
+[`LazySovereignNFTV5`](src/token/ERC721/sovereign/lazy/extensions/LazySovereignNFTV5.sol) extends `LazySovereignNFT` with the creator-token interface and transfer-time validation. It preserves `mintTo(address)`, minter permissions, metadata preparation, URI updates/locking, supply cap and ERC-2981 queries used by the existing release flow. It is a new optional implementation, not a replacement for standard or legacy RoyaltyGuard collections.
+
+**Deployment and tooling**
+
+1. Deploy a `LazySovereignNFTV5` implementation and the updated `LazySovereignNFTFactory`. Its owner installs the implementation with `setSovereignNFT(implementation, factory.LAZY_SOVEREIGN_NFT_V5())`.
+2. Artists create clones with the existing `createSovereignNFTContract(name, symbol, maxTokens, contractType)` signature, selecting `LAZY_SOVEREIGN_NFT_V5`. Both existing creation events are retained.
+3. Prepare metadata, approve `RareMinter` and configure the release using the existing methods. Minting does not require a new `RareMinter` implementation.
+
+The implementation is installed separately because embedding a fourth token deployment in the factory constructor exceeds Ethereum's init-code limit. V5 creation reverts until an implementation with code is installed. The standalone V5 implementation is initialization-locked; each clone initializes once. Existing factory deployments are not upgraded by this source change.
+
+**This is not yet a new published CLI option.** The inspected Rare SDK/CLI deployment selectors only recognize the existing lazy types and use configured per-chain factory addresses. Selecting V5 through their normal deployment flow requires the new constant/ABI/type selection and the deployed factory address to be registered downstream. Do not disguise V5 as `lazy-royalty-guard` or silently switch the ordinary lazy type. Existing release/mint/metadata interfaces can be used once a V5 collection address is supplied; this does not establish Studio-kit or hosted Connect end-to-end readiness.
+
+**Validator policy and royalties**
+
+- Clone initialization selects Limit Break V5 at `0x721C008fdff27BF06E7E123956E2Fe03B63342e3` and registers token type 721. It reverts if the validator is absent or registration fails, rather than silently creating an unrestricted collection. Validate deployment on every intended chain.
+- `ICreatorToken` discovery reports the view selector `validateTransfer(address,address,address,uint256)`. Ordinary transfers call that validator even when an operator already holds approval. Mint/burn skip validation; validator-originated transfers follow the upstream prevalidated-transfer convention. The token never grants automatic validator approval.
+- The collection owner can call `setTransferValidator(address)` or directly configure V5's ruleset/list. Zero disables validation; nonzero replacements must have code and accept token-type registration. This is artist-controlled policy, not an immutable royalty guarantee.
+- Initially the collection uses V5's default policy/list, including its upstream-managed authorizers. To support SuperRare trading, configure a reviewed operator list for the actual Bazaar/other supported transfer callers. This token does not automatically whitelist every SuperRare sale contract. Enabling V5's default-list extension adds Limit Break list 0; it does not create a SuperRare-owned default.
+- OpenSea uses the creator-token/authorizer flow with restricted orders and signed fulfillment data. Generic Seaport/conduit allowlisting is not equivalent to royalty checking. A compatible interface and a successful SuperRare test are not evidence of an OpenSea signed-order fill.
+- ERC-2981 and payout remain separate. There is no new platform cut, splitter or approved collection rate baked in. Initialization retains the existing lazy collection's 10% default receiver/rate behavior; configure approved terms before minting. The added owner-only `setDefaultRoyaltyPercentage(uint256)` matches the existing SDK selector, uses **whole percent (0–100), not basis points**, and rejects values above 100.
+- The inherited mint logic stores token-specific receiver/rate values. Changing a default does not rewrite an already-minted token's nonzero stored values; explicit per-token receiver updates remain available. Zero is the inherited royalty-percentage fallback sentinel. Keep these semantics in mind when changing settings after mint.
+
+Protocol references: [creator-token-standards v5.0.0](https://github.com/limitbreakinc/creator-token-standards/tree/980a63b33591d568b6e04b45f37deba05a55f787), [V5 deployment directory](https://apptokens.com/docs/integration-guide/creator-token-standards/v5/contract-deployments), [V5 policy source](https://github.com/limitbreakinc/creator-token-transfer-validator/tree/59adb8b36ab0256c7430b017b1c9f8b4841d6e1e), and [OpenSea creator-fee integration](https://docs.opensea.io/docs/creator-fee-enforcement).
+
+**PFP launch work beyond this token**
+
+These are integration/design boundaries, not commitments to implement them in this change:
+
+| Area | Reuse | Work still required |
+| --- | --- | --- |
+| deans artwork and immediate reveal | Sequential mint IDs, base URI, per-token URI override and metadata lock | Final asset/trait-attribution preparation, permanent storage, assignment fairness, pre-mint secrecy and the exact immediate-reveal mechanism. A later collection-wide URI update is not automatically that mechanism. |
+| deans multi-artist payouts | Existing primary-sale split inputs and a configurable secondary royalty receiver | Approved individual allocations, fee basis and an executable multi-recipient distribution design. Primary proceeds and secondary royalties need separate configurations; a two-recipient example does not distribute contributor pools. |
+| Both collections' phases | One active RareMinter price/start/transaction cap; replaceable address-only allowlist root and expiry | Different scheduled phase prices, reserved supply/carryover and phase-specific allowances need operational reconfiguration or additional phase logic. Root replacement does not reset existing wallet counters. Approve any rolling-update/proof-delivery process. |
+| deans wallet limits | RareMinter's collection-wide wallet mint and transaction counters | Confirm the proposed limit and whether it applies only to allowlist or across phases; verify checkout eligibility and proof delivery in the chosen Studio kit. |
+| CARNAGE dynamic artwork | Virtual `tokenURI`, standard NFT ownership and existing creator-token integration surface | Integrate V5 with the artist's actual renderer/game contract if it must retain onchain artwork and arena state. This generic URI token does not implement or migrate that art. Verify thumbnails, fighter pages and the reported metadata-refresh fix; no ERC-4906 refresh mechanism is added here. |
+| CARNAGE supply/burn and delegated wallets | Fixed cumulative mint cap; inherited burn; sender-based RareMinter minting | Resolve fixed/open/timed supply and burn policy. Burning does not replenish mint capacity. An allowlisted hot wallet receives its own mint; native vault minting is not supplied. |
+| Both launches' readiness | Existing token/minter primitives | Per-collection consent/economics, supported wallet/device and sale-path checks, peak-demand rehearsal, monitoring, incident/pause procedures and launch sign-off. |
+
+In the inspected source, `RareMinter` does not invoke `MarketUtils.checkSplits`, even though that helper specifies a five-recipient cap. Do not infer that an arbitrary contributor allocation is validated on-chain: approve and validate recipient/ratio totals through the actual deployment tool and exercise real payouts. No unrelated payout or phase implementation is changed here.
+
 
 ### `SovereignBatchMint` — standard creator collections
 
@@ -191,7 +235,7 @@ All creator-owned NFT contracts above are designed to be deployed per-creator vi
 
 **Use only for `RareMinter` drops:**
 
-- **`LazySovereignNFTFactory`** (`src/token/ERC721/sovereign/lazy/LazySovereignNFTFactory.sol`) — deploys `LazySovereignNFT`. This factory is only needed when the creator intends to run their drop through `RareMinter` (since `LazySovereignNFT` is the only token contract `RareMinter` can drive). For non-`RareMinter` drops, prefer the V2 factories above.
+- **`LazySovereignNFTFactory`** (`src/token/ERC721/sovereign/lazy/LazySovereignNFTFactory.sol`) — deploys `LazySovereignNFT` and its optional variants, including separately installed `LazySovereignNFTV5`. Use this for `RareMinter` drops; the implementations retain its `mintTo(address)` interface. For non-`RareMinter` drops, prefer the V2 factories above.
 
 ### Royalty extensions
 
@@ -302,5 +346,15 @@ make build
 ## Tests
 
 ```bash
-forge test
+make test
 ```
+
+The existing `make test` target runs the non-fork suite. The V5 integration module uses the real V5 validator, deployed RareMinter and Bazaar at Ethereum block 26350391:
+
+```bash
+MAINNET_RPC_URL="$ARCHIVE_MAINNET_RPC_URL" forge test \
+  --match-path src/test/forks/mainnet/LazySovereignNFTV5.t.sol -vv
+```
+
+The module performs all writes only inside Foundry's fork. A local Anvil fork at the same block can be supplied as `MAINNET_RPC_URL` when the upstream RPC transport is unreliable. It covers paid primary minting, secondary Bazaar royalty balances after explicit operator setup, default denied/allowed transfers, revocation despite prior approval, owner controls, initialization and inherited metadata/royalty behavior. It does not exercise OpenSea's offchain signature service, every marketplace fill path or a hosted Connect browser checkout.
+

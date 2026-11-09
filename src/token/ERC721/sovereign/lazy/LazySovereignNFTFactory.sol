@@ -7,16 +7,19 @@ import "openzeppelin-contracts/proxy/Clones.sol";
 import "./LazySovereignNFT.sol";
 import "./extensions/LazySovereignNFTRoyaltyGuard.sol";
 import "./extensions/LazySovereignNFTRoyaltyGuardDeadmanTrigger.sol";
+import "./extensions/LazySovereignNFTV5.sol";
 
 contract LazySovereignNFTFactory is Ownable {
 
     bytes32 public constant LAZY_SOVEREIGN_NFT = keccak256("LAZY_SOVEREIGN_NFT");
     bytes32 public constant LAZY_ROYALTY_GUARD = keccak256("LAZY_ROYALTY_GUARD");
     bytes32 public constant LAZY_ROYALTY_GUARD_DEADMAN = keccak256("LAZY_ROYALTY_GUARD_DEADMAN");
+    bytes32 public constant LAZY_SOVEREIGN_NFT_V5 = keccak256("LAZY_SOVEREIGN_NFT_V5");
 
     address public lazySovereignNFT;
     address public lazySovereignNFTRoyaltyGuard;
     address public lazySovereignNFTRoyaltyGuardDeadmanTrigger;
+    address public lazySovereignNFTV5;
 
     event SovereignNFTContractCreated(
         address indexed contractAddress,
@@ -57,6 +60,11 @@ contract LazySovereignNFTFactory is Ownable {
             lazySovereignNFTRoyaltyGuardDeadmanTrigger = _sovereignNFT;
             return;
         }
+        if (_contractType == LAZY_SOVEREIGN_NFT_V5) {
+            require(_sovereignNFT.code.length > 0, "setSovereignNFT::V5 implementation has no code.");
+            lazySovereignNFTV5 = _sovereignNFT;
+            return;
+        }
         require(false, "setSovereignNFT::Unsupported _contractType.");
     }
 
@@ -89,6 +97,16 @@ contract LazySovereignNFTFactory is Ownable {
         if (_contractType == LAZY_ROYALTY_GUARD_DEADMAN) {
             sovAddr = Clones.clone(lazySovereignNFTRoyaltyGuardDeadmanTrigger);
             LazySovereignNFTRoyaltyGuardDeadmanTrigger(sovAddr).init(
+                _name,
+                _symbol,
+                msg.sender,
+                _maxTokens
+            );
+        }
+        if (_contractType == LAZY_SOVEREIGN_NFT_V5) {
+            require(lazySovereignNFTV5.code.length > 0, "createSovereignNFTContract::V5 implementation not configured.");
+            sovAddr = Clones.clone(lazySovereignNFTV5);
+            LazySovereignNFTV5(sovAddr).init(
                 _name,
                 _symbol,
                 msg.sender,
