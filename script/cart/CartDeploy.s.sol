@@ -13,17 +13,19 @@ import {NetworkConfig} from "../NetworkConfig.s.sol";
 
 /// @title CartDeploy
 /// @notice Deploys the complete Cart system and validates its external settlement dependencies.
-/// @dev CART_OWNER defaults to the deployer's address when omitted. Set CART_PLATFORM_SIGNER
-///      before broadcasting. Optional code-hash environment variables turn the logged
+/// @dev CART_OWNER defaults to the deployer's address. CART_PLATFORM_SIGNER overrides the
+///      network's initial signer. Optional code-hash environment variables turn the logged
 ///      fingerprints into a strict deployment check.
 contract CartDeploy is Script {
   error CodeHashMismatch(string name, address target, bytes32 expected, bytes32 actual);
+  error InvalidPlatformSigner();
 
   function run() external {
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address owner = vm.envOr("CART_OWNER", vm.addr(privateKey));
-    address platformSigner = vm.envAddress("CART_PLATFORM_SIGNER");
     NetworkConfig.Addresses memory config = NetworkConfig.getCurrent();
+    address platformSigner = vm.envOr("CART_PLATFORM_SIGNER", config.cartInitialPlatformSigner);
+    if (platformSigner == address(0)) revert InvalidPlatformSigner();
 
     address weth = NetworkConfig.requireContract(config.weth, "weth");
     address permit2 = NetworkConfig.requireContract(config.permit2, "permit2");
@@ -51,6 +53,7 @@ contract CartDeploy is Script {
     console.log("Network:", NetworkConfig.chainName(block.chainid));
     console.log("Chain ID:", block.chainid);
     console.log("Cart proxy:", address(proxy));
+    console.log("Cart platform signer:", platformSigner);
     console.log("Cart implementation:", address(implementation));
     console.log("Cart route policy:", address(routePolicy));
     console.log("Cart payment executor:", address(paymentExecutor));

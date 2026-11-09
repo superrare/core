@@ -100,6 +100,8 @@ library NetworkConfig {
     address cartPaymentExecutor;
     address cartLens;
     address cartHashes;
+    // Initial platform signer for fresh Cart deployments.
+    address cartInitialPlatformSigner;
   }
 
   function getCurrent() internal view returns (Addresses memory) {
@@ -125,6 +127,7 @@ library NetworkConfig {
   }
 
   function _ethereumMainnet() private pure returns (Addresses memory config) {
+    config.cartInitialPlatformSigner = _addr(0x430c786844B45aa5bFb15CCeA0B9676A28267256);
     config.weth = _addr(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     config.permit2 = _addr(0x000000000022D473030F116dDEE9F6B43aC78BA3);
     config.universalRouter = _addr(0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af);

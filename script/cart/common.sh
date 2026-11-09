@@ -41,9 +41,6 @@ cart_run_script() {
   cart_load_env
   : "${RPC_URL:?RPC_URL is required. Set CART_ENV_FILE to select the deployment environment.}"
   : "${PRIVATE_KEY:?PRIVATE_KEY is required}"
-  if [[ "${target}" == CartDeploy ]]; then
-    : "${CART_PLATFORM_SIGNER:?CART_PLATFORM_SIGNER is required}"
-  fi
   if [[ "${verify}" == true ]]; then
     : "${ETHERSCAN_API_KEY:?ETHERSCAN_API_KEY is required with --verify}"
   fi
@@ -58,6 +55,9 @@ cart_run_script() {
   if [[ "${chain_id}" != "${CART_CHAIN_ID:-11155111}" ]]; then
     echo "RPC chain ${chain_id} does not match CART_CHAIN_ID=${CART_CHAIN_ID:-11155111}." >&2
     return 1
+  fi
+  if [[ "${target}" == CartDeploy && "${chain_id}" != 1 ]]; then
+    : "${CART_PLATFORM_SIGNER:?CART_PLATFORM_SIGNER is required}"
   fi
   multiplier="${CART_GAS_ESTIMATE_MULTIPLIER:-150}"
   if ! [[ "${multiplier}" =~ ^[1-9][0-9]*$ ]] || (( multiplier < 100 )); then
