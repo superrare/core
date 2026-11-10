@@ -1,24 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.15;
 
-import "../LazySovereignNFT.sol";
-import "../../../../extensions/ICreatorToken.sol";
-import "../../../../extensions/ICreatorTokenTransferValidator.sol";
+import "./LazySovereignBatchMint.sol";
+import "../../../../token/extensions/ICreatorToken.sol";
+import "../../../../token/extensions/ICreatorTokenTransferValidator.sol";
 
-/// @notice A RareMinter-compatible collection with transfer-time creator-token validation.
-/// @dev Minting, metadata and ERC-2981 behavior are inherited from LazySovereignNFT.
-///      The owner may change or disable validation; the validator does not settle royalties.
-contract LazySovereignNFTV5 is LazySovereignNFT, ICreatorToken {
+/// @notice A V2 lazy-batch collection with transfer-time creator-token validation.
+/// @dev The V2 factory initializes the implementation before creating clones.
+///      Batch reservation, materialization, metadata and royalties retain V2 behavior.
+contract LazySovereignBatchMintV5 is LazySovereignBatchMint, ICreatorToken {
     address public constant DEFAULT_TRANSFER_VALIDATOR = 0x721C008fdff27BF06E7E123956E2Fe03B63342e3;
 
     address private transferValidator;
 
     error InvalidTransferValidator();
-    error InvalidRoyaltyPercentage();
-
-    constructor() {
-        _disableInitializers();
-    }
 
     /// @dev The parent initializer protects the whole transaction against replay.
     function init(string calldata _name, string calldata _symbol, address _creator, uint256 _maxTokens)
@@ -37,15 +32,6 @@ contract LazySovereignNFTV5 is LazySovereignNFT, ICreatorToken {
     /// @dev Nonzero validators must accept ERC-721 token-type registration.
     function setTransferValidator(address validator) external override onlyOwner {
         _setTransferValidator(validator);
-    }
-
-    /// @notice Set the royalty default in whole percentage points for subsequent mints.
-    /// @dev Existing nonzero per-token snapshots retain their rates.
-    function setDefaultRoyaltyPercentage(uint256 percentage) external onlyOwner {
-        if (percentage > 100) {
-            revert InvalidRoyaltyPercentage();
-        }
-        _setDefaultRoyaltyPercentage(percentage);
     }
 
     function getTransferValidationFunction()

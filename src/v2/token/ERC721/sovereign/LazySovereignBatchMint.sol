@@ -74,7 +74,7 @@ contract LazySovereignBatchMint is
     string calldata _symbol,
     address _creator,
     uint256 _maxTokens
-  ) public initializer {
+  ) public virtual initializer {
     require(_creator != address(0), "creator cannot be null address");
     _setDefaultRoyaltyPercentage(10);
     disabled = false;
