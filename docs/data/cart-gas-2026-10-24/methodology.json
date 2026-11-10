@@ -1,0 +1,11 @@
+{
+  "chain_id": 11155111,
+  "proxy": "0x1EBF35b3A76caEf60a009d2786A66A91D42A38Bc",
+  "snapshot_block": 11983573,
+  "snapshot_block_hash": "0x7846b976d50f20344712660fb3d107bec553a8907ab6b6646224a4c63efbcb2f",
+  "snapshot_timestamp_unix": 1792842228,
+  "rpc": "https://ethereum-sepolia-rpc.publicnode.com",
+  "history_api": "https://eth-sepolia.blockscout.com/api/v2/addresses/0x1EBF35b3A76caEf60a009d2786A66A91D42A38Bc/transactions",
+  "purchase_selector": "0xa58ea93f",
+  "method": "All five explorer history pages; ABI-decoded every purchase. Cross-check receipt gas, block and success where public RPC serves receipts, and line and fulfillment event counts for each available purchase receipt. Assign implementation by successful upgrade calldata and receipt logs when available. Statistics use nearest-rank p95. Local benchmarks are approximate gross external-call gas plus intrinsic, subject to calldata floor; they use working-tree code and mock assets."
+}

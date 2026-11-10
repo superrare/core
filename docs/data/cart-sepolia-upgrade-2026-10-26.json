@@ -1,0 +1,108 @@
+{
+  "chainId": 11155111,
+  "proxy": "0x1EBF35b3A76caEf60a009d2786A66A91D42A38Bc",
+  "owner": "0xBa68422A154e459f7b4992a95Ad358d412b6bd1d",
+  "contracts": {
+    "CartRoutePolicy": "0xbf6c6d2e8be99cdc5882d186c40fdf9222892f9c",
+    "CartPayments": "0xbf73e54100d9c9853d31ce5a82b9a1066a3103cb",
+    "Cart": "0x6d10c6a2cbd956cbc5bf74e06fab3651434c52aa",
+    "CartLens": "0x7dd8e5c3560af43700722270fbbc1d0d6079e9b5"
+  },
+  "transactions": [
+    {
+      "label": "CartRoutePolicy",
+      "hash": "0x69b83674a1c37be56f14fd7fd6e2925fb2d2c3678ed0059c45d1e1c0dfb70075",
+      "estimateGas": 1297097,
+      "gasLimit": 1621372,
+      "gasUsed": "0x139e5e",
+      "blockNumber": "0xb71bd9"
+    },
+    {
+      "label": "CartPayments",
+      "hash": "0x8d04f3da180c3ad53d108c83b1d1a8240f350d1043ecc88f07e64e59a1d7a5c2",
+      "estimateGas": 15679336,
+      "gasLimit": 19599170,
+      "gasUsed": "0xed589f",
+      "blockNumber": "0xb71bda"
+    },
+    {
+      "label": "Cart",
+      "hash": "0xaf4eba30be082272157b6620a4d7ac104f9d25f95b44324be208c3ddeafc5276",
+      "estimateGas": 28498892,
+      "gasLimit": 35623615,
+      "gasUsed": "0x1af6ab5",
+      "blockNumber": "0xb71bdb"
+    },
+    {
+      "label": "CartLens",
+      "hash": "0xa1dfa585d2ed1dfccf94a285bb031d911605e95f3363d28816bd251760497747",
+      "estimateGas": 15345995,
+      "gasLimit": 19182494,
+      "gasUsed": "0xe84cc2",
+      "blockNumber": "0xb71bdc"
+    },
+    {
+      "label": "Upgrade",
+      "hash": "0xb1343a63d2c27c12452027372cdc3fbfa24dcfafbae86d650baf5af9a2f9d397",
+      "estimateGas": 42997,
+      "gasLimit": 53747,
+      "gasUsed": "0xa67e",
+      "blockNumber": "0xb71bdd"
+    }
+  ],
+  "date": "2026-10-26",
+  "postflight": {
+    "proxyImplementation": "0x6d10c6a2cbd956cbc5bf74e06fab3651434c52aa",
+    "owner": "0xBa68422A154e459f7b4992a95Ad358d412b6bd1d",
+    "platformSigner": "0xF7885c18e2757fbaEa2dCfFF3aC0DF94520f4EAE",
+    "protocolRecipient": "0xBa68422A154e459f7b4992a95Ad358d412b6bd1d",
+    "paused": false,
+    "universalRouter": "0x3A9D48AB9751398BbFa63ad67599Bb04e4BdF98b",
+    "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+    "weth": "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
+    "routePolicy": "0xbF6c6D2E8Be99cDc5882d186c40fDF9222892f9C",
+    "CartRoutePolicyRuntimeMatches": true,
+    "CartRoutePolicyImmutableAddresses": [],
+    "CartPaymentsRuntimeMatches": true,
+    "CartPaymentsImmutableAddresses": [
+      "0xbf6c6d2e8be99cdc5882d186c40fdf9222892f9c",
+      "0xbf73e54100d9c9853d31ce5a82b9a1066a3103cb"
+    ],
+    "CartRuntimeMatches": true,
+    "CartImmutableAddresses": [
+      "0x6d10c6a2cbd956cbc5bf74e06fab3651434c52aa",
+      "0xbf6c6d2e8be99cdc5882d186c40fdf9222892f9c",
+      "0xbf73e54100d9c9853d31ce5a82b9a1066a3103cb"
+    ],
+    "CartLensRuntimeMatches": true,
+    "CartLensImmutableAddresses": [],
+    "cart65LinesReachesHashValidation": true,
+    "lens65LinesReachesHashValidation": true,
+    "policyAccepts33Commands": true,
+    "policyStillRejectsMismatchedArrays": true
+  },
+  "tests": {
+    "command": "FOUNDRY_PROFILE=cart forge test --offline",
+    "suites": 18,
+    "passed": 599,
+    "failed": 0,
+    "skipped": 0,
+    "invariantRuns": 256,
+    "invariantCallsPerTest": 128000
+  },
+  "sourceVerification": {
+    "runtime": "matches local tested artifacts after resolving immutables",
+    "explorer": "not submitted; source-export approval required"
+  },
+  "earlierFailedAttempt": {
+    "hash": "0xcaa5cd48b73d63e83789404333f15cf0a5e0565be31932408a7c146930a091fd",
+    "reason": "route-policy creation ran out of gas using the older local simulator estimate; proxy was unchanged",
+    "recovery": "new deployments used node eth_estimateGas with a 25 percent margin and sequential receipt confirmation"
+  },
+  "localArtifactSha256": {
+    "CartRoutePolicy": "c3335d963c718ce7d43af3596a1ba32a12c0d49d4a011de821c64fe0bc7bd202",
+    "CartPayments": "0a8c259d0308c9f34f30e9dc3ece20d3f128cd078d9d9e1b036a0d5c10a275e1",
+    "Cart": "afacb36ae68ed860434e011bdc5316ecf9dd62f5bec420ac30d5d41a4854ba3d",
+    "CartLens": "d3b89eb33ac3457e1fe0ca02c45f4b767c1d8fc66a735a0c16cb74d4f525f165"
+  }
+}

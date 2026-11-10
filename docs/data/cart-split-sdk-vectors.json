@@ -1,0 +1,92 @@
+{
+  "sdk": "ethers@6.15.0",
+  "domain": {
+    "name": "SuperRare Cart",
+    "version": "1",
+    "chainId": 1,
+    "verifyingContract": "0x0000000000000000000000000000000000001234"
+  },
+  "types": {
+    "Split": [
+      {
+        "name": "recipient",
+        "type": "address"
+      },
+      {
+        "name": "basisPoints",
+        "type": "uint16"
+      }
+    ],
+    "Listing": [
+      {
+        "name": "listingSalt",
+        "type": "bytes32"
+      },
+      {
+        "name": "seller",
+        "type": "address"
+      },
+      {
+        "name": "sku",
+        "type": "bytes32"
+      },
+      {
+        "name": "fulfillmentKind",
+        "type": "uint8"
+      },
+      {
+        "name": "tokenContract",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "name": "settlementCurrency",
+        "type": "address"
+      },
+      {
+        "name": "minimumUnitPrice",
+        "type": "uint256"
+      },
+      {
+        "name": "availableQuantity",
+        "type": "uint256"
+      },
+      {
+        "name": "paymentRecipient",
+        "type": "address"
+      },
+      {
+        "name": "splits",
+        "type": "Split[]"
+      }
+    ]
+  },
+  "value": {
+    "listingSalt": "0x1111111111111111111111111111111111111111111111111111111111111111",
+    "seller": "0x0000000000000000000000000000000000002222",
+    "sku": "0x2222222222222222222222222222222222222222222222222222222222222222",
+    "fulfillmentKind": 1,
+    "tokenContract": "0x0000000000000000000000000000000000000000",
+    "tokenId": 0,
+    "settlementCurrency": "0x0000000000000000000000000000000000000000",
+    "minimumUnitPrice": 100,
+    "availableQuantity": 3,
+    "paymentRecipient": "0x0000000000000000000000000000000000003333",
+    "splits": [
+      {
+        "recipient": "0x0000000000000000000000000000000000003333",
+        "basisPoints": 8000
+      },
+      {
+        "recipient": "0x0000000000000000000000000000000000004444",
+        "basisPoints": 2000
+      }
+    ]
+  },
+  "domainSeparator": "0x109a5d60a1ddcf3cdb2382a619eced17d11f7c407fe3e2b37f9c962ca84b7e2a",
+  "empty": "0x26be2aa27193d9ecc1a3db9bc569abb6040c77d3cd9b5a43a032e8c8fb5f94a6",
+  "populated": "0x2134c7b34f7e8e057acfcb07ffe97f93e09c5348d6521a1721f0c974b4e3d58c"
+}

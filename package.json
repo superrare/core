@@ -15,6 +15,7 @@
     "lint": "concurrently -n prettier,solhint -c green,yellow \"npm run lint:prettier\" \"npm run lint:solhint\"",
     "lint:prettier": "pprettier --check --concurrency 50 --ignore-path .prettierignore \"**/*\"",
     "lint:solhint": "find src/ -name '*.sol' | xargs npm run solhint",
+    "setup:cart": "bash script/cart/setup.sh",
     "solhint": "solhint",
     "test": "forge test -vvv"
   },

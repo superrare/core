@@ -1,0 +1,222 @@
+[
+  {
+    "transaction_hash": "0xb944bd39a60079c9c7b5d3ad39725143d88ec4a36e9c68f724e9f5246a8746fa",
+    "source": "https://eth-sepolia.blockscout.com/api/v2/transactions/0xb944bd39a60079c9c7b5d3ad39725143d88ec4a36e9c68f724e9f5246a8746fa/raw-trace",
+    "trace_address": [],
+    "call_type": "call",
+    "to": "0x1ebf35b3a76caef60a009d2786a66a91d42a38bc",
+    "selector": "0xa58ea93f",
+    "inclusive_gas_used": 967599
+  },
+  {
+    "transaction_hash": "0xb944bd39a60079c9c7b5d3ad39725143d88ec4a36e9c68f724e9f5246a8746fa",
+    "source": "https://eth-sepolia.blockscout.com/api/v2/transactions/0xb944bd39a60079c9c7b5d3ad39725143d88ec4a36e9c68f724e9f5246a8746fa/raw-trace",
+    "trace_address": [
+      0
+    ],
+    "call_type": "delegatecall",
+    "to": "0x6a667afbca403de9b2c5876534383c9c73c0db40",
+    "selector": "0xa58ea93f",
+    "inclusive_gas_used": 961873
+  },
+  {
+    "transaction_hash": "0xb944bd39a60079c9c7b5d3ad39725143d88ec4a36e9c68f724e9f5246a8746fa",
+    "source": "https://eth-sepolia.blockscout.com/api/v2/transactions/0xb944bd39a60079c9c7b5d3ad39725143d88ec4a36e9c68f724e9f5246a8746fa/raw-trace",
+    "trace_address": [
+      0,
+      0
+    ],
+    "call_type": "staticcall",
+    "to": "0x3e96a85be716caad612e16238efdac707e3fb2e9",
+    "selector": "0x8da5cb5b",
+    "inclusive_gas_used": 5442
+  },
+  {
+    "transaction_hash": "0xb944bd39a60079c9c7b5d3ad39725143d88ec4a36e9c68f724e9f5246a8746fa",
+    "source": "https://eth-sepolia.blockscout.com/api/v2/transactions/0xb944bd39a60079c9c7b5d3ad39725143d88ec4a36e9c68f724e9f5246a8746fa/raw-trace",
+    "trace_address": [
+      0,
+      1
+    ],
+    "call_type": "delegatecall",
+    "to": "0xc46c1c0d0776d3ae6a52591244f299faf2c14fa6",
+    "selector": "0x21fee789",
+    "inclusive_gas_used": 15536
+  },
+  {
+    "transaction_hash": "0xb944bd39a60079c9c7b5d3ad39725143d88ec4a36e9c68f724e9f5246a8746fa",
+    "source": "https://eth-sepolia.blockscout.com/api/v2/transactions/0xb944bd39a60079c9c7b5d3ad39725143d88ec4a36e9c68f724e9f5246a8746fa/raw-trace",
+    "trace_address": [
+      0,
+      2
+    ],
+    "call_type": "call",
+    "to": "0x3e96a85be716caad612e16238efdac707e3fb2e9",
+    "selector": "0x755edd17",
+    "inclusive_gas_used": 565266
+  },
+  {
+    "transaction_hash": "0xb944bd39a60079c9c7b5d3ad39725143d88ec4a36e9c68f724e9f5246a8746fa",
+    "source": "https://eth-sepolia.blockscout.com/api/v2/transactions/0xb944bd39a60079c9c7b5d3ad39725143d88ec4a36e9c68f724e9f5246a8746fa/raw-trace",
+    "trace_address": [
+      0,
+      3
+    ],
+    "call_type": "delegatecall",
+    "to": "0xc46c1c0d0776d3ae6a52591244f299faf2c14fa6",
+    "selector": "0x94c5baf0",
+    "inclusive_gas_used": 46680
+  },
+  {
+    "transaction_hash": "0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95",
+    "source": "https://eth-sepolia.blockscout.com/api/v2/transactions/0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95/raw-trace",
+    "trace_address": [],
+    "call_type": "call",
+    "to": "0x1ebf35b3a76caef60a009d2786a66a91d42a38bc",
+    "selector": "0xa58ea93f",
+    "inclusive_gas_used": 1749709
+  },
+  {
+    "transaction_hash": "0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95",
+    "source": "https://eth-sepolia.blockscout.com/api/v2/transactions/0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95/raw-trace",
+    "trace_address": [
+      0
+    ],
+    "call_type": "delegatecall",
+    "to": "0x6a667afbca403de9b2c5876534383c9c73c0db40",
+    "selector": "0xa58ea93f",
+    "inclusive_gas_used": 1742130
+  },
+  {
+    "transaction_hash": "0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95",
+    "source": "https://eth-sepolia.blockscout.com/api/v2/transactions/0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95/raw-trace",
+    "trace_address": [
+      0,
+      0
+    ],
+    "call_type": "delegatecall",
+    "to": "0xc46c1c0d0776d3ae6a52591244f299faf2c14fa6",
+    "selector": "0x21fee789",
+    "inclusive_gas_used": 32658
+  },
+  {
+    "transaction_hash": "0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95",
+    "source": "https://eth-sepolia.blockscout.com/api/v2/transactions/0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95/raw-trace",
+    "trace_address": [
+      0,
+      1
+    ],
+    "call_type": "call",
+    "to": "0x966058f421c1155c6e8aa97103b6713db28cb896",
+    "selector": "0xf242432a",
+    "inclusive_gas_used": 35009
+  },
+  {
+    "transaction_hash": "0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95",
+    "source": "https://eth-sepolia.blockscout.com/api/v2/transactions/0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95/raw-trace",
+    "trace_address": [
+      0,
+      2
+    ],
+    "call_type": "call",
+    "to": "0x966058f421c1155c6e8aa97103b6713db28cb896",
+    "selector": "0xf242432a",
+    "inclusive_gas_used": 6109
+  },
+  {
+    "transaction_hash": "0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95",
+    "source": "https://eth-sepolia.blockscout.com/api/v2/transactions/0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95/raw-trace",
+    "trace_address": [
+      0,
+      3
+    ],
+    "call_type": "call",
+    "to": "0x966058f421c1155c6e8aa97103b6713db28cb896",
+    "selector": "0xf242432a",
+    "inclusive_gas_used": 6109
+  },
+  {
+    "transaction_hash": "0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95",
+    "source": "https://eth-sepolia.blockscout.com/api/v2/transactions/0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95/raw-trace",
+    "trace_address": [
+      0,
+      4
+    ],
+    "call_type": "call",
+    "to": "0x966058f421c1155c6e8aa97103b6713db28cb896",
+    "selector": "0xf242432a",
+    "inclusive_gas_used": 6109
+  },
+  {
+    "transaction_hash": "0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95",
+    "source": "https://eth-sepolia.blockscout.com/api/v2/transactions/0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95/raw-trace",
+    "trace_address": [
+      0,
+      5
+    ],
+    "call_type": "call",
+    "to": "0x966058f421c1155c6e8aa97103b6713db28cb896",
+    "selector": "0xf242432a",
+    "inclusive_gas_used": 6109
+  },
+  {
+    "transaction_hash": "0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95",
+    "source": "https://eth-sepolia.blockscout.com/api/v2/transactions/0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95/raw-trace",
+    "trace_address": [
+      0,
+      6
+    ],
+    "call_type": "call",
+    "to": "0x966058f421c1155c6e8aa97103b6713db28cb896",
+    "selector": "0xf242432a",
+    "inclusive_gas_used": 6109
+  },
+  {
+    "transaction_hash": "0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95",
+    "source": "https://eth-sepolia.blockscout.com/api/v2/transactions/0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95/raw-trace",
+    "trace_address": [
+      0,
+      7
+    ],
+    "call_type": "call",
+    "to": "0x966058f421c1155c6e8aa97103b6713db28cb896",
+    "selector": "0xf242432a",
+    "inclusive_gas_used": 6109
+  },
+  {
+    "transaction_hash": "0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95",
+    "source": "https://eth-sepolia.blockscout.com/api/v2/transactions/0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95/raw-trace",
+    "trace_address": [
+      0,
+      8
+    ],
+    "call_type": "call",
+    "to": "0x966058f421c1155c6e8aa97103b6713db28cb896",
+    "selector": "0xf242432a",
+    "inclusive_gas_used": 6109
+  },
+  {
+    "transaction_hash": "0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95",
+    "source": "https://eth-sepolia.blockscout.com/api/v2/transactions/0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95/raw-trace",
+    "trace_address": [
+      0,
+      9
+    ],
+    "call_type": "call",
+    "to": "0x966058f421c1155c6e8aa97103b6713db28cb896",
+    "selector": "0xf242432a",
+    "inclusive_gas_used": 6109
+  },
+  {
+    "transaction_hash": "0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95",
+    "source": "https://eth-sepolia.blockscout.com/api/v2/transactions/0x0153e37813a0a727d7dfc744a1a3b3310f2ac523153aa61f227d4e06b7b20e95/raw-trace",
+    "trace_address": [
+      0,
+      10
+    ],
+    "call_type": "delegatecall",
+    "to": "0xc46c1c0d0776d3ae6a52591244f299faf2c14fa6",
+    "selector": "0x94c5baf0",
+    "inclusive_gas_used": 93153
+  }
+]

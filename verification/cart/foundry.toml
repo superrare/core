@@ -1,0 +1,21 @@
+[profile.default]
+out = "out"
+src = "../../src/cart"
+test = "test"
+script = "script"
+libs = ["../../lib"]
+allow_paths = ["../../src"]
+solc_version = "0.8.18"
+ast = true
+via_ir = true
+optimizer = true
+optimizer_runs = 100
+auto_detect_remappings = false
+remappings = [
+  "openzeppelin-contracts-upgradeable/=../../lib/openzeppelin-contracts-upgradeable/contracts/",
+  "openzeppelin-contracts/=../../lib/openzeppelin-contracts/contracts/",
+  "forge-std/=../../lib/forge-std/src/",
+  "ds-test/=../../lib/ds-test/src/",
+  "src/=../../src/",
+  "cart-src/=../../src/cart/"
+]
