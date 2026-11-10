@@ -15,6 +15,7 @@ This repository contains the Solidity contracts that power Rare Protocol's marke
   - [`LazySovereignNFT` — token contract for `RareMinter` drops](#lazysovereignnft--token-contract-for-rareminter-drops)
   - [`LazySovereignBatchMintV5` — V2 creator-token transfer validation](#lazysovereignbatchmintv5--v2-creator-token-transfer-validation)
   - [`SovereignBatchMint` — standard creator collections](#sovereignbatchmint--standard-creator-collections)
+  - [`SovereignBatchMintV5` — standard V2 creator-token collections](#sovereignbatchmintv5--standard-v2-creator-token-collections)
   - [`LazySovereignBatchMint` — lazy batch drops](#lazysovereignbatchmint--lazy-batch-drops)
   - [Choosing between `SovereignBatchMint` and `LazySovereignBatchMint`](#choosing-between-sovereignbatchmint-and-lazysovereignbatchmint)
   - [Factories — how creators get their own contract instance](#factories--how-creators-get-their-own-contract-instance)
@@ -176,9 +177,23 @@ Protocol references: [creator-token-standards v5.0.0](https://github.com/limitbr
 
 - `mintTo(string uri, address receiver, address royaltyReceiver)` — immediately mints a single token to `receiver` with the given URI. Owner-only.
 - `addNewToken(string uri)` — same as `mintTo` but mints to `msg.sender` (the contract owner).
-- `batchMint(string baseURI, uint256 numberOfTokens)` — reserves a contiguous token ID range under `baseURI` and emits an EIP-2309 `ConsecutiveTransfer` event. Standard ERC-721 indexers and marketplaces interpret this event as ownership of the whole range by the contract owner, so **the tokens are immediately visible and tradeable on any ERC-721 marketplace** the moment the batch is created. Token URIs resolve to `baseURI/<id>.json`.
+- `batchMint(string baseURI, uint256 numberOfTokens)` — records a contiguous token ID range under `baseURI` and emits `ConsecutiveTransfer`. Indexers that support this event can discover the batch before per-token storage is written; verify the intended venue's indexing rather than assume event emission proves compatibility. Token URIs resolve to `baseURI/<id>.json`.
 
-Use this when you want a creator collection that works seamlessly with the broader ERC-721 ecosystem — both Rare's marketplace contracts and external marketplaces (OpenSea, Blur, etc.) — with the option of either one-off immediate mints or large batch reservations.
+Use this for owner-issued individual NFTs and batch collections. Standard batch issuance still defers per-token storage until first transfer; it is not the lazy token's `prepareMint` accounting.
+
+### `SovereignBatchMintV5` — standard V2 creator-token collections
+
+[`SovereignBatchMintV5`](src/v2/token/ERC721/sovereign/SovereignBatchMintV5.sol) extends maintained V2 `SovereignBatchMint`. It provides the same [V5 policy, discovery and artist controls](#lazysovereignbatchmintv5--v2-creator-token-transfer-validation) as the lazy subtype, while preserving standard issuance:
+
+- `mintTo(uri, receiver, royaltyReceiver)` creates the NFT immediately. `addNewToken(uri)` issues to the owner. Both are owner-only; minting skips V5 transfer validation but still enforces the inherited safe-receiver check.
+- `batchMint(baseURI, count)` records ownership/supply and emits `ConsecutiveTransfer`. Individual storage is still materialized on first transfer, which must bind `from` to the logical owner before minting and then pass V5. This protects ordinary and safe transfers from sender spoofing.
+- Immediate mints store per-token royalty receiver/rate snapshots; changing defaults does not replace nonzero snapshots. Batch materialization does not create those snapshots and can follow current defaults. Zero keeps the inherited fallback semantics. Neither mode introduces a new fee, approved rate or splitter.
+- Keep standard V2 supply/burn behavior separate from lazy accounting: standard `totalSupply` includes batch-created tokens before transfer, and standard batch capacity checks use that live-supply counter. Burning never reuses old IDs, but this is not a newly imposed lifetime-edition cap. Approve collection supply/burn requirements separately.
+
+Deploy the implementation through the **unchanged `SovereignBatchMintFactory`** constructor, then use either existing `createSovereignBatchMint` overload. As in the lazy factory, its constructor initializes the implementation; no constructor initializer lock is added. Existing standard deployment scripts accept an explicit `SOVEREIGN_BATCH_MINT_IMPLEMENTATION`; default behavior still deploys the ordinary implementation. Use a separately configured V5 factory rather than silently changing an existing standard factory.
+
+No new core factory ABI is required. Downstream selection/address registration, actual V2 checkout support, event indexing and approved operator/authorizer configuration still need explicit acceptance. Listing/auction ingress uses the approval manager; auction settlement uses the auction itself. Immediate mint support is not a new public sale/allowlist/phase engine, and this subtype does not implement legacy RareMinter's `mintTo(address)`.
+
 
 ### `LazySovereignBatchMint` — lazy batch drops
 
@@ -221,8 +236,8 @@ All creator-owned NFT contracts above are designed to be deployed per-creator vi
 
 **Recommended (V2):**
 
-- **`SovereignBatchMintFactory`** (`src/v2/token/ERC721/sovereign/SovereignBatchMintFactory.sol`) — deploys `SovereignBatchMint`. This is the recommended path for new creator collections.
-- **`LazySovereignBatchMintFactory`** (`src/v2/token/ERC721/sovereign/LazySovereignBatchMintFactory.sol`) — deploys `LazySovereignBatchMint`. Use this for large drops that will be sold via the batch listing/auction contracts.
+- **`SovereignBatchMintFactory`** (`src/v2/token/ERC721/sovereign/SovereignBatchMintFactory.sol`) — deploys `SovereignBatchMint` or its V5 subtype when explicitly configured with that implementation. Constructor, create signatures and events are unchanged.
+- **`LazySovereignBatchMintFactory`** (`src/v2/token/ERC721/sovereign/LazySovereignBatchMintFactory.sol`) — deploys `LazySovereignBatchMint` or its explicitly configured V5 subtype. Use this for lazy prepared-ID drops sold via the batch listing/auction routes.
 
 **Use only for `RareMinter` drops:**
 
@@ -340,11 +355,11 @@ make build
 make test
 ```
 
-The existing `make test` target runs the non-fork suite. The V5 module exercises the real V5 validator on an Ethereum mainnet fork at block 26350391 and the V2 lazy-batch token/factory and settlement paths:
+The existing `make test` target runs the non-fork suite. The V5 modules exercise the real validator on an Ethereum mainnet fork at block 26350391, including lazy and standard immediate/batch issuance and V2 settlement:
 
 ```bash
 MAINNET_RPC_URL="$ARCHIVE_MAINNET_RPC_URL" forge test \
-  --match-path src/test/forks/mainnet/LazySovereignBatchMintV5.t.sol -vv
+  --match-path 'src/test/forks/mainnet/*SovereignBatchMintV5*.t.sol' -vv
 ```
 
 All writes stay inside the local fork. A local Anvil fork at the same block can be supplied as `MAINNET_RPC_URL` when upstream transport is unreliable. Verify batch reservation/materialization, rollback on denied transfers, safe transfers, owner policy, metadata/royalties and V2 payout balances. Test-local marketplace deployments prove the checked-in V2 implementation, not the configured mainnet proxy's revision or grants. OpenSea signed fulfillment, every marketplace path and hosted Connect checkout remain separate acceptance.
