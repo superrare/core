@@ -1,0 +1,61 @@
+{
+  "chainId": 1,
+  "sourceCommit": "947aa0a87842d776493a89d525fcfd7f5c258c4a",
+  "contracts": {
+    "CartRoutePolicy": "0xBE3B5Ae83133E7EaDFFBFf4dbFDdC5b50b9931E9",
+    "CartPayments": "0x0d6c9C6870Bfe22B231662505496A01A906C742A",
+    "Cart": "0x077522069e1C2740c57cB8c797d2D5d064c43e61",
+    "ERC1967Proxy": "0x6cb621e971e57C4889e6ca15725c0E27EB5aE4ec",
+    "CartLens": "0x740640f3db6c188663b64b3F30dB7b7Df4338a51",
+    "CartHashes": "0x01d40F86b244E9a88Aae23c5E619090F308FF2Fa"
+  },
+  "transactions": [
+    {
+      "label": "CartRoutePolicy",
+      "hash": "0x91740001a119da70a48c9ed526f378dd61116c57c579c32f28428ee515cd530b",
+      "blockNumber": 26381391,
+      "gasUsed": 733771,
+      "effectiveGasPriceWei": 53990818
+    },
+    {
+      "label": "CartPayments",
+      "hash": "0x8cf119e21bb945b00e1d9d83bb359fa7b14b6b6b1d5e93572c056305196a5e6d",
+      "blockNumber": 26381392,
+      "gasUsed": 2639745,
+      "effectiveGasPriceWei": 57921711
+    },
+    {
+      "label": "Cart",
+      "hash": "0x7840eb6e6dae768ca4a3e1f66ab0a46254b951ec78971a2ede5ab28fdaef281f",
+      "blockNumber": 26381393,
+      "gasUsed": 4173899,
+      "effectiveGasPriceWei": 58905486
+    },
+    {
+      "label": "ERC1967Proxy",
+      "hash": "0x10a8b2ac8ed3e237b3d6432c09faec48edaedf5d151be2da82c9bc5bf6405e0b",
+      "blockNumber": 26381394,
+      "gasUsed": 352251,
+      "effectiveGasPriceWei": 58772783
+    },
+    {
+      "label": "CartLens",
+      "hash": "0x95f3aecf0d30a02d30195b3a31fc8709a6638f026a536bee5b1ab2f77ffcdf58",
+      "blockNumber": 26381396,
+      "gasUsed": 2274010,
+      "effectiveGasPriceWei": 52732489
+    },
+    {
+      "label": "CartHashes",
+      "hash": "0xff0a4d171b1e9d718119fe94353336ea6c1c082055e2909eb0b40e9a584d1098",
+      "blockNumber": 26381397,
+      "gasUsed": 613417,
+      "effectiveGasPriceWei": 54423235
+    }
+  ],
+  "proxyState": {
+    "owner": "0xB4409d6b68c0a8d394d25f9FF006Db219d23Bae4",
+    "platformSigner": "0x430c786844B45aa5bFb15CCeA0B9676A28267256",
+    "paused": false
+  }
+}

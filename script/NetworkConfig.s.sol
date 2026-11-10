@@ -131,6 +131,12 @@ library NetworkConfig {
     config.weth = _addr(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     config.permit2 = _addr(0x000000000022D473030F116dDEE9F6B43aC78BA3);
     config.universalRouter = _addr(0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af);
+    config.cartProxy = _addr(0x6cb621e971e57C4889e6ca15725c0E27EB5aE4ec);
+    config.cartImplementation = _addr(0x077522069e1C2740c57cB8c797d2D5d064c43e61);
+    config.cartRoutePolicy = _addr(0xBE3B5Ae83133E7EaDFFBFf4dbFDdC5b50b9931E9);
+    config.cartPaymentExecutor = _addr(0x0d6c9C6870Bfe22B231662505496A01A906C742A);
+    config.cartLens = _addr(0x740640f3db6c188663b64b3F30dB7b7Df4338a51);
+    config.cartHashes = _addr(0x01d40F86b244E9a88Aae23c5E619090F308FF2Fa);
     config.superRareV1 = _addr(0x41A322b28D0fF354040e2CbC676F0320d8c8850d);
     config.superRareV2 = _addr(0xb932a70A57673d89f4acfFBE830E8ed7f75Fb9e0);
     config.marketplace = _addr(0x65B49f7AEE40347f5A90b714be4eF086f3fe5E2C);
