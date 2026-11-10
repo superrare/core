@@ -295,6 +295,8 @@ contract LazySovereignBatchMint is
     (bool isLazyToken, , ) = _batchMintInfo(_tokenId);
 
     if (isLazyToken && !ERC721Upgradeable._exists(_tokenId) && !tokensBurned[_tokenId]) {
+      // Bind virtual ownership before _mint makes the supplied _from the physical owner.
+      require(_from == owner(), "ERC721: transfer from incorrect owner");
       _mint(_from, _tokenId);
       totalSupplyCounter.increment();
     }

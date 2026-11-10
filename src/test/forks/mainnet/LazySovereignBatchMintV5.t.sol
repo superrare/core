@@ -336,6 +336,43 @@ contract LazySovereignBatchMintV5Test is LazySovereignBatchMintV5ForkBase {
         assertEq(token.getApproved(1), address(0));
     }
 
+    function testReservedOwnerCannotBeForgedToBypassTransferPolicy() public {
+        vm.prank(ARTIST);
+        token.setApprovalForAll(OPERATOR, true);
+        vm.expectRevert("ERC721: transfer from incorrect owner");
+        vm.prank(OPERATOR, OPERATOR);
+        token.transferFrom(OPERATOR, COLLECTOR, 1);
+        vm.expectRevert("ERC721: transfer from incorrect owner");
+        vm.prank(OPERATOR, OPERATOR);
+        token.safeTransferFrom(OPERATOR, COLLECTOR, 2);
+        vm.expectRevert("ERC721: transfer from incorrect owner");
+        vm.prank(OPERATOR, OPERATOR);
+        token.safeTransferFrom(OPERATOR, COLLECTOR, 3, hex"1234");
+
+        uint48 listId = _customList();
+        _setListAccount(listId, RECIPIENT, true);
+        vm.expectRevert("ERC721: transfer from incorrect owner");
+        vm.prank(OPERATOR, OPERATOR);
+        token.transferFrom(RECIPIENT, COLLECTOR, 1);
+        assertEq(token.totalSupply(), 0);
+        assertEq(token.balanceOf(OPERATOR), 0);
+        assertEq(token.balanceOf(RECIPIENT), 0);
+        assertEq(token.balanceOf(COLLECTOR), 0);
+        for (uint256 id = 1; id <= 3; ++id) {
+            assertEq(token.ownerOf(id), ARTIST);
+        }
+        assertTrue(token.isApprovedForAll(ARTIST, OPERATOR));
+
+        vm.expectRevert();
+        vm.prank(OPERATOR, OPERATOR);
+        token.transferFrom(ARTIST, COLLECTOR, 1);
+        _setListAccount(listId, OPERATOR, true);
+        vm.prank(OPERATOR, OPERATOR);
+        token.transferFrom(ARTIST, COLLECTOR, 1);
+        assertEq(token.ownerOf(1), COLLECTOR);
+        assertEq(token.totalSupply(), 1);
+    }
+
     function testAllowedOperatorMaterializesThenListRevocationBlocksExistingApproval() public {
         uint48 listId = _customList();
         _setListAccount(listId, OPERATOR, true);

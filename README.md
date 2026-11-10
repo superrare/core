@@ -138,7 +138,7 @@ There is no on-chain randomization or shuffle mechanism — "blind" here is an o
 
 ### `LazySovereignBatchMintV5` — V2 creator-token transfer validation
 
-[`LazySovereignBatchMintV5`](src/v2/token/ERC721/sovereign/LazySovereignBatchMintV5.sol) extends the maintained **V2 `LazySovereignBatchMint`**, not the deprecated `LazySovereignNFT`. It adds creator-token discovery and transfer-time validation while retaining V2 batch preparation, lazy materialization, metadata controls, supply/burn behavior and ERC-2981 settings. The only base change is making the V2 initializer virtual. No legacy adapter or new `RareMinter` integration is supplied.
+[`LazySovereignBatchMintV5`](src/v2/token/ERC721/sovereign/LazySovereignBatchMintV5.sol) extends the maintained **V2 `LazySovereignBatchMint`**, not the deprecated `LazySovereignNFT`. It adds creator-token discovery and transfer-time validation while retaining V2 batch preparation, lazy materialization, metadata controls, supply/burn behavior and ERC-2981 settings. The V2 base makes its initializer virtual and binds `from` to the reserved owner before materialization; an approved operator cannot forge that input to obtain V5's owner/OTC exemption. Valid V2 transfers retain their behavior. No legacy adapter or new `RareMinter` integration is supplied.
 
 **Deployment and tooling**
 
