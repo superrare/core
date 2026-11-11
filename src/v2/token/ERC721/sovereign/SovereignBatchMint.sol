@@ -123,11 +123,11 @@ contract SovereignBatchMint is
     emit ConsecutiveTransfer(startTokenId, endTokenId, address(0), owner());
   }
 
-  function addNewToken(string memory _uri) public onlyOwner ifNotDisabled {
+  function addNewToken(string memory _uri) public virtual onlyOwner ifNotDisabled {
     _createToken(_uri, msg.sender, getDefaultRoyaltyPercentage(), msg.sender);
   }
 
-  function mintTo(string calldata _uri, address _receiver, address _royaltyReceiver) external onlyOwner ifNotDisabled {
+  function mintTo(string calldata _uri, address _receiver, address _royaltyReceiver) external virtual onlyOwner ifNotDisabled {
     _createToken(_uri, _receiver, getDefaultRoyaltyPercentage(), _royaltyReceiver);
   }
 

@@ -4,11 +4,12 @@ pragma solidity ^0.8.15;
 import "./LazySovereignBatchMint.sol";
 import "../../../../token/extensions/ICreatorToken.sol";
 import "../../../../token/extensions/ICreatorTokenTransferValidator.sol";
+import "../../../royalty/RoyaltySplitReceiver.sol";
 
 /// @notice A V2 lazy-batch collection with transfer-time creator-token validation.
 /// @dev The V2 factory initializes the implementation before creating clones.
 ///      Batch reservation, materialization, metadata and royalties retain V2 behavior.
-contract LazySovereignBatchMintV5 is LazySovereignBatchMint, ICreatorToken {
+contract LazySovereignBatchMintV5 is LazySovereignBatchMint, ICreatorToken, RoyaltySplitReceiver {
     address public constant DEFAULT_TRANSFER_VALIDATOR = 0x721C008fdff27BF06E7E123956E2Fe03B63342e3;
 
     address private transferValidator;
@@ -22,6 +23,29 @@ contract LazySovereignBatchMintV5 is LazySovereignBatchMint, ICreatorToken {
     {
         super.init(_name, _symbol, _creator, _maxTokens);
         _setTransferValidator(DEFAULT_TRANSFER_VALIDATOR);
+    }
+
+    function initWithRoyaltySplit(
+        string calldata name,
+        string calldata symbol,
+        address creator,
+        uint256 maxTokens,
+        address splitterFactory,
+        RoyaltySplitConfig calldata config
+    ) external returns (address splitter) {
+        init(name, symbol, creator, maxTokens);
+        splitter = _initializeRoyaltySplit(splitterFactory, config);
+        _setDefaultRoyaltyReceiver(splitter);
+        _setDefaultRoyaltyPercentage(config.royaltyPercentage);
+    }
+
+    function setRoyaltyBeneficiaryForToken(address beneficiary, uint256 tokenId) external onlyOwner {
+        ownerOf(tokenId);
+        _setRoyaltyReceiver(tokenId, _resolveRoyaltyReceiver(beneficiary));
+    }
+
+    function _royaltyDefaultReceiver() internal view override returns (address) {
+        return getDefaultRoyaltyReceiver();
     }
 
     function getTransferValidator() public view override returns (address) {

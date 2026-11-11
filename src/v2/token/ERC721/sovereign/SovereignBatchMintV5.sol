@@ -4,11 +4,12 @@ pragma solidity ^0.8.15;
 import "./SovereignBatchMint.sol";
 import "../../../../token/extensions/ICreatorToken.sol";
 import "../../../../token/extensions/ICreatorTokenTransferValidator.sol";
+import "../../../royalty/RoyaltySplitReceiver.sol";
 
 /// @notice A standard V2 collection with transfer-time creator-token validation.
 /// @dev The V2 factory initializes the implementation before creating clones.
 ///      Immediate minting, batch creation, metadata and royalties retain V2 behavior.
-contract SovereignBatchMintV5 is SovereignBatchMint, ICreatorToken {
+contract SovereignBatchMintV5 is SovereignBatchMint, ICreatorToken, RoyaltySplitReceiver {
     address public constant DEFAULT_TRANSFER_VALIDATOR = 0x721C008fdff27BF06E7E123956E2Fe03B63342e3;
 
     address private transferValidator;
@@ -22,6 +23,43 @@ contract SovereignBatchMintV5 is SovereignBatchMint, ICreatorToken {
     {
         super.init(_name, _symbol, _creator, _maxTokens);
         _setTransferValidator(DEFAULT_TRANSFER_VALIDATOR);
+    }
+
+    function initWithRoyaltySplit(
+        string calldata name,
+        string calldata symbol,
+        address creator,
+        uint256 maxTokens,
+        address splitterFactory,
+        RoyaltySplitConfig calldata config
+    ) external returns (address splitter) {
+        init(name, symbol, creator, maxTokens);
+        splitter = _initializeRoyaltySplit(splitterFactory, config);
+        _setDefaultRoyaltyReceiver(splitter);
+        _setDefaultRoyaltyPercentage(config.royaltyPercentage);
+    }
+
+    function addNewToken(string memory uri) public override onlyOwner ifNotDisabled {
+        _createToken(uri, msg.sender, getDefaultRoyaltyPercentage(), _resolveRoyaltyReceiver(msg.sender));
+    }
+
+    /// @dev On opt-in collections the royalty argument is the beneficiary, not a new split policy.
+    function mintTo(string calldata uri, address receiver, address royaltyReceiver)
+        external
+        override
+        onlyOwner
+        ifNotDisabled
+    {
+        _createToken(uri, receiver, getDefaultRoyaltyPercentage(), _resolveRoyaltyReceiver(royaltyReceiver));
+    }
+
+    function setRoyaltyBeneficiaryForToken(address beneficiary, uint256 tokenId) external onlyOwner {
+        ownerOf(tokenId);
+        _setRoyaltyReceiver(tokenId, _resolveRoyaltyReceiver(beneficiary));
+    }
+
+    function _royaltyDefaultReceiver() internal view override returns (address) {
+        return getDefaultRoyaltyReceiver();
     }
 
     function getTransferValidator() public view override returns (address) {
