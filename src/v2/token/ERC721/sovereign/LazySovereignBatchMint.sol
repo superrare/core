@@ -74,7 +74,7 @@ contract LazySovereignBatchMint is
     string calldata _symbol,
     address _creator,
     uint256 _maxTokens
-  ) public initializer {
+  ) public virtual initializer {
     require(_creator != address(0), "creator cannot be null address");
     _setDefaultRoyaltyPercentage(10);
     disabled = false;
@@ -295,6 +295,8 @@ contract LazySovereignBatchMint is
     (bool isLazyToken, , ) = _batchMintInfo(_tokenId);
 
     if (isLazyToken && !ERC721Upgradeable._exists(_tokenId) && !tokensBurned[_tokenId]) {
+      // Bind virtual ownership before _mint makes the supplied _from the physical owner.
+      require(_from == owner(), "ERC721: transfer from incorrect owner");
       _mint(_from, _tokenId);
       totalSupplyCounter.increment();
     }

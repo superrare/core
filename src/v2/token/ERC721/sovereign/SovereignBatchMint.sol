@@ -79,7 +79,7 @@ contract SovereignBatchMint is
     string calldata _symbol,
     address _creator,
     uint256 _maxTokens
-  ) public initializer {
+  ) public virtual initializer {
     require(_creator != address(0), "creator cannot be null address");
     _setDefaultRoyaltyPercentage(10);
     disabled = false;
@@ -123,11 +123,11 @@ contract SovereignBatchMint is
     emit ConsecutiveTransfer(startTokenId, endTokenId, address(0), owner());
   }
 
-  function addNewToken(string memory _uri) public onlyOwner ifNotDisabled {
+  function addNewToken(string memory _uri) public virtual onlyOwner ifNotDisabled {
     _createToken(_uri, msg.sender, getDefaultRoyaltyPercentage(), msg.sender);
   }
 
-  function mintTo(string calldata _uri, address _receiver, address _royaltyReceiver) external onlyOwner ifNotDisabled {
+  function mintTo(string calldata _uri, address _receiver, address _royaltyReceiver) external virtual onlyOwner ifNotDisabled {
     _createToken(_uri, _receiver, getDefaultRoyaltyPercentage(), _royaltyReceiver);
   }
 
@@ -272,6 +272,8 @@ contract SovereignBatchMint is
     (bool wasBatchMinted, , ) = _batchMintInfo(_tokenId);
 
     if (wasBatchMinted && !ERC721Upgradeable._exists(_tokenId) && !tokensBurned[_tokenId]) {
+      // Bind virtual ownership before _mint makes the supplied _from the physical owner.
+      require(_from == owner(), "ERC721: transfer from incorrect owner");
       _mint(_from, _tokenId);
     }
 

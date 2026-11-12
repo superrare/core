@@ -13,7 +13,9 @@ This repository contains the Solidity contracts that power Rare Protocol's marke
   - [`RareMinter` — blind & sequential lazy minting](#rareminter--blind--sequential-lazy-minting)
 - [Token Contracts](#token-contracts)
   - [`LazySovereignNFT` — token contract for `RareMinter` drops](#lazysovereignnft--token-contract-for-rareminter-drops)
+  - [`LazySovereignBatchMintV5` — V2 creator-token transfer validation](#lazysovereignbatchmintv5--v2-creator-token-transfer-validation)
   - [`SovereignBatchMint` — standard creator collections](#sovereignbatchmint--standard-creator-collections)
+  - [`SovereignBatchMintV5` — standard V2 creator-token collections](#sovereignbatchmintv5--standard-v2-creator-token-collections)
   - [`LazySovereignBatchMint` — lazy batch drops](#lazysovereignbatchmint--lazy-batch-drops)
   - [Choosing between `SovereignBatchMint` and `LazySovereignBatchMint`](#choosing-between-sovereignbatchmint-and-lazysovereignbatchmint)
   - [Factories — how creators get their own contract instance](#factories--how-creators-get-their-own-contract-instance)
@@ -110,7 +112,7 @@ Use `BatchOffer` when you want to make a **blanket offer over a curated list of 
 
 `RareMinter` is the marketplace contract for **blind mints and sequential token lazy minting** — fixed-price public drops where buyers pay and receive a newly-minted token in one transaction. Token IDs are assigned sequentially as each buyer comes in (1, 2, 3, ...), and tokens are minted on-demand at sale settlement rather than pre-minted upfront. The contract supports optional Merkle allow-lists, per-address and per-tx mint caps, payment currency selection, and revenue splits.
 
-**Pairs with:** [`LazySovereignNFT`](#lazysovereignnft--token-contract-for-rareminter-drops). `RareMinter` mints by calling `IERC721Mint.mintTo(address) returns (uint256)`, and `LazySovereignNFT` is the only active token contract that implements that signature. The other active token contracts (`SovereignBatchMint`, `LazySovereignBatchMint`) have richer `mintTo` signatures and aren't callable by `RareMinter`.
+**Pairs with:** [`LazySovereignNFT`](#lazysovereignnft--token-contract-for-rareminter-drops). `RareMinter` calls `IERC721Mint.mintTo(address) returns (uint256)`. That is a legacy minting interface, not the V2 lazy-batch flow: `LazySovereignBatchMint` and its V5 subtype reserve IDs with `prepareMint` and materialize them on transfer through the listing/auction routes.
 
 **Setup:**
 1. Deploy `LazySovereignNFT` via `LazySovereignNFTFactory` (see [Token Contracts](#token-contracts)).
@@ -135,15 +137,82 @@ This contract supports two common drop styles when paired with `RareMinter`:
 
 There is no on-chain randomization or shuffle mechanism — "blind" here is an off-chain UX pattern enabled by `updateBaseURI`. If you need randomized assignment, that has to be implemented at a layer above this contract.
 
+### `LazySovereignBatchMintV5` — V2 creator-token transfer validation
+
+[`LazySovereignBatchMintV5`](src/v2/token/ERC721/sovereign/LazySovereignBatchMintV5.sol) extends the maintained **V2 `LazySovereignBatchMint`**, not the deprecated `LazySovereignNFT`. It adds creator-token discovery and transfer-time validation while retaining V2 batch preparation, lazy materialization, metadata controls, supply/burn behavior and ERC-2981 settings. The V2 base makes its initializer virtual and binds `from` to the reserved owner before materialization; an approved operator cannot forge that input to obtain V5's owner/OTC exemption. Valid V2 transfers retain their behavior. No legacy adapter or new `RareMinter` integration is supplied.
+
+**Deployment and tooling**
+
+1. Deploy a `LazySovereignBatchMintV5` implementation and pass its address to the existing one-argument V2 `LazySovereignBatchMintFactory` constructor.
+2. The factory initializes the implementation once, following the existing V2 pattern. The V5 implementation deliberately does not disable initialization in its constructor, which would break that factory. Artists create one-shot initialized clones through either existing `createLazySovereignBatchMint` overload; the existing creation event is retained.
+3. The artist calls `prepareMint(baseURI, count)`, configures royalties and approves the V2 `ERC721ApprovalManager`. Review V5 permission for that manager (listing buys and auction escrow) and the auction house itself (settlement/return). A permitted sale materializes the reserved token and transfers it to its buyer. Preparation alone does not increase `totalSupply` or emit standard mint events.
+
+Use a separately configured V5 factory for this optional choice; do not silently replace an ordinary factory's implementation. Existing deployed factories and tool presets are not upgraded by this source change. Existing constructor/create signatures remain valid; the optional [royalty-split entrypoint](#optional-deterministic-royalty-splits) is additive. Published Rare SDK/CLI/Studio still need explicit factory/address and actual V2 sale-flow selection. No hosted Connect support is inferred.
+
+**Validator policy and royalties**
+
+- Initialization selects Limit Break V5 at `0x721C008fdff27BF06E7E123956E2Fe03B63342e3` and registers type 721. Missing code or failed registration reverts atomically. Verify the validator on every intended chain.
+- Discovery reports the view selector `validateTransfer(address,address,address,uint256)`. Ordinary transfers validate the actual caller/from/to/ID, including the transfer after lazy materialization. Denial rolls back materialization and settlement, not merely the final owner change.
+- Mint/burn skip validation; validator-originated transfers follow upstream's prevalidated-transfer convention. No automatic validator approval is granted. Ordinary ERC-721 approval alone does not bypass policy.
+- The owner can replace or disable validation and directly configure V5's ruleset/list. Nonzero replacements must have code and accept registration. This is artist-controlled policy, not an immutable royalty guarantee.
+- Default V5 authorizers/list do not automatically permit all SuperRare contracts. Listing buys and auction escrow call the token through `ERC721ApprovalManager`; auction settlement/return calls it directly from the auction house. Configure both actual callers where applicable. OpenSea's creator-token signed-fulfillment flow is not equivalent to broadly allowlisting Seaport/conduits.
+- Royalty rate, receiver and settlement remain separate. Existing whole-percentage setters and artist default/per-token receiver controls remain available. Ordinary collections retain V2 behavior; the optional split-enabled path below uses fixed OZ payout templates without an approved/hardcoded platform fee. Lazy materialization does not create legacy mint-time royalty snapshots: changing defaults can affect tokens without an applicable override.
+
+Protocol references: [creator-token-standards v5.0.0](https://github.com/limitbreakinc/creator-token-standards/tree/980a63b33591d568b6e04b45f37deba05a55f787), [V5 deployment directory](https://apptokens.com/docs/integration-guide/creator-token-standards/v5/contract-deployments), [V5 policy source](https://github.com/limitbreakinc/creator-token-transfer-validator/tree/59adb8b36ab0256c7430b017b1c9f8b4841d6e1e), and [OpenSea creator-fee integration](https://docs.opensea.io/docs/creator-fee-enforcement).
+
+**PFP launch work beyond this token**
+
+| Area | V2 reuse | Work still required |
+| --- | --- | --- |
+| deans artwork and immediate reveal | Reserved IDs, per-batch URI updates, per-token overrides and metadata lock | Final assets/trait attribution, permanent storage, assignment fairness, secrecy and agreed immediate-reveal UX. A prepared-ID listing is not automatically a sequential blind mint. |
+| deans multi-artist payouts | Optional OZ royalty splitter and configurable royalty receiver | Approve actual recipient wallets/shares, replaceable beneficiary allocation and fee basis. V2 primary listing/auction splits still allow at most five direct recipients; their settlement configuration remains separate from ERC-2981 royalties. |
+| Both collections' phases and limits | V2 prepared-ID sale primitives | Match the actual listing/auction route to phase prices, eligibility/proofs, wallet/transaction caps, reserved supply/carryover and rolling additions. Legacy RareMinter counters are not V2 capabilities. |
+| CARNAGE dynamic artwork | Virtual URI/ownership methods and V5 transfer hook | Integrate with the artist's actual renderer/game contract; verify thumbnails, fighter pages and metadata refresh. This subtype does not implement/migrate the artwork or add ERC-4906. |
+| CARNAGE supply/burn and delegated wallets | Fixed reservation cap, lazy cancellation and materialized-token burn | Confirm edition/supply/burn policy. Burn does not release reserved IDs; `totalSupply` counts materialized live tokens, not reservations. Verify hot-wallet vs vault recipient behavior in the actual sale path. |
+| Both launches' readiness | Existing V2 token/factory and trading primitives | Artist consent/economics, indexer visibility of unmaterialized tokens, checkout/wallet acceptance, supported sale paths, peak-load/batch-gas rehearsal, monitoring, incident controls and launch sign-off. |
+
 ### `SovereignBatchMint` — standard creator collections
 
 `src/v2/token/ERC721/sovereign/SovereignBatchMint.sol`. A creator-owned ERC-721 supporting both individual minting and batch creation:
 
 - `mintTo(string uri, address receiver, address royaltyReceiver)` — immediately mints a single token to `receiver` with the given URI. Owner-only.
 - `addNewToken(string uri)` — same as `mintTo` but mints to `msg.sender` (the contract owner).
-- `batchMint(string baseURI, uint256 numberOfTokens)` — reserves a contiguous token ID range under `baseURI` and emits an EIP-2309 `ConsecutiveTransfer` event. Standard ERC-721 indexers and marketplaces interpret this event as ownership of the whole range by the contract owner, so **the tokens are immediately visible and tradeable on any ERC-721 marketplace** the moment the batch is created. Token URIs resolve to `baseURI/<id>.json`.
+- `batchMint(string baseURI, uint256 numberOfTokens)` — records a contiguous token ID range under `baseURI` and emits `ConsecutiveTransfer`. Indexers that support this event can discover the batch before per-token storage is written; verify the intended venue's indexing rather than assume event emission proves compatibility. Token URIs resolve to `baseURI/<id>.json`.
 
-Use this when you want a creator collection that works seamlessly with the broader ERC-721 ecosystem — both Rare's marketplace contracts and external marketplaces (OpenSea, Blur, etc.) — with the option of either one-off immediate mints or large batch reservations.
+Use this for owner-issued individual NFTs and batch collections. Standard batch issuance still defers per-token storage until first transfer; it is not the lazy token's `prepareMint` accounting.
+
+### `SovereignBatchMintV5` — standard V2 creator-token collections
+
+[`SovereignBatchMintV5`](src/v2/token/ERC721/sovereign/SovereignBatchMintV5.sol) extends maintained V2 `SovereignBatchMint`. It provides the same [V5 policy, discovery and artist controls](#lazysovereignbatchmintv5--v2-creator-token-transfer-validation) as the lazy subtype, while preserving standard issuance:
+
+- `mintTo(uri, receiver, royaltyReceiver)` creates the NFT immediately. `addNewToken(uri)` issues to the owner. Both are owner-only; minting skips V5 transfer validation but still enforces the inherited safe-receiver check.
+- `batchMint(baseURI, count)` records ownership/supply and emits `ConsecutiveTransfer`. Individual storage is still materialized on first transfer, which must bind `from` to the logical owner before minting and then pass V5. This protects ordinary and safe transfers from sender spoofing.
+- Immediate mints store per-token royalty receiver/rate snapshots; changing defaults does not replace nonzero snapshots. Batch materialization does not create those snapshots and can follow current defaults. Zero retains inherited fallback semantics; in split-enabled minting a zero beneficiary selects the current default receiver. The optional splitter does not impose a new approved fee.
+- Keep standard V2 supply/burn behavior separate from lazy accounting: standard `totalSupply` includes batch-created tokens before transfer, and standard batch capacity checks use that live-supply counter. Burning never reuses old IDs, but this is not a newly imposed lifetime-edition cap. Approve collection supply/burn requirements separately.
+
+Deploy the implementation through the existing one-argument `SovereignBatchMintFactory` constructor and use either original `createSovereignBatchMint` overload, or opt into split-enabled creation below. The factory initializes the implementation; no constructor initializer lock is added. Existing scripts accept `SOVEREIGN_BATCH_MINT_IMPLEMENTATION`; their default still deploys the ordinary implementation. Use a separately configured V5 factory rather than silently changing an existing standard factory.
+
+Existing core constructor/create ABIs are preserved; split-enabled creation is a new named function. Downstream selection/address registration, actual V2 checkout support, event indexing and operator policy still need explicit acceptance. Listing/auction ingress uses the approval manager; auction settlement uses the auction itself. Immediate mint support is not a public phase engine or legacy RareMinter `mintTo(address)` adapter.
+
+### Optional deterministic royalty splits
+
+[`RoyaltySplitterFactory`](src/v2/royalty/RoyaltySplitterFactory.sol) deploys the installed OpenZeppelin `PaymentSplitter` with immutable payees/shares. It has no owner, upgrade path, protocol fee or custom payout math. `CREATE2` derives the address from the exact **ordered recipients and relative shares**, the shared deployer and its bytecode. Identical terms reuse across standard/lazy collections, pooling receipts under that same agreement; recipient order or different share weights produce different addresses even if proportions are equivalent. The royalty sale rate is separate and does not enter splitter identity.
+
+1. Deploy the shared splitter factory. On each V2 NFT factory, its owner calls `setRoyaltySplitterFactory(address)` with that address. This configuration is captured by newly split-enabled collections, not retroactively changed for existing ones.
+2. Call `createSovereignBatchMintWithRoyaltySplit` or `createLazySovereignBatchMintWithRoyaltySplit` with name, symbol, supply cap and `RoyaltySplitConfig`: `recipients`, positive `shares`, `beneficiaryIndex` and `royaltyPercentage` in existing **whole-percent** units (0–100). The beneficiary index explicitly identifies the one replaceable allocation; no artist/SuperRare ratio is inferred.
+3. The new path clones a compatible V5 implementation, performs its one-shot `initWithRoyaltySplit`, creates/reuses the default splitter, sets the royalty rate/receiver, and leaves the caller as artist owner **and creator**. It returns `(collection, splitter)` and emits the original collection-created event plus `RoyaltySplitConfigured`. Invalid configuration or failed initialization rolls everything back. Older implementations that lack this initializer remain usable through ordinary creation but cannot use the new path.
+
+**Routing in opt-in collections:** `addNewToken` honors the configured current default royalty receiver, independently of the owner/minting wallet; transferring collection ownership alone does not change that payout destination. `mintTo(uri, receiver, royaltyReceiver)` interprets its last argument as an explicit beneficiary: the original default beneficiary, zero or current default receiver uses the current default receiver. A different beneficiary substitutes only the designated allocation, creating its splitter once and reusing it later. Compatible known splitters are accepted directly; incompatible known splitters revert rather than receive another split. Replacing a beneficiary with another fixed recipient duplicates an OZ payee and is rejected, not silently merged.
+
+`predictRoyaltySplitter(beneficiary)` calculates the collection's destination without deployment; `royaltySplitTerms()` exposes the template. The shared factory's `predictSplitter` can calculate an address even for invalid constructor terms; prediction alone is not validation or a reason to fund an undeployed address. `getOrCreateSplitter` validates through the OZ constructor. A small deployed-address provenance hash distinguishes known splitters, not a per-person cache. Unknown external contracts are treated as beneficiaries, not automatically recognized as final splitters.
+
+Both types expose owner-only `setRoyaltyBeneficiaryForToken` for minted/reserved tokens. Existing raw receiver setters and validator controls remain available, so this is **not** an immutable NFT royalty guarantee. An existing splitter's terms/funds cannot be redirected: replacements require a new configuration and relevant NFT receiver updates. Immediate snapshots still require per-token changes rather than assuming a default edit rewrites them.
+
+OZ receives ETH or ordinary ERC-20s such as WETH and accrues entitlements. Anyone may call `release(payee)` or `release(token, payee)`; funds go only to that payee, not the triggering caller. Releases are separate gas-paying transactions, not automatic per-sale wallet payouts. A rejecting recipient cannot block others' separate releases. Shares/address mistakes, lost recipient keys and rounding dust have no admin sweep; use approved wallets and assess token behavior before funding.
+
+Ordinary four-argument initialization and original create functions do not enable this routing: their explicit mint receivers, return values and events retain their behavior. Primary-sale splits remain a separate marketplace configuration. No deployed address, commercial allocation, hosted checkout or OpenSea signed-fill acceptance is approved by this feature.
+
+
 
 ### `LazySovereignBatchMint` — lazy batch drops
 
@@ -182,16 +251,16 @@ In practice:
 
 ### Factories — how creators get their own contract instance
 
-All creator-owned NFT contracts above are designed to be deployed per-creator via a factory. Every active factory in this repo uses OpenZeppelin's `Clones.clone()` (EIP-1167 minimal proxy) and exposes a permissionless deploy function — anyone can call it to spin up a new collection instance owned by `msg.sender`.
+All creator-owned NFT contracts above are designed to be deployed per-creator via a factory. NFT collection factories use OpenZeppelin's `Clones.clone()` (EIP-1167 minimal proxy) and expose permissionless creation owned by `msg.sender`. The separate royalty splitter factory deploys full OZ PaymentSplitter contracts with CREATE2; it does not clone NFT collections.
 
 **Recommended (V2):**
 
-- **`SovereignBatchMintFactory`** (`src/v2/token/ERC721/sovereign/SovereignBatchMintFactory.sol`) — deploys `SovereignBatchMint`. This is the recommended path for new creator collections.
-- **`LazySovereignBatchMintFactory`** (`src/v2/token/ERC721/sovereign/LazySovereignBatchMintFactory.sol`) — deploys `LazySovereignBatchMint`. Use this for large drops that will be sold via the batch listing/auction contracts.
+- **`SovereignBatchMintFactory`** (`src/v2/token/ERC721/sovereign/SovereignBatchMintFactory.sol`) — deploys the standard V2 implementation or matching V5 subtype. Original constructor/create signatures and events are preserved; named split-enabled creation is additive.
+- **`LazySovereignBatchMintFactory`** (`src/v2/token/ERC721/sovereign/LazySovereignBatchMintFactory.sol`) — deploys the lazy V2 implementation or matching V5 subtype. Original creation remains available; split-enabled creation additionally configures the immutable payout template.
 
 **Use only for `RareMinter` drops:**
 
-- **`LazySovereignNFTFactory`** (`src/token/ERC721/sovereign/lazy/LazySovereignNFTFactory.sol`) — deploys `LazySovereignNFT`. This factory is only needed when the creator intends to run their drop through `RareMinter` (since `LazySovereignNFT` is the only token contract `RareMinter` can drive). For non-`RareMinter` drops, prefer the V2 factories above.
+- **`LazySovereignNFTFactory`** (`src/token/ERC721/sovereign/lazy/LazySovereignNFTFactory.sol`) — legacy factory for `LazySovereignNFT` and its RoyaltyGuard variants. It is not the V5 deployment path; new V5 lazy-batch collections use the V2 factory above.
 
 ### Royalty extensions
 
@@ -302,5 +371,22 @@ make build
 ## Tests
 
 ```bash
-forge test
+make test
 ```
+
+The existing `make test` target runs the non-fork suite. The V5 modules exercise the real validator on an Ethereum mainnet fork at block 26350391, including lazy and standard immediate/batch issuance and V2 settlement:
+
+```bash
+MAINNET_RPC_URL="$ARCHIVE_MAINNET_RPC_URL" forge test \
+  --match-path 'src/test/forks/mainnet/*SovereignBatchMintV5*.t.sol' -vv
+```
+
+The splitter unit module runs in the non-fork suite. Real-V5 collection wiring, ETH/WETH royalties and release assertions run separately:
+
+```bash
+MAINNET_RPC_URL="$ARCHIVE_MAINNET_RPC_URL" forge test \
+  --match-path src/test/forks/mainnet/RoyaltySplitCollections.t.sol -vv
+```
+
+All writes stay inside the local fork. A local Anvil fork at the same block can be supplied as `MAINNET_RPC_URL` when upstream transport is unreliable. Verify batch reservation/materialization, rollback on denied transfers, safe transfers, owner policy, metadata/royalties and V2 payout balances. Test-local marketplace deployments prove the checked-in V2 implementation, not the configured mainnet proxy's revision or grants. OpenSea signed fulfillment, every marketplace path and hosted Connect checkout remain separate acceptance.
+
