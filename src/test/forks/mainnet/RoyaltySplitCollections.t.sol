@@ -319,14 +319,33 @@ contract RoyaltySplitCollectionsTest is RoyaltySplitCollectionsForkBase {
         _assertTemplates();
     }
 
-    function testTransferredCollectionOwnerAddNewTokenSubstitutesCurrentCallerNotOriginalCreator() public {
+    function testDefaultMintKeepsConfiguredWalletAcrossOwnerChangesAndHonorsExplicitRetarget() public {
+        RoyaltySplitConfig memory config = _config();
+        config.recipients[config.beneficiaryIndex] = ALTERNATE;
         vm.prank(ARTIST);
-        token.transferOwnership(ALTERNATE);
-        vm.prank(ALTERNATE);
-        token.addNewToken("ipfs://new-owner");
-        _assertRoyalty(address(token), 1, token.predictRoyaltySplitter(ALTERNATE), 0.2 ether);
-        assertEq(token.tokenCreator(1), ARTIST);
-        _assertTemplates();
+        (address collection, address configuredSplit) =
+            factory.createSovereignBatchMintWithRoyaltySplit("Separate payout wallet", "WAL", 3, config);
+        SovereignBatchMintV5 routed = SovereignBatchMintV5(collection);
+        vm.prank(ARTIST);
+        routed.addNewToken("ipfs://configured-wallet");
+        _assertRoyalty(collection, 1, configuredSplit, 0.2 ether);
+        assertEq(routed.ownerOf(1), ARTIST);
+
+        vm.prank(ARTIST);
+        routed.transferOwnership(COLLECTOR);
+        vm.prank(COLLECTOR);
+        routed.addNewToken("ipfs://new-owner-same-wallet");
+        _assertRoyalty(collection, 2, configuredSplit, 0.2 ether);
+        assertEq(routed.ownerOf(2), COLLECTOR);
+        assertEq(routed.tokenCreator(2), ARTIST);
+
+        vm.startPrank(COLLECTOR);
+        routed.setDefaultRoyaltyReceiver(OPERATOR);
+        routed.addNewToken("ipfs://owner-retarget");
+        vm.stopPrank();
+        _assertRoyalty(collection, 3, OPERATOR, 0.2 ether);
+        _assertRoyalty(collection, 1, configuredSplit, 0.2 ether);
+        _assertRoyalty(collection, 2, configuredSplit, 0.2 ether);
     }
 
     function testOrdinaryFactoryCreationAndCustomMintReceiverRemainUnchanged() public {

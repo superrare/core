@@ -40,7 +40,8 @@ contract SovereignBatchMintV5 is SovereignBatchMint, ICreatorToken, RoyaltySplit
     }
 
     function addNewToken(string memory uri) public override onlyOwner ifNotDisabled {
-        _createToken(uri, msg.sender, getDefaultRoyaltyPercentage(), _resolveRoyaltyReceiver(msg.sender));
+        address receiver = address(royaltySplitterFactory) == address(0) ? msg.sender : getDefaultRoyaltyReceiver();
+        _createToken(uri, msg.sender, getDefaultRoyaltyPercentage(), receiver);
     }
 
     /// @dev On opt-in collections the royalty argument is the beneficiary, not a new split policy.
